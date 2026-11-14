@@ -10,8 +10,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from marsroute.layers import load_layers  # noqa: E402
-from marsroute.model import save_model, train_model  # noqa: E402
+from backend.problems.mars_route.layers import load_layers  # noqa: E402
+from backend.problems.mars_route.model import save_model, train_model  # noqa: E402
 
 
 def main() -> None:

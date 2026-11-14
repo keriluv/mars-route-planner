@@ -11,10 +11,10 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from marsroute.evaluate import evaluate_route  # noqa: E402
-from marsroute.layers import load_layers  # noqa: E402
-from marsroute.model import load_model, predict_traversability  # noqa: E402
-from marsroute.planner import astar, build_cost_surface, route_lonlat, simplify  # noqa: E402
+from backend.problems.mars_route.evaluate import evaluate_route  # noqa: E402
+from backend.problems.mars_route.layers import load_layers  # noqa: E402
+from backend.problems.mars_route.model import load_model, predict_traversability  # noqa: E402
+from backend.problems.mars_route.planner import astar, build_cost_surface, route_lonlat, simplify  # noqa: E402
 
 
 def lonlat_to_cell(lon: float, lat: float, bbox, size: int) -> tuple[int, int]:

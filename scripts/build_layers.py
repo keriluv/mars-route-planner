@@ -11,7 +11,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from marsroute.layers import build_layers, load_layers  # noqa: E402
+from backend.problems.mars_route.layers import build_layers, load_layers  # noqa: E402
 
 
 def main() -> None:

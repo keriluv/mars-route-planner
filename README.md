@@ -104,7 +104,8 @@ scripts/prepare_rems.py      parseo de REMS a CSV
 scripts/train_model.py       entrenamiento y métricas
 scripts/plan_route.py        costo, A* y evaluación
 scripts/make_maps.py         mapas y resumen ambiental
-src/marsroute/               geometría, capas, modelo, planificador, evaluación
+src/backend/problems/mars_route/  capas, modelo, planificador, evaluación y visor
+src/backend/problems/mars_environment/  parser de datos atmosféricos REMS
 data/raw/                    datos originales
 data/processed/              capas y CSV procesados
 models/                      modelo entrenado y métricas

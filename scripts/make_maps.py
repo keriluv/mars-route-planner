@@ -18,8 +18,8 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from marsroute.layers import load_layers  # noqa: E402
-from marsroute.visualize import (  # noqa: E402
+from backend.problems.mars_route.layers import load_layers  # noqa: E402
+from backend.problems.mars_route.visualize import (  # noqa: E402
     plot_context,
     plot_integrated,
     plot_layer_grid,
