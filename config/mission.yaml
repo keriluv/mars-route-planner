@@ -22,3 +22,15 @@ planner:
   caution_slope_deg: 8.0
   min_traversability: 0.0
   margin_cells: 2
+
+# Tiempo de marcha orientativo para simulaciones. El terreno reduce la velocidad
+# base según pendiente, rugosidad y riesgo; ajustar al conseguir datos de movilidad.
+simulation:
+  base_speed_kmh: 3.4
+  target_segment_hours: 1.0
+
+# Límites conservadores del prototipo indicados para el hackathon.
+oxygen:
+  hard_limit_hours: 3.0
+  contingency_reserve_hours: 0.5
+  max_exploration_hours: 2.5
