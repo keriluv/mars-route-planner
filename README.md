@@ -105,7 +105,7 @@ scripts/train_model.py       entrenamiento y métricas
 scripts/plan_route.py        costo, A* y evaluación
 scripts/make_maps.py         mapas y resumen ambiental
 src/backend/problems/mars_route/  capas, modelo, planificador, evaluación y visor
-src/backend/problems/mars_environment/  parser de datos atmosféricos REMS
+src/backend/problems/mars_conditions/  estadísticas meteorológicas y superficiales
 data/raw/                    datos originales
 data/processed/              capas y CSV procesados
 models/                      modelo entrenado y métricas
@@ -126,6 +126,8 @@ python scripts\train_model.py
 python scripts\plan_route.py
 python scripts\make_maps.py
 ```
+
+Para abrir el análisis interactivo de las condiciones meteorológicas y superficiales, ejecuta `python src\backend\problems\mars_conditions\main_statics.py` después de preparar las capas y los CSV de REMS.
 
 `download_data.py` descarga un mosaico THEMIS de 632 MB a `data/cache/` (ignorado por git) y lo recorta al área de estudio. Los archivos TAB crudos de REMS (22 MB cada uno) también se excluyen del repositorio; `prepare_rems.py` los convierte en CSV compactos.
 

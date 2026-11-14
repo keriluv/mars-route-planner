@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from backend.problems.mars_environment.rems import parse_sol  # noqa: E402
+from backend.problems.mars_conditions.rems import parse_sol  # noqa: E402
 
 SOLS = (100, 4500)
 

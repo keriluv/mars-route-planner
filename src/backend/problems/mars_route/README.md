@@ -25,4 +25,4 @@ El tiempo estimado usa `simulation.base_speed_kmh` como velocidad base y ajusta 
 
 El visor usa `data/raw/gale_context.jpg` como mapa base (contexto regional del conjunto del proyecto; fuentes de capas descritas en el README principal).
 
-Los datos atmosféricos REMS están organizados aparte en `backend/problems/mars_environment/`, porque no participan en el cálculo de rutas. Los insumos y artefactos permanecen fuera de `src/`: `data/`, `models/`, `outputs/` y `config/`.
+El análisis meteorológico y superficial está organizado aparte en `backend/problems/mars_conditions/`, porque no participa en la búsqueda de rutas. Los insumos y artefactos permanecen fuera de `src/`: `data/`, `models/`, `outputs/` y `config/`.
