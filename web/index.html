@@ -42,6 +42,7 @@
     <button class="icon-btn play" id="btnPlay" aria-label="Iniciar simulación" title="Iniciar / pausar (Espacio)" disabled>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z"/><path class="i-pause" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
     </button>
+    <button class="btn ghost" id="btnClearSimulation" type="button" hidden>Limpiar simulación</button>
     <div class="speed" role="radiogroup" aria-label="Velocidad">
       <button role="radio" aria-checked="true" data-speed="1">x1</button>
       <button role="radio" aria-checked="false" data-speed="10">x10</button>
@@ -233,8 +234,8 @@
 
         <h3>Modo de movilidad</h3>
         <div class="seg" id="mobilitySeg" role="radiogroup" aria-label="Modo de movilidad">
-          <button role="radio" aria-checked="true" data-mobility="rover">Rover presurizado</button>
-          <button role="radio" aria-checked="false" data-mobility="astronaut">EVA a pie (traje)</button>
+          <button role="radio" aria-checked="false" data-mobility="rover">Rover presurizado</button>
+          <button role="radio" aria-checked="true" data-mobility="astronaut">EVA a pie (traje)</button>
         </div>
 
         <div class="profile-metrics" id="profileMetrics" aria-live="polite">
@@ -291,6 +292,10 @@
   <section class="dock" id="dock" hidden>
     <div class="dock-plan" id="dockPlan" hidden></div>
     <div class="dock-walk" id="dockWalk" hidden>
+      <div class="walk-controls" id="walkControls">
+        <span id="walkPrompt">La ruta está preparada y pausada. Inicia cuando quieras.</span>
+        <button class="btn primary" id="btnSimStart" type="button">Iniciar simulación</button>
+      </div>
       <div class="profile" id="profile" aria-label="Perfil de altura de la ruta"></div>
       <div class="live" id="live" aria-label="Datos en vivo"></div>
     </div>

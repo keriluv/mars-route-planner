@@ -148,6 +148,31 @@
     }
   }
 
+  function makeAstronaut() {
+    const group = new THREE.Group();
+    const suit = new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.8 });
+    const trim = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 });
+    const visor = new THREE.MeshStandardMaterial({ color: 0x0b3550, metalness: 0.35, roughness: 0.25 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.58, 1.15, 12), suit);
+    body.position.y = 1.18; group.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), suit);
+    head.position.y = 2.05; group.add(head);
+    const glass = new THREE.Mesh(new THREE.SphereGeometry(0.29, 16, 10), visor);
+    glass.position.set(0, 2.06, 0.27); group.add(glass);
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.75, 0.34), trim);
+    pack.position.set(0, 1.28, -0.48); group.add(pack);
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.85, 8), suit);
+      arm.position.set(side * 0.62, 1.22, 0); arm.rotation.z = side * -0.18; group.add(arm);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.8, 8), suit);
+      leg.position.set(side * 0.22, 0.37, 0); group.add(leg);
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.48), trim);
+      boot.position.set(side * 0.22, 0.06, 0.08); group.add(boot);
+    });
+    group.userData.body = body;
+    return group;
+  }
+
   let last = {};
   S3.update = function (st) {
     if (!S3.ready) return;
@@ -168,7 +193,7 @@
       doneMesh = tube(st.route.slice(0, Math.max(2, i + 1)), 0x46c882, 0.3);
     }
     if (!astro) {
-      astro = new THREE.Mesh(new THREE.SphereGeometry(0.7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      astro = makeAstronaut();
       beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
       scene.add(astro);
       scene.add(beacon);
@@ -177,7 +202,7 @@
       const p = toXYZ(st.pos[0], st.pos[1], 0.8);
       astro.position.copy(p);
       beacon.position.set(p.x, p.y + 3, p.z);
-      astro.material.color.set(st.color || "#1E64DC");
+      astro.userData.body.material.color.set(st.color || "#1E64DC");
       astro.visible = beacon.visible = true;
       if (follow) {
         controls.target.lerp(p, 0.25);

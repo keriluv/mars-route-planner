@@ -22,13 +22,16 @@
   const ONE_WAY_MIN = 12;           // retraso de comunicación Marte → Tierra (simulado)
   const MIN_PER_SEC = 2;            // x1 = 2 minutos marcianos por segundo real
   const EVA_START = 8, EVA_END = 17;
+  const SEGMENT_HOURS = 1.5;        // duración objetivo de cada tramo, ajustada por terreno
+  let simulationSnapshot = null;
 
   function newTrip(c) {
     const base = MR.withKm(D.routes[c.main].points);
     return {
       crew: c, mode: "base", choice: "model", baseRoute: base, adjusted: null, shortRoute: null, route: null,
-      profileMode: "segura", mobility: "rover", alertTriggered: false,
-      km: 0, simMin: EVA_START * 60, playing: false, speed: 1, stages: [], stageIdx: 0,
+      profileMode: "segura", mobility: "astronaut", alertTriggered: false,
+      km: 0, simMin: EVA_START * 60, playing: false, speed: 10, stages: [], stageIdx: 0,
+      simulationId: null, simulationStarted: false,
       findings: [], missions: [], log: [], ai: [], handled: {}, events: [], proposed: {},
       unread: { misiones: 1, bitacora: 0, hallazgos: 0 }, briefed: false, wx: null, lastWx: -1e9,
       lastTele: -1e9, flags: {}, alerts: 0, detours: 0, hazards: [], lows: [], stops: [], measure: null,
@@ -64,9 +67,30 @@
     const list = regionObjectives();
     return list.find(o => o.id === c.goalId) || list[list.length - 1];
   }
-  function makeStages(route) {
-    const L = route[route.length - 1][2], n = Math.max(2, Math.min(5, Math.round(L / 14)));
-    return Array.from({ length: n }, (_, i) => (L * (i + 1)) / n);
+  function makeStages(route, mobility = T.mobility, targetHours = SEGMENT_HOURS) {
+    if (!route || route.length < 2) return [];
+    const stages = [];
+    let elapsed = 0, nextBoundary = targetHours;
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1], b = route[i];
+      const distanceKm = Math.max(0, b[2] - a[2]);
+      const midpoint = posAt(route, (a[2] + b[2]) / 2) || b;
+      const speed = mobility === "rover"
+        ? MR.roverSpeed(midpoint[4], midpoint[6])
+        : MR.walkSpeed(MR.gradeAt(route, i), midpoint[6]);
+      const inHazard = T.hazards.some(z => (a[2] + b[2]) / 2 >= z.startKm && (a[2] + b[2]) / 2 <= z.endKm);
+      const edgeHours = distanceKm / Math.max(0.2, speed * (inHazard ? 0.6 : 1));
+      const previousElapsed = elapsed;
+      elapsed += edgeHours;
+      while (nextBoundary <= elapsed && edgeHours > 0) {
+        const fraction = (nextBoundary - previousElapsed) / edgeHours;
+        stages.push(a[2] + distanceKm * Math.max(0, Math.min(1, fraction)));
+        nextBoundary += targetHours;
+      }
+    }
+    const totalKm = route[route.length - 1][2];
+    if (!stages.length || totalKm - stages[stages.length - 1] > 0.05) stages.push(totalKm);
+    return stages;
   }
   function recomputeHazards() {
     const r = activeRoute();
@@ -268,7 +292,7 @@
           closeModal();
           setRouteProfile("segura");
           const curP = curPos() || T.baseRoute[0];
-          MR.API.sendReporte({
+          if (!T.simulationId) MR.API.sendReporte({
             id: uid("rep_storm_"),
             author: T.crew.id,
             type: "alerta_clima",
@@ -670,6 +694,8 @@
 
   function bindTop() {
     $("btnPlay").addEventListener("click", togglePlay);
+    $("btnSimStart").addEventListener("click", startOrPauseSimulation);
+    $("btnClearSimulation").addEventListener("click", confirmClearSimulation);
     document.querySelectorAll(".speed button").forEach(b => b.addEventListener("click", () => setSpeed(+b.dataset.speed)));
     $("btnConditions").addEventListener("click", () => openDashboard());
     $("btnTheme").addEventListener("click", () => {
@@ -763,6 +789,8 @@
   }
   function togglePlay() {
     if (T.mode !== "walk") return;
+    if (!T.simulationStarted) return toast("Pulsa «Iniciar simulación» para comenzar la caminata.");
+    if (!$("stageCard").hidden) return;
     if (!$("modal").hidden && $("modal").classList.contains("critical")) return;
     T.playing = !T.playing;
     if (T.playing) { $("stageCard").hidden = true; }
@@ -774,10 +802,28 @@
     $("clock").textContent = time().label;
     const L = activeRoute() ? activeRoute()[activeRoute().length - 1][2] : 0;
     $("kmReadout").textContent = `${fmt(T.km)} / ${fmt(L)} km`;
-    const p = $("btnPlay"); p.disabled = T.mode !== "walk"; p.setAttribute("aria-pressed", T.playing);
+    const checkpoint = !$("stageCard").hidden;
+    const p = $("btnPlay"); p.disabled = T.mode !== "walk" || !T.simulationStarted || checkpoint; p.setAttribute("aria-pressed", T.playing);
     p.setAttribute("aria-label", T.playing ? "Pausar simulación" : "Iniciar simulación");
+    const start = $("btnSimStart");
+    if (start) {
+      start.hidden = T.mode !== "walk";
+      start.disabled = checkpoint;
+      start.textContent = T.playing ? "Pausar simulación" : T.simulationStarted ? "Continuar simulación" : "Iniciar simulación";
+      $("walkPrompt").textContent = checkpoint ? "Tramo terminado: revisa los datos y decide cómo seguir." : T.simulationStarted ? "Simulación controlada por ti; puedes pausarla cuando quieras." : "Misión aceptada. Inicia cuando estés listo.";
+    }
+    const clear = $("btnClearSimulation"); if (clear) clear.hidden = !T.simulationId;
     document.querySelectorAll(".crew button").forEach(b => b.setAttribute("aria-checked", b.dataset.id === T.crew.id));
     document.querySelectorAll(".speed button").forEach(b => b.setAttribute("aria-checked", +b.dataset.speed === T.speed));
+  }
+  function startOrPauseSimulation() {
+    if (T.mode !== "walk" || !$("stageCard").hidden) return;
+    if (!T.simulationStarted) {
+      T.simulationStarted = true;
+      logSys("Simulación de práctica iniciada por el usuario.");
+    }
+    T.playing = !T.playing;
+    renderStatus(); renderDock(true);
   }
 
   /* =====================================================
@@ -1106,11 +1152,11 @@
   function saveFinding(ll, type, note, photo) {
     const tn = FTYPES.find(x => x[0] === type)[1];
     const f = { id: uid("f"), type, typeName: tn + (note ? " · " + note.slice(0, 24) : ""), note, photo, lon: ll[0], lat: ll[1],
-      elev: MR.sample("dem", ll[0], ll[1]), simMin: T.simMin, km: T.km, fresh: true, isNew: true, crew: T.crew.id };
+      elev: MR.sample("dem", ll[0], ll[1]), simMin: T.simMin, km: T.km, fresh: true, isNew: true, crew: T.crew.id, simulationId: T.simulationId || null };
     T.findings.push(f); closePointUI(); refreshMarkers(); bump("hallazgos");
     const msg = sendToEarth(`Hallazgo · ${tn}${note ? ": " + note : ""}`, ll, "hallazgo");
-    MR.API.send("hallazgos", { ...f, photo: photo ? "[img]" : null });
-    MR.API.sendReporte({
+    if (!T.simulationId) MR.API.send("hallazgos", { ...f, photo: photo ? "[img]" : null });
+    if (!T.simulationId) MR.API.sendReporte({
       id: "rep_" + f.id,
       author: T.crew.id,
       type: "hallazgo",
@@ -1123,7 +1169,7 @@
       sync_status: "local"
     });
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Hallazgo registrado: ${tn}` });
-    toast("Guardado · enviado a la Tierra", "Deshacer", () => {
+    toast(T.simulationId ? "Hallazgo guardado en esta simulación" : "Guardado · enviado a la Tierra", "Deshacer", () => {
       T.findings = T.findings.filter(x => x !== f); T.log = T.log.filter(x => x !== msg);
       bump("hallazgos", -1); refreshMarkers(); renderPanel(); toast("Hallazgo eliminado");
     });
@@ -1211,7 +1257,7 @@
   function openMainBriefing() {
     if (T.mode !== "base") return;
     T.briefed = true;
-    const r = T.baseRoute, st = MR.routeStats(r), n = makeStages(r).length;
+    const r = T.baseRoute, st = MR.routeStats(r, T.mobility), n = makeStages(r).length;
     const minT = Math.min(MR.weather(EVA_START, st.maxElev, T.crew.profile).air, MR.weather(EVA_END, st.maxElev, T.crew.profile).air);
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg assigned">Misión asignada · Principal</span><span style="color:var(--text-2)">${T.crew.short} · ${T.crew.role}</span></div>
       <h2>${esc(T.crew.title)}</h2>
@@ -1239,15 +1285,21 @@
     T.events.push({ t: T.simMin, c: "var(--brand-red)", txt: "Misión principal aceptada" });
   }
   function acceptRoute() {
+    simulationSnapshot = {
+      trip: { ...T, findings: T.findings.map(x => ({ ...x })), missions: T.missions.map(x => ({ ...x })), log: T.log.map(x => ({ ...x })),
+        ai: T.ai.map(x => x && typeof x === "object" ? { ...x } : x), events: T.events.map(x => ({ ...x })),
+        handled: { ...T.handled }, flags: { ...T.flags }, proposed: { ...T.proposed }, unread: { ...T.unread },
+        stops: T.stops.map(x => x && typeof x === "object" ? { ...x } : x), hazards: T.hazards.map(x => ({ ...x })), lows: T.lows.map(x => ({ ...x })) }
+    };
+    T.simulationId = uid("sim"); T.simulationStarted = false;
     T.route = MR.withKm(planRoute().map(p => p.slice()));
     T.mode = "walk"; T.km = 0; T.stages = makeStages(T.route); T.stageIdx = 0; T.playing = false;
     recomputeHazards(); setLeft(false);
     renderAll(); renderRoutes();
     const p = curPos(); MR.Map.centerOn(p[0], p[1], 1.5);
-    banner({ kind: "ok", title: "Ruta aceptada · simulación en pausa", sub: "Pulsa ▶ (Espacio) para empezar a caminar.", ttl: 6000 });
+    banner({ kind: "ok", title: "Ruta aceptada · lista para simular", sub: "Pulsa «Iniciar simulación» cuando estés listo. Habrá una parada de decisión al final de cada tramo.", ttl: 6000 });
     logSys(`Ruta aceptada (${T.choice === "short" ? "ruta corta" : T.adjusted ? "ruta ajustada" : "ruta del modelo"}): ${fmt(T.route[T.route.length - 1][2])} km.`);
     T.events.push({ t: T.simMin, c: "var(--accent)", txt: "Inicio del recorrido" });
-    MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "en curso", km: T.route[T.route.length - 1][2] });
   }
 
   // Misión propia (editable)
@@ -1331,7 +1383,7 @@
     }
     logSys(`Misión secundaria aceptada: ${m.name}.`);
     T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secundaria aceptada: ${m.name}` });
-    MR.API.send("misiones", { crew: T.crew.id, kind: "secundaria", name: m.name, origin: m.origin, lon: m.lon, lat: m.lat, status: m.status });
+    if (!T.simulationId) MR.API.send("misiones", { crew: T.crew.id, kind: "secundaria", name: m.name, origin: m.origin, lon: m.lon, lat: m.lat, status: m.status });
     renderStops(); renderRoutes(); refreshMarkers(); renderPanel(); renderDock(true); renderStatus(); update3d();
   }
 
@@ -1391,6 +1443,28 @@
     });
   }
 
+  function confirmClearSimulation() {
+    if (!T.simulationId || !simulationSnapshot) return;
+    showModal(`<div class="mhead"><h2>¿Limpiar la simulación?</h2></div><div class="mbody">
+      <p class="who">Se quitarán del mapa el recorrido y los hallazgos de esta prueba. Los datos guardados antes de iniciarla se conservan.</p>
+      <div class="actions"><button class="btn" data-c data-focus>Seguir aquí</button><button class="btn danger" data-y>Limpiar simulación</button></div></div>`, {
+      dismiss: false,
+      bind: m => {
+        m.querySelector("[data-c]").addEventListener("click", closeModal);
+        m.querySelector("[data-y]").addEventListener("click", () => {
+          closeModal();
+          T = simulationSnapshot.trip;
+          trips[T.crew.id] = T;
+          simulationSnapshot = null;
+          $("stageCard").hidden = true;
+          closePointUI();
+          renderAll(true); MR.Map.fit();
+          toast("Simulación limpiada; datos previos conservados.");
+        });
+      },
+    });
+  }
+
   /* =====================================================
      AVISOS: banner (arriba), tarjeta de etapa (abajo), toast
      ===================================================== */
@@ -1423,26 +1497,41 @@
         <p>${fmt(T.km)} km recorridos · quedan ${fmt(L - T.km)} km. Caminar de noche no está permitido.</p>
         <div class="next"><div class="stat"><span class="v num">${fmt(night, 0)} °C</span><span class="k">mínima esta noche</span></div>
         <div class="stat"><span class="v num">${nxt.label}</span><span class="k">reanudación</span></div></div>
-        <div class="actions"><button class="btn primary" data-r>Descansar hasta las 08:00</button></div>`;
+        <div class="actions"><button class="btn primary" data-r>Descansar hasta las 08:00</button><button class="btn danger" data-ab>Abortar misión</button></div>`;
       card.querySelector("[data-r]").addEventListener("click", () => { restUntilMorning(); });
+      card.querySelector("[data-ab]").addEventListener("click", () => confirmAbort());
     } else {
-      const done = T.stageIdx; const a = T.stages[done - 1] || 0, b = T.stages[done] || L;
-      const seg = T.route.filter(p => p[2] >= a && p[2] <= b);
+      const done = T.stageIdx; const a = T.stages[done - 2] || 0, b = T.stages[done - 1] || L;
+      const seg = [posAt(T.route, a), ...T.route.filter(p => p[2] > a && p[2] < b), posAt(T.route, b)].filter(Boolean);
       const gain = seg.length ? seg[seg.length - 1][3] - seg[0][3] : 0;
       const hz = T.hazards.filter(z => z.startKm >= a && z.startKm <= b).length;
-      const h = seg.length > 1 ? MR.estimateHours(MR.withKm(seg)) : 0;
-      const minT = MR.weather(Math.min(EVA_END, time().hour + h), seg.length ? Math.max(...seg.map(p => p[3])) : 0, T.crew.profile).air;
+      const h = seg.length > 1 ? MR.estimateHours(MR.withKm(seg), T.mobility) : 0;
+      const slope = seg.length ? seg.reduce((sum, p) => sum + (p[4] || 0), 0) / seg.length : 0;
+      const rough = seg.length ? seg.reduce((sum, p) => sum + (p[5] || 0), 0) / seg.length : 0;
+      const trav = seg.length ? seg.reduce((sum, p) => sum + (p[6] || 0), 0) / seg.length : 0;
+      const difficulty = slope > 12 || rough > 15 || trav < 0.4 || hz >= 2 ? "Difícil" : slope > 7 || rough > 8 || trav < 0.65 || hz ? "Media" : "Fácil";
+      const reason = difficulty === "Difícil" ? `pendiente ${fmt(slope, 1)}°, rugosidad ${fmt(rough, 1)} m y facilidad de paso ${fmt(trav, 2)}`
+        : difficulty === "Media" ? `pendiente ${fmt(slope, 1)}°, rugosidad ${fmt(rough, 1)} m y facilidad de paso ${fmt(trav, 2)}`
+          : `pendiente moderada (${fmt(slope, 1)}°), rugosidad ${fmt(rough, 1)} m y buen paso (${fmt(trav, 2)})`;
+      const here = curPos() || T.route[0], wx = T.wx || MR.weather(time().hour, here[3], T.crew.profile);
       card.innerHTML = `<h3>${MR.ICONS.ok} Etapa ${done} de ${n} completada</h3>
-        <p>${fmt(T.km)} km · quedan ${fmt(L - T.km)} km</p>
-        <div class="next"><div class="stat"><span class="v num">${gain >= 0 ? "+" : ""}${fmt(gain, 0)} m</span><span class="k">desnivel próximo tramo</span></div>
+        <p>${fmt(T.km)} km recorridos · quedan ${fmt(L - T.km)} km · ${fmt(b - a, 1)} km en este tramo</p>
+        <p><b>Terreno ${difficulty.toLowerCase()}:</b> ${reason}${hz ? `; ${hz} zona(s) empinada(s) identificada(s)` : ""}.</p>
+        <div class="next"><div class="stat"><span class="v num">${gain >= 0 ? "+" : ""}${fmt(gain, 0)} m</span><span class="k">desnivel de este tramo</span></div>
           <div class="stat"><span class="v num">${fmt(h, 1)} h</span><span class="k">tiempo estimado</span></div>
-          <div class="stat"><span class="v num">${fmt(minT, 0)} °C</span><span class="k">al final del tramo</span></div>
-          <div class="stat"><span class="v num">${hz}</span><span class="k">tramos empinados</span></div></div>
-        <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn primary" data-c>Continuar</button></div>`;
+          <div class="stat"><span class="v num">${fmt(wx.air, 0)} °C</span><span class="k">aire actual</span></div>
+          <div class="stat"><span class="v num">${fmt(wx.uv, 1)}</span><span class="k">índice UV</span></div>
+          <div class="stat"><span class="v num">${fmt(wx.p, 1)} Pa</span><span class="k">presión estimada</span></div>
+          <div class="stat"><span class="v num">${fmt(here[3], 0)} m</span><span class="k">elevación actual</span></div>
+          <div class="stat"><span class="v num">${fmt(rough, 1)} m</span><span class="k">rugosidad media</span></div></div>
+        <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn" data-f>Registrar hallazgo</button><button class="btn primary" data-c>Continuar tramo</button><button class="btn danger" data-ab>Abortar misión</button></div>`;
       card.querySelector("[data-r]").addEventListener("click", () => { T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h."); renderStatus(); updateWeather(true); });
       card.querySelector("[data-c]").addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
+      card.querySelector("[data-f]").addEventListener("click", () => { if (S.view !== "2d") setView("2d"); openFindingForm([here[0], here[1]]); });
+      card.querySelector("[data-ab]").addEventListener("click", () => confirmAbort());
     }
     card.hidden = false;
+    renderStatus();
     card.querySelector(".btn.primary").focus({ preventScroll: true });
   }
   function restUntilMorning() {
@@ -1492,13 +1581,11 @@
     T.km = Math.min(L, T.km + (v * dMin) / 60); T.simMin += dMin;
     // datos de condiciones cada 10 min marcianos
     if (T.simMin - T.lastWx >= 10) updateWeather();
-    if (T.simMin - T.lastTele >= 30) { T.lastTele = T.simMin; const p = curPos(); MR.API.send("telemetria", { crew: T.crew.id, t: T.simMin, km: T.km, lon: p[0], lat: p[1], elev: p[3], wx: T.wx }); }
+    if (T.simMin - T.lastTele >= 30) { T.lastTele = T.simMin; const p = curPos(); if (!T.simulationId) MR.API.send("telemetria", { crew: T.crew.id, t: T.simMin, km: T.km, lon: p[0], lat: p[1], elev: p[3], wx: T.wx }); }
     checkEvents(L);
   }
   function checkEvents(L) {
     const h = time().hour;
-    // llegada
-    if (T.km >= L - 0.005) return arrive();
     // evento meteorológico crítico reproducible a las 11:30 LTST
     if (!T.handled["mda_storm_1130"] && time().hour === 11 && time().minute >= 30) {
       T.handled["mda_storm_1130"] = 1;
@@ -1512,11 +1599,13 @@
     const lz = T.lows.find(z => !T.handled[z.id] && z.startKm - T.km <= 0.4 && z.endKm >= T.km);
     if (lz) { T.handled[lz.id] = 1; banner({ kind: "warn", title: `Terreno difícil en ${fmt(Math.max(0, (lz.startKm - T.km) * 1000), 0)} m`, sub: `Facilidad de paso ${fmt(lz.min, 2)} · se reduce el ritmo`, onClick: () => { const p = posAt(T.route, lz.startKm); MR.Map.centerOn(p[0], p[1], 3); } }); }
     // fin de etapa
-    if (T.stageIdx < T.stages.length - 1 && T.km >= T.stages[T.stageIdx]) {
+    if (T.stageIdx < T.stages.length && T.km >= T.stages[T.stageIdx]) {
       T.stageIdx++; T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Etapa ${T.stageIdx} completada` });
       logSys(`Etapa ${T.stageIdx} de ${T.stages.length} completada en km ${fmt(T.km)}.`);
       return stageCard("stage");
     }
+    // En la última parada, la llegada se confirma después de que el usuario continúe.
+    if (T.km >= L - 0.005 && T.stageIdx >= T.stages.length) return arrive();
     // ventana EVA
     if (h >= EVA_END - 1 && !T.flags["eva1h_" + time().sol]) { T.flags["eva1h_" + time().sol] = true; banner({ kind: "warn", title: "Queda 1 h de jornada EVA", sub: `A las ${EVA_END}:00 se detiene el recorrido`, ttl: 6000 }); }
     if (h >= EVA_END || h < EVA_START) return stageCard("night");
@@ -1571,7 +1660,7 @@
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: "Meta alcanzada" });
     logSys(`Meta alcanzada: ${goalObj().name}.`);
     sendToEarth(`Llegamos a la meta: ${goalObj().name}. Coordenadas confirmadas.`, [goalObj().lon, goalObj().lat], "estado");
-    MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "completada" });
+    if (!T.simulationId) MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "completada" });
     renderAll();
     setTimeout(openSummary, MR.reduceMotion() ? 0 : 700);
   }
@@ -1582,7 +1671,7 @@
   function sendToEarth(text, ll, kind = "texto") {
     const m = { id: uid("l"), from: "me", text, t: T.simMin, arrive: T.simMin + ONE_WAY_MIN, ll, kind };
     T.log.push(m);
-    MR.API.send("bitacora", { crew: T.crew.id, from: "explorador", text, t: T.simMin, lon: ll && ll[0], lat: ll && ll[1], kind });
+    if (!T.simulationId) MR.API.send("bitacora", { crew: T.crew.id, from: "explorador", text, t: T.simMin, lon: ll && ll[0], lat: ll && ll[1], kind });
     // respuesta de la Tierra: llega tras ida + vuelta + 6 min de análisis
     const reply = kind === "hallazgo" ? `Recibido: «${text.replace("Hallazgo · ", "")}». Excelente; guarden la muestra y registren contexto.`
       : kind === "mision" ? `Recibido: ${text}. De acuerdo, prioridad media.` : kind === "estado" ? "¡Felicitaciones a toda la tripulación! Recibido en la Tierra." :
@@ -1625,7 +1714,7 @@
       const q2 = p || R[0]; const o = D.objetivos.filter(o => !["base"].includes(o.type)).map(o => [o, MR.distKm(q2, [o.lon, o.lat])]).sort((a, b) => a[1] - b[1])[0];
       a = `El objetivo más cercano es «${o[0].name}» a ${fmt(o[1])} km. ${o[0].note}`;
     } else if (/ruta|[oó]ptim|por qu[eé]/.test(s)) {
-      const st = MR.routeStats(R);
+      const st = MR.routeStats(R, T.mobility);
       a = `La ruta actual mide ${fmt(st.length)} km con pendiente media ${fmt(st.meanSlope)}° y facilidad media ${fmt(st.meanTrav, 2)}. El modelo prefiere rodear por terreno parecido al que Curiosity ya cruzó, aunque sea más larga.`;
     } else a = "Puedo responder sobre: distancia restante, próximo peligro, condiciones, tu posición, objetivos cercanos o por qué esta ruta.";
     T.ai.push({ from: "them", text: a, t: T.simMin });
@@ -1770,7 +1859,7 @@
   }
   function renderPlanCards() {
     const A = T.adjusted || T.baseRoute, B = T.shortRoute;
-    const sa = MR.routeStats(A), sb = B ? MR.routeStats(B) : null;
+    const sa = MR.routeStats(A, T.mobility), sb = B ? MR.routeStats(B, T.mobility) : null;
     const card = (key, title, st, why, bad) => `<button class="rcard" role="radio" aria-checked="${T.choice === key}" data-k="${key}">
       <header><b>${title}</b>${key === "model" ? '<span class="badge ok">Recomendada</span>' : '<span class="badge warn">Más riesgo</span>'}</header>
       <div class="stats"><div class="stat"><span class="v">${fmt(st.length, 1)}</span><span class="k">km</span></div>
@@ -2055,7 +2144,7 @@
   function dashTerrain(body) {
     const A = T.mode === "walk" || T.mode === "done" ? T.route : T.adjusted || T.baseRoute;
     const B = T.crew.main === "summit" ? MR.withKm(D.routes.summit_short.points) : T.shortRoute;
-    const sa = MR.routeStats(A), sb = B ? MR.routeStats(B) : null;
+    const sa = MR.routeStats(A, T.mobility), sb = B ? MR.routeStats(B, T.mobility) : null;
     const rows = [["Longitud", "length", " km", 1, "min"], ["Horas de caminata (est.)", "hours", " h", 1, "min"], ["Pendiente media", "meanSlope", "°", 1, "min"], ["Pendiente máxima", "maxSlope", "°", 1, "min"],
       ["Rugosidad media", "meanRough", " m", 1, "min"], ["Facilidad de paso media", "meanTrav", "", 2, "max"], ["Tramos sobre el umbral", "hazards", "", 0, "min"], ["Trayecto con paso difícil", "lowFrac", " %", 0, "min", 100]];
     const cell = (st, other, r) => { const v = st[r[1]] * (r[5] || 1); const o = other ? other[r[1]] * (r[5] || 1) : null;
@@ -2107,7 +2196,7 @@
      VISTA COMPLETA — Resumen automático
      ===================================================== */
   function openSummary() {
-    const el = $("summary"), R = T.route, st = MR.routeStats(R);
+    const el = $("summary"), R = T.route, st = MR.routeStats(R, T.mobility);
     const sols = Math.floor(T.simMin / 1440) + 1, sec = T.missions.filter(m => m.status === "completada").length;
     const hrs = (T.simMin - EVA_START * 60) / 60;
     el.innerHTML = `<header class="fv-head"><button class="btn" data-back>↩ Volver al mapa</button><div><h2>Resumen de la misión</h2><div class="sub">${T.crew.short} · ${T.crew.role}</div></div></header>

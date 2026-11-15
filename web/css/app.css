@@ -642,6 +642,12 @@ body[data-mode="walk"] .sidepanel { bottom: 156px; }
 .dock-walk {
   width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end;
 }
+.walk-controls {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r-m); background: var(--panel); box-shadow: var(--shadow);
+}
+.walk-controls span { color: var(--text-2); font-size: 13px; }
+.walk-controls button { min-width: 180px; }
 .profile {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-l); box-shadow: var(--shadow);
   height: 132px; padding: 8px 10px 4px; min-width: 0; position: relative;
