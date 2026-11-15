@@ -236,55 +236,37 @@
     T.playing = false; renderStatus(); T.alerts++;
     if (S.panel) togglePanel(null);
     $("stageCard").hidden = true;
-    T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Alerta crítica: tormenta de polvo MDA-GALE-14" });
-    logSys("ALERTA CRÍTICA MDA-GALE-14: Viento 28.4 m/s (umbral: 20 m/s), Opacidad tau 2.15 (umbral: 1.50).");
+    T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Alerta simulada: tormenta de polvo" });
+    logSys("Alerta simulada: viento 28.4 m/s y opacidad tau 2.15 en un escenario hipotético.");
 
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta meteorológica crítica · Simulación pausada</span></div>
-      <h2>${MR.ICONS.warn}Tormenta de polvo y viento en MDA-GALE-14</h2>
-      <div class="coords" style="color:var(--text-2);font-size:12px;margin-top:2px">Sol 1 · 11:30 LTST · Estación Gale (137.48°E, -4.68°S)</div></div>
+      <h2>${MR.ICONS.warn}Tormenta de polvo y viento simulada</h2>
+      <div class="coords" style="color:var(--text-2);font-size:12px;margin-top:2px">Escenario hipotético · no es una observación meteorológica en tiempo real</div></div>
       <div class="mbody">
         ${factsHtml([
-          ["28,4 m/s", "Viento (Crítico > 20 m/s)"],
-          ["2,15", "Opacidad \u03c4 (Crítico > 1.50)"],
+          ["28,4 m/s", "Viento simulado"],
+          ["2,15", "Opacidad \u03c4 simulada"],
           ["−64 °C", "Temp. ambiente"],
           ["Dunas Bagnold", "Corredor impactado"]
         ])}
         <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--danger);background:var(--panel-2);border-radius:4px">
-          <strong>Explicación del sistema predictivo:</strong><br>
-          La estación MDA-GALE-14 reporta ráfagas severas y caída de visibilidad directa sobre el corredor de Bagnold Dunes.
-          El cruce directo presenta alto riesgo de abrasión y atascamiento del vehículo.
-          <br><strong>Recomendación:</strong> Replanificar de inmediato activando el <em>Perfil Seguro</em> para rodear la tormenta hacia Mount Sharp Base.
+          La simulación plantea ráfagas y polvo en el corredor. La replanificación teniendo en cuenta los recursos restantes y la tormenta aún no está disponible.
         </div>
         <div class="actions" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
           <button class="btn ghost" data-ignore>Mantener rumbo actual</button>
-          <button class="btn primary" data-replan>Replanificar ruta segura</button>
+          <button class="btn primary" data-pause>Dejar en pausa</button>
         </div>
       </div>`, {
       cls: "critical", dismiss: false,
       bind: el => {
         el.querySelector("[data-ignore]").addEventListener("click", () => {
           closeModal();
-          banner({ kind: "warn", title: "Alerta ignorada por el operador", sub: "Riesgo de daño en sensores y atasco en Bagnold Dunes.", ttl: 5000 });
+          banner({ kind: "warn", title: "Alerta simulada ignorada", sub: "Se conserva la ruta anterior; las condiciones no se han incorporado a su evaluación.", ttl: 5000 });
           T.playing = true; renderStatus();
         });
-        el.querySelector("[data-replan]").addEventListener("click", () => {
+        el.querySelector("[data-pause]").addEventListener("click", () => {
           closeModal();
-          setRouteProfile("segura");
-          const curP = curPos() || T.baseRoute[0];
-          MR.API.sendReporte({
-            id: uid("rep_storm_"),
-            author: T.crew.id,
-            type: "alerta_clima",
-            lon: curP[0],
-            lat: curP[1],
-            elev: curP[3] || -4400,
-            km: T.km,
-            text: "Replanificación de emergencia por tormenta de polvo MDA-GALE-14 (viento 28.4 m/s, tau 2.15)",
-            attachments: { wind: 28.4, tau: 2.15, simMin: T.simMin, station: "MDA-GALE-14" },
-            sync_status: "local"
-          });
-          toast("Ruta replanificada: corredor este seguro hacia Mount Sharp Base");
-          banner({ kind: "nominal", title: "Ruta replanificada con éxito", sub: "Evitando corredor de tormenta en MDA-GALE-14 · Refugio seguro verificado.", ttl: 6000 });
+          toast("Simulación en pausa; replanificación validada pendiente.");
         });
       }
     });

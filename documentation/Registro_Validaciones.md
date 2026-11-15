@@ -2,6 +2,8 @@
 
 ## Precisión de recursos EVA
 
+La alerta de tormenta identifica sus valores como escenario hipotético y ya no anuncia una replanificación inexistente ni registra un reporte que la afirme. El usuario puede dejar la simulación en pausa o continuar por la ruta anterior, que no incorpora la tormenta. La replanificación requiere todavía un balance acumulado de recursos y una evaluación ambiental coherente; este flujo no se ha probado visualmente en navegador.
+
 Al aceptar una ruta se copian sus puntos y distancias del servidor sin recalcularlos en el cliente. La aprobación rechaza puntos incompletos, valores no finitos y distancias acumuladas decrecientes. `tests/test_route_validation.cjs` verifica la copia y el rechazo. Los cambios de ruta locales durante la marcha están deshabilitados hasta que exista validación integral del recorrido restante; la simulación se pausa y las misiones secundarias permanecen propuestas. La alerta permite continuar por la ruta anterior bajo decisión del usuario o abortar. Falta verificar estos flujos en navegador.
 
 La comprobación del refugio utiliza el centro de la celda final realmente devuelto por A*, en lugar de la coordenada solicitada. `tests/test_planner_safety.py` cubre el caso en que el ajuste de grilla sitúa ese punto fuera del radio permitido. La respuesta incluye coordenadas solicitadas, centros de celda y distancias de ajuste; el panel muestra las distancias antes de aceptar la ruta. No se ha comprobado visualmente este flujo en navegador.
