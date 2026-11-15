@@ -165,6 +165,22 @@
     const tob = 6 * Math.exp(-3.5 * Math.abs(grade + 0.05));
     return Math.max(0.4, tob * 0.55 * (1 - 0.35 * (1 - trav)));
   };
+  // Tasas demostrativas compartidas con el modelo EVA del servidor.
+  MR.consumeEvaResources = function (state, minutes, grade = 0) {
+    if (!state || ![state.oxygen_pct, state.battery_pct, state.eva_time_min,
+      state.radiation_dose_msv, minutes, grade].every(Number.isFinite) ||
+      state.oxygen_pct < 0 || state.oxygen_pct > 100 || state.battery_pct < 0 ||
+      state.battery_pct > 100 || state.eva_time_min < 0 || state.radiation_dose_msv < 0 || minutes < 0) {
+      throw new RangeError("Estado o duración EVA inválidos");
+    }
+    const oxygenRate = 1.2 * (grade > 0.14 ? 1.3 : 1);
+    return {
+      oxygen_pct: Math.max(0, state.oxygen_pct - oxygenRate * minutes / 576 * 100),
+      battery_pct: Math.max(0, state.battery_pct - minutes / 60 * 12),
+      eva_time_min: state.eva_time_min + minutes,
+      radiation_dose_msv: state.radiation_dose_msv + minutes / 60 * 0.025,
+    };
+  };
   MR.gradeAt = function (pts, i) {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
     const d = (b[2] - a[2]) * 1000;

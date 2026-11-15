@@ -2,6 +2,8 @@
 
 ## Precisión de recursos EVA
 
+`MR.consumeEvaResources` calcula consumo por minutos con las tasas demostrativas del servidor, incluyendo mayor consumo de oxígeno en pendientes ascendentes y descanso sin pendiente. `tests/test_eva_estimates.cjs` comprueba acumulación, inmutabilidad y entradas inválidas. Es una función preparatoria aún no conectada al reloj: falta definir cómo representar el descanso nocturno, el refugio y cualquier reposición, y evitar divergencias entre las constantes de cliente y servidor.
+
 Las estimaciones locales de duración y recursos usan por defecto la caminata EVA; antes algunas llamadas sin modo explícito utilizaban velocidad de rover. `tests/test_eva_estimates.cjs` verifica el comportamiento predeterminado. Estas estimaciones locales siguen siendo provisionales y difieren del cálculo del servidor.
 
 El cálculo de recursos admite un estado inicial explícito y acumula consumo, tiempo y dosis sobre él; valida reservas y exposición iniciales. El planificador puede usar ese estado al evaluar una o varias alternativas. La API acepta opcionalmente `initial_resources` con los cuatro campos numéricos obligatorios `oxygen_pct`, `battery_pct`, `eva_time_min` y `radiation_dose_msv`; omitirlo conserva el comportamiento de una EVA nueva. `tests/test_eva_resources.py` compara una ruta completa con dos tramos sucesivos; las pruebas del planificador y la API comprueban reservas insuficientes y entradas inválidas. La simulación todavía no mantiene ni suministra ese estado para replanificar, y la API no verifica su procedencia.
