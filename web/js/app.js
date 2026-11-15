@@ -309,6 +309,16 @@
   function renderProfileMetrics() {
     const box = $("profileMetrics");
     if (!box) return;
+    if (T.mode === "walk" && T.evaResources) {
+      const state = T.evaResources;
+      box.innerHTML = `<p>Balance acumulado EVA · simulación demostrativa</p>
+        <p>Tiempo transcurrido: ${fmt(state.eva_time_min, 1)} min</p>
+        <p>Oxígeno restante: ${fmt(state.oxygen_pct, 1)}%</p>
+        <p>Batería restante: ${fmt(state.battery_pct, 1)}%</p>
+        <p>Dosis acumulada: ${fmt(state.radiation_dose_msv, 3)} mSv</p>
+        <p>La ruta restante aún no se ha reevaluado con este balance ni con el clima.</p>`;
+      return;
+    }
     const r = activeRoute() || T.baseRoute;
     if (MR.routeApproval.matches(T.approval, planRoute(), currentRegion, T.profileMode)) {
       const resources = T.approval.resources;
@@ -1455,7 +1465,7 @@
           <div class="stat"><span class="v num">${fmt(minT, 0)} °C</span><span class="k">al final del tramo</span></div>
           <div class="stat"><span class="v num">${hz}</span><span class="k">tramos empinados</span></div></div>
         <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn primary" data-c>Continuar</button></div>`;
-      card.querySelector("[data-r]").addEventListener("click", () => { T.evaResources = MR.consumeEvaResources(T.evaResources, 60); T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h; recursos EVA consumidos."); renderStatus(); updateWeather(true); if (MR.evaResourcesExhausted(T.evaResources)) toast("EVA en pausa: autonomía demostrativa agotada."); });
+      card.querySelector("[data-r]").addEventListener("click", () => { T.evaResources = MR.consumeEvaResources(T.evaResources, 60); T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h; recursos EVA consumidos."); renderStatus(); renderProfileMetrics(); updateWeather(true); if (MR.evaResourcesExhausted(T.evaResources)) toast("EVA en pausa: autonomía demostrativa agotada."); });
       card.querySelector("[data-c]").addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
     }
     card.hidden = false;
@@ -1485,7 +1495,7 @@
         }
         renderStatus(); renderLive();
       }
-      if (now - lastProfile > 700) { lastProfile = now; renderProfile(); if (S.panel === "misiones") renderPanel(); }
+      if (now - lastProfile > 700) { lastProfile = now; renderProfile(); renderProfileMetrics(); if (S.panel === "misiones") renderPanel(); }
     }
     requestAnimationFrame(loop);
   }
@@ -1499,7 +1509,7 @@
     T.evaResources = MR.consumeEvaResources(T.evaResources, dMin, grade);
     T.km = Math.min(L, T.km + (v * dMin) / 60); T.simMin += dMin;
     if (MR.evaResourcesExhausted(T.evaResources)) {
-      T.playing = false; renderStatus(); toast("EVA en pausa: autonomía demostrativa agotada."); return;
+      T.playing = false; renderStatus(); renderProfileMetrics(); toast("EVA en pausa: autonomía demostrativa agotada."); return;
     }
     // datos de condiciones cada 10 min marcianos
     if (T.simMin - T.lastWx >= 10) updateWeather();
