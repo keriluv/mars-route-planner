@@ -2,6 +2,8 @@
 
 ## Precisión de recursos EVA
 
+La comprobación del refugio utiliza el centro de la celda final realmente devuelto por A*, en lugar de la coordenada solicitada. `tests/test_planner_safety.py` cubre el caso en que el ajuste de grilla sitúa ese punto fuera del radio permitido. La ruta sigue aproximando las paradas a centros de celda; falta comunicar explícitamente al usuario el desplazamiento de cada parada.
+
 Las restricciones de oxígeno, batería, tiempo y radiación se evalúan con los valores de recursos sin redondear. Se eliminó del cálculo EVA el modelo heredado de rover presurizado; solo admite astronautas. `tests/test_eva_resources.py` comprueba una reserva de 24,96 % frente al umbral del 25 % y el rechazo del modelo de rover. La ruta densa conserva la precisión de distancia, elevación y transitabilidad para calcular esos recursos; `tests/test_planner_safety.py` verifica esa precisión. Los parámetros siguen siendo demostrativos, no validados científicamente.
 
 ## Persistencia de reportes sin conexión

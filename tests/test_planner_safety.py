@@ -70,3 +70,15 @@ def test_route_keeps_measurement_precision_for_resource_calculation():
     assert result.points[-1][3] == pytest.approx(0.046)
     assert result.points[-1][6] == pytest.approx(0.9876)
     assert result.estimated_hours * 60 == pytest.approx(result.resources.eva_time_min)
+
+
+def test_shelter_check_uses_actual_grid_endpoint():
+    layers = {"dem": np.zeros((5, 5)), "slope": np.zeros((5, 5)),
+              "traversability": np.ones((5, 5))}
+    planner = MultiCriteriaPlanner(layers, (137.4, -4.8, 137.6, -4.6), 5)
+    requested = (137.441, -4.641)
+    result = planner.plan_alternative("segura", (137.44, -4.64), [], requested,
+                                      [{"lon": requested[0], "lat": requested[1], "name": "Refugio"}])
+    assert not result.is_valid
+    assert "no es un refugio" in result.rejection_reason
+    assert result.explanation["refugio_alcanzado"] == "Ninguno"

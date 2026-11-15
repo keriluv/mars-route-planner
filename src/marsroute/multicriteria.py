@@ -230,7 +230,9 @@ class MultiCriteriaPlanner:
         is_valid = True
         rejection_reason = None
 
-        final_dest = all_stops[-1]
+        # A* termina en el centro de la celda, no necesariamente en la
+        # coordenada solicitada. Validar el punto que devolverá la ruta.
+        final_dest = route_lonlat(np.asarray([cells[-1]], dtype="int32"), self.bbox, self.grid_size)[0]
         matched_shelter = check_shelter_proximity(final_dest[0], final_dest[1], shelters_catalog)
         if require_final_shelter and not matched_shelter:
             is_valid = False
