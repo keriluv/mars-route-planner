@@ -668,10 +668,46 @@
   // Exponer para interacción Three.js 3D
   MR.openMineralModal = openMineralModal;
 
+  function openRoverMaps() {
+    const maps = {
+      curiosity: { name: "Curiosity", region: "Gale", map: "https://mars.nasa.gov/maps/location/?mission=MSL&site=NOW", source: "https://science.nasa.gov/mission/msl-curiosity/location-map/" },
+      perseverance: { name: "Perseverance", region: "Jezero", map: "https://mars.nasa.gov/maps/location/?mission=M20&site=NOW", source: "https://science.nasa.gov/mission/mars-2020-perseverance/location-map/" }
+    };
+    showModal(`<div class="mhead rover-map-head"><h2>Ubicación de los rovers</h2>
+      <p class="who">Mapas oficiales de NASA: última posición publicada y recorrido. Los datos pueden tener retraso; no son telemetría en directo. Requieren conexión a internet.</p></div>
+      <div class="mbody rover-map-body">
+        <div class="rover-map-controls" role="group" aria-label="Seleccionar rover">
+          <button class="btn" type="button" data-rover="curiosity">Curiosity · Gale</button>
+          <button class="btn" type="button" data-rover="perseverance">Perseverance · Jezero</button>
+          <a class="btn" data-source target="_blank" rel="noopener noreferrer">Abrir página de NASA ↗</a>
+        </div>
+        <p class="who rover-map-note">Si el mapa no carga, comprueba tu conexión o abre la página oficial de NASA.</p>
+        <iframe class="rover-map-frame" title="Mapa oficial de ubicación del rover" loading="lazy" referrerpolicy="no-referrer"></iframe>
+        <div class="actions"><button class="btn" type="button" data-close>Cerrar</button></div>
+      </div>`, {
+      cls: "rover-map-modal",
+      onClose: () => { const frame = $("modal").querySelector("iframe"); if (frame) frame.removeAttribute("src"); },
+      bind: el => {
+        const frame = el.querySelector("iframe"), source = el.querySelector("[data-source]");
+        function select(id) {
+          const rover = maps[id];
+          frame.src = rover.map;
+          frame.title = `Mapa oficial de ${rover.name} en ${rover.region}`;
+          source.href = rover.source;
+          el.querySelectorAll("[data-rover]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.rover === id)));
+        }
+        el.querySelectorAll("[data-rover]").forEach(b => b.addEventListener("click", () => select(b.dataset.rover)));
+        el.querySelector("[data-close]").addEventListener("click", closeModal);
+        select(currentRegion === "jezero" ? "perseverance" : "curiosity");
+      }
+    });
+  }
+
   function bindTop() {
     $("btnPlay").addEventListener("click", togglePlay);
     document.querySelectorAll(".speed button").forEach(b => b.addEventListener("click", () => setSpeed(+b.dataset.speed)));
     $("btnConditions").addEventListener("click", () => openDashboard());
+    $("btnRovers").addEventListener("click", openRoverMaps);
     $("btnTheme").addEventListener("click", () => {
       const n = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = n; MR.store.set("theme", n); renderDock(true);

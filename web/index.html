@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https://trek.nasa.gov; connect-src 'self' https://trek.nasa.gov; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https://trek.nasa.gov; connect-src 'self' https://trek.nasa.gov; frame-src https://mars.nasa.gov; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Ruta segura a Mount Sharp · Planificador predictivo de recorridos en Marte</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,6 +57,7 @@
     <button class="icon-btn lang-btn" id="btnLang" title="Idioma: Español / English" aria-label="Cambiar idioma">
       <span id="langLabel">ES</span>
     </button>
+    <button class="icon-btn" id="btnRovers" title="Ubicación publicada de los rovers" aria-label="Ver mapas oficiales de los rovers">Rovers</button>
     <button class="icon-btn" id="btnConditions" title="Condiciones (D)" aria-label="Ver condiciones">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 16V9m4 7V5m4 11v-5m4 5V7" /></svg><span>Condiciones</span></button>
     <button class="icon-btn" id="btnTheme" title="Tema claro / oscuro" aria-label="Cambiar tema">
