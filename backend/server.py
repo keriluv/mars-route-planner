@@ -332,6 +332,11 @@ class Handler(BaseHTTPRequestHandler):
                 if name == "scenario":
                     scen_file = ROOT / "data" / "simulated" / "demo_scenario.json"
                     return self._json(200, json.loads(scen_file.read_text(encoding="utf-8")) if scen_file.exists() else {})
+                if name in ("rover-validation", "validacion-rovers"):
+                    vfile = ROOT / "outputs" / "validacion_rovers.json"
+                    if not vfile.exists():
+                        vfile = ROOT / "web" / "data" / "rover_validation.json"
+                    return self._json(200, json.loads(vfile.read_text(encoding="utf-8")) if vfile.exists() else {})
                 if name == "reportes":
                     reports = storage.list_reports(q.get("author") or q.get("autor"))
                     return self._json(200, [r.to_dict() for r in reports])

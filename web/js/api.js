@@ -83,6 +83,16 @@
     if (!API.online) return null;
     try { return await req("scenario"); } catch (e) { return null; }
   };
+  API.getRoverValidation = async function () {
+    if (API.online) {
+      try { const d = await req("rover-validation"); if (d && d.curiosity_gale) return d; } catch (_) {}
+    }
+    try {
+      const res = await fetch("data/rover_validation.json");
+      if (res.ok) return await res.json();
+    } catch (_) {}
+    return null;
+  };
   API.getReportes = async function () {
     if (!API.online) return [];
     try { return await req("reportes"); } catch (e) { return []; }
