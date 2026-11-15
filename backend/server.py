@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import yaml
 from docstore import DocStore  # noqa: E402
 from marsroute.storage import Storage  # noqa: E402
-from marsroute.domain import Report  # noqa: E402
+from marsroute.domain import Report, ResourceState  # noqa: E402
 
 MAX_BODY = 64 * 1024
 CREW = {"ev1", "ev2", "ev3"}
@@ -160,6 +160,22 @@ def save_telemetria(b):
 _planner = {}
 
 
+def parse_initial_resources(value):
+    if not isinstance(value, dict):
+        raise ValueError("initial_resources debe ser un objeto completo")
+    fields = {"oxygen_pct": (0, 100), "battery_pct": (0, 100),
+              "eva_time_min": (0, 1e9), "radiation_dose_msv": (0, 1e9)}
+    if set(value) != set(fields):
+        raise ValueError("initial_resources requiere oxígeno, batería, tiempo y dosis")
+    parsed = {}
+    for name, (low, high) in fields.items():
+        v = value[name]
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ValueError(f"{name} debe ser un número")
+        parsed[name] = _num(v, low, high)
+    return ResourceState(**parsed)
+
+
 def plan_route(b):
     import numpy as np
     import yaml
@@ -183,6 +199,7 @@ def plan_route(b):
     requested_profile = b.get("profile", "segura")
     if requested_profile not in ("all", "segura", "rapida", "cientifica"):
         raise ValueError("perfil de ruta desconocido")
+    initial_resources = parse_initial_resources(b["initial_resources"]) if "initial_resources" in b else None
 
     if "planner_instance" not in _planner:
         cfg = yaml.safe_load((ROOT / "config" / "mission.yaml").read_text(encoding="utf-8"))
@@ -213,6 +230,7 @@ def plan_route(b):
             final_shelter_lonlat=final_dest,
             shelters_catalog=shelters,
             require_final_shelter=require_shelter,
+            initial_resources=initial_resources,
         )
         first = alts.get("segura") or list(alts.values())[0]
         return {
@@ -231,6 +249,7 @@ def plan_route(b):
         final_shelter_lonlat=final_dest,
         shelters_catalog=shelters,
         require_final_shelter=require_shelter,
+        initial_resources=initial_resources,
     )
     return {
         "route": [[p[0], p[1]] for p in alt.points],
