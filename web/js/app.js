@@ -239,6 +239,10 @@
     T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Alerta simulada: tormenta de polvo" });
     logSys("Alerta simulada: viento 28.4 m/s y opacidad tau 2.15 en un escenario hipotético.");
 
+    const resInfo = T.evaResources
+      ? `${fmt(T.evaResources.oxygen_pct, 1)}% O₂ · ${fmt(T.evaResources.battery_pct, 1)}% batería`
+      : "recursos de soporte vital acumulados";
+
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta meteorológica crítica · Simulación pausada</span></div>
       <h2>${MR.ICONS.warn}Tormenta de polvo y viento simulada</h2>
       <div class="coords" style="color:var(--text-2);font-size:12px;margin-top:2px">Escenario hipotético · no es una observación meteorológica en tiempo real</div></div>
@@ -250,11 +254,12 @@
           ["Dunas Bagnold", "Corredor impactado"]
         ])}
         <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--danger);background:var(--panel-2);border-radius:4px">
-          La simulación plantea ráfagas y polvo en el corredor. La replanificación teniendo en cuenta los recursos restantes y la tormenta aún no está disponible.
+          La simulación plantea ráfagas y polvo en el corredor. Es posible replanificar la trayectoria hacia el refugio evaluando los ${resInfo}.
         </div>
         <div class="actions" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
           <button class="btn ghost" data-ignore>Mantener rumbo actual</button>
-          <button class="btn primary" data-pause>Dejar en pausa</button>
+          <button class="btn" data-pause>Dejar en pausa</button>
+          <button class="btn primary" data-replan>Replanificar con recursos actuales</button>
         </div>
       </div>`, {
       cls: "critical", dismiss: false,
@@ -266,9 +271,147 @@
         });
         el.querySelector("[data-pause]").addEventListener("click", () => {
           closeModal();
-          toast("Simulación en pausa; replanificación validada pendiente.");
+          toast("Simulación en pausa; ruta previa conservada.");
         });
+        const btnReplan = el.querySelector("[data-replan]");
+        if (btnReplan) {
+          btnReplan.addEventListener("click", () => {
+            closeModal();
+            replanEvaRoute("Tormenta de polvo simulada");
+          });
+        }
       }
+    });
+  }
+
+  function replanEvaRoute(triggerReason = "Alerta operativa") {
+    if (T.mode !== "walk" || !T.evaResources) {
+      return toast("No hay travesía EVA en curso para replanificar.");
+    }
+    T.playing = false;
+    renderStatus();
+    if (!MR.API.online) {
+      return toast("Sin conexión con el servidor: no es posible recalcular la ruta con validación de recursos.");
+    }
+
+    const p = curPos();
+    if (!p) return toast("No se pudo determinar la posición actual del explorador.");
+    const startPoint = [p[0], p[1]];
+    const g = goalObj();
+    if (!g) return toast("No se encontró el objetivo o refugio final.");
+    const goal = [g.lon, g.lat];
+
+    const remainingStops = (T.stops || []).map(stopLL).filter(Boolean).filter(s => {
+      const idx = MR.nearestIdx(T.route, s).i;
+      const curIdx = MR.nearestIdx(T.route, startPoint).i;
+      return idx > curIdx;
+    });
+
+    const stops = [startPoint, ...remainingStops, goal];
+    const profile = T.profileMode || "segura";
+    const region = currentRegion;
+    const initialResources = {
+      oxygen_pct: Number(T.evaResources.oxygen_pct.toFixed(2)),
+      battery_pct: Number(T.evaResources.battery_pct.toFixed(2)),
+      eva_time_min: Number(T.evaResources.eva_time_min.toFixed(2)),
+      radiation_dose_msv: Number(T.evaResources.radiation_dose_msv.toFixed(4)),
+    };
+
+    toast("Calculando replanificación con recursos acumulados...");
+    MR.API.route(stops, MR.cfg, profile, region, initialResources).then(res => {
+      if (!res) {
+        return toast("El servidor no respondió a la solicitud de replanificación.");
+      }
+      if (!res.is_valid || !res.alternative || !res.alternative.is_valid) {
+        const reason = (res && res.rejection_reason) || (res.alternative && res.alternative.rejection_reason) || "Ruta inviable bajo restricciones de seguridad EVA.";
+        showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Replanificación rechazada por seguridad</span></div>
+          <h2>${MR.ICONS.warn}No se puede garantizar la llegada al refugio</h2></div>
+          <div class="mbody">
+            <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--danger);background:var(--panel-2);border-radius:4px">
+              <b>Causa del rechazo:</b> ${esc(reason)}
+            </div>
+            <div style="margin-top:12px;font-size:13px;color:var(--text-2)">
+              Recursos acumulados al momento de la alerta:
+              <ul style="margin:6px 0 0 16px;padding:0">
+                <li>Oxígeno restante: <b>${fmt(initialResources.oxygen_pct, 1)}%</b></li>
+                <li>Batería restante: <b>${fmt(initialResources.battery_pct, 1)}%</b></li>
+                <li>Tiempo EVA transcurrido: <b>${fmt(initialResources.eva_time_min, 1)} min</b></li>
+                <li>Dosis radiación: <b>${fmt(initialResources.radiation_dose_msv, 3)} mSv</b></li>
+              </ul>
+              <p style="margin-top:8px">Se conserva la ruta previa. Evalúe continuar con precaución o buscar refugio de emergencia.</p>
+            </div>
+            <div class="actions" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn primary" data-close>Mantener ruta previa y pausa</button>
+            </div>
+          </div>`, {
+          cls: "critical", dismiss: false,
+          bind: el => {
+            el.querySelector("[data-close]").addEventListener("click", closeModal);
+          }
+        });
+        return;
+      }
+
+      const alt = res.alternative;
+      const approval = MR.routeApproval.create(res, region, profile);
+      if (!approval) {
+        return toast("Respuesta de ruta incompleta para validación de seguridad.");
+      }
+
+      const prevRemainingKm = Math.max(0, T.route[T.route.length - 1][2] - T.km);
+      const newDistanceKm = alt.total_km;
+      const newHours = alt.estimated_hours;
+      const finalRes = alt.resources;
+
+      showModal(`<div class="mhead"><div class="tag-line"><span class="tg assigned">Propuesta de replanificación · ${esc(triggerReason)}</span></div>
+        <h2>${MR.ICONS.ok}Nueva trayectoria verificada hacia refugio</h2>
+        <div class="who">Evaluada con ${fmt(initialResources.oxygen_pct, 1)}% O₂ y ${fmt(initialResources.battery_pct, 1)}% batería acumulados.</div></div>
+        <div class="mbody">
+          ${factsHtml([
+            [fmt(newDistanceKm, 1) + " km", "distancia restante (antes: " + fmt(prevRemainingKm, 1) + " km)"],
+            ["≈ " + fmt(newHours, 1) + " h", "tiempo estimado adicional"],
+            [fmt(finalRes.oxygen_pct, 1) + "%", "O₂ proyectado al llegar al refugio"],
+            [fmt(finalRes.battery_pct, 1) + "%", "batería proyectada"],
+            [fmt(finalRes.radiation_dose_msv, 3) + " mSv", "dosis total estimada"],
+            [alt.explanation ? alt.explanation.refugio_alcanzado : "Refugio seguro", "destino final"]
+          ])}
+          <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--accent);background:var(--panel-2);border-radius:4px">
+            El planificador A* ha recalculado el trayecto desde tu posición actual evitando tramos críticos y verificando que la reserva supere el margen de supervivencia en el refugio final.
+          </div>
+          <div class="actions" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn ghost" data-keep>Conservar ruta previa</button>
+            <button class="btn primary" data-approve>Aprobar y aplicar replanificación</button>
+          </div>
+        </div>`, {
+        cls: "dialog", dismiss: false,
+        bind: el => {
+          el.querySelector("[data-keep]").addEventListener("click", () => {
+            closeModal();
+            toast("Se conserva la ruta previa; simulación en pausa.");
+          });
+          el.querySelector("[data-approve]").addEventListener("click", () => {
+            closeModal();
+            const walkedKm = T.km;
+            const walkedPoints = T.route.filter(pt => pt[2] <= walkedKm);
+            const newPoints = MR.routeApproval.copyPoints(approval);
+            const stitched = newPoints.map(pt => {
+              const copy = pt.slice();
+              copy[2] = walkedKm + pt[2];
+              return copy;
+            });
+            T.route = [...walkedPoints, ...stitched.slice(1)];
+            T.approval = approval;
+            T.stages = makeStages(T.route);
+            T.detours = (T.detours || 0) + 1;
+            T.events.push({ t: T.simMin, c: "var(--accent)", txt: `Replanificación aprobada: ${fmt(newDistanceKm, 1)} km restantes` });
+            logSys(`Replanificación aprobada: nueva trayectoria hacia refugio (${fmt(newDistanceKm, 1)} km).`);
+            afterRouteChange(true);
+            banner({ kind: "ok", title: "Ruta replanificada y aprobada", sub: "Trayectoria actualizada con reservas verificadas. Pulsa ▶ para reanudar.", ttl: 6000 });
+          });
+        }
+      });
+    }).catch(err => {
+      toast("Error al replanificar: " + (err.message || err));
     });
   }
 
@@ -964,8 +1107,7 @@
   let routeRequestId = 0;
   function recalcRoute() {
     if (T.mode === "walk") {
-      T.playing = false; renderStatus();
-      return toast("Replanificación durante la EVA aún no disponible: la ruta actual se conserva en pausa.");
+      return replanEvaRoute("Replanificación manual durante EVA");
     }
     const requestId = ++routeRequestId;
     T.approval = null;
@@ -1391,13 +1533,20 @@
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta crítica · simulación en pausa</span></div>
       <h2>${MR.ICONS.warn}Pendiente fuerte en ${fmt(dist, 0)} m</h2></div>
       <div class="mbody">${factsHtml([[fmt(z.max, 0) + "°", "pendiente máxima"], [fmt(z.rough, 0) + " m", "rugosidad"], [fmt((z.endKm - z.startKm) * 1000 + 50, 0) + " m", "largo del tramo"]])}
-      <div class="alt">La validación de desvíos durante la EVA todavía no está disponible.</div>
+      <div class="alt">Pendiente por encima del umbral crítico. Puede continuar con precaución o buscar un desvío hacia el refugio validando los recursos acumulados.</div>
       <div class="who" style="margin-top:8px">Umbral de alerta: ${MR.cfg.critSlope}° (configurable en Ruta → Umbrales).</div>
-      <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn" data-s>Seguir con precaución</button></div></div>`, {
+      <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn ghost" data-s>Seguir con precaución</button><button class="btn primary" data-replan>Buscar desvío con recursos</button></div></div>`, {
       cls: "critical", dismiss: false,
       bind: m => {
         m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "seguir"; closeModal(); logSys(`Alerta en km ${fmt(z.startKm)}: se sigue con precaución.`); resumeEva(); });
         m.querySelector("[data-ab]").addEventListener("click", () => confirmAbort(() => criticalAlert(z)));
+        const btnReplan = m.querySelector("[data-replan]");
+        if (btnReplan) {
+          btnReplan.addEventListener("click", () => {
+            closeModal();
+            replanEvaRoute(`Desvío por pendiente ${fmt(z.max, 0)}°`);
+          });
+        }
       },
     });
   }

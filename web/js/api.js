@@ -65,9 +65,11 @@
     const q = API.queue.splice(0);
     for (const [k, p] of q) await API.send(k, p);
   };
-  API.route = async function (stops, cfg, profile = "all", region = "gale") {
+  API.route = async function (stops, cfg, profile = "all", region = "gale", initial_resources = null) {
     if (!API.online) return null;
-    try { return await req("route", { method: "POST", body: JSON.stringify({ stops, cfg, profile, region }) }, 60000); } catch (e) { return null; }
+    const body = { stops, cfg, profile, region };
+    if (initial_resources) body.initial_resources = initial_resources;
+    try { return await req("route", { method: "POST", body: JSON.stringify(body) }, 60000); } catch (e) { return null; }
   };
   API.getRegions = async function () {
     if (!API.online) return null;
