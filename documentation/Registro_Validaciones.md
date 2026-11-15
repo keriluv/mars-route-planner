@@ -75,6 +75,26 @@ Se completaron las 4 fases de alta prioridad acordadas en el plan de trabajo:
    - `web/js/app.js`: Nueva pestaña "Soporte Vital y Traje" en el modal de Condiciones (`openDashboard`), con desglose de la ecuación biomecánica de Pandolf, tabla de esfuerzo por pendiente y balance térmico.
 
 ### Resumen de validación actual
-- **Python test suite:** 54 pruebas pasadas exitosamente (`pytest -q` en 108.52 s).
-- **Node.js test suite:** 13 pruebas pasadas exitosamente (`node --test tests/*.cjs` en 189 ms).
+- **Python test suite:** 54 pruebas pasadas exitosamente (`pytest -q` en 97.24 s).
+- **Node.js test suite:** 16 pruebas pasadas exitosamente (`node --test tests/*.cjs` en 148 ms).
 - **Formato y calidad git:** `git diff --check` limpio sin errores de espaciado.
+
+## Alertas y ventanas emergentes durante la simulación de recorrido (Noviembre 2026)
+
+Se implementaron alertas progresivas y ventanas emergentes reactivas conforme transcurre la caminata EVA, monitoreando el estado metabólico, los consumibles de soporte vital y las condiciones ambientales:
+
+1. **Alerta preventiva de Oxígeno (≤ 35%):**
+   - Banner de advertencia en pantalla que notifica a la tripulación el consumo acumulado de O₂ en gramos y el porcentaje restante en el tanque PLSS.
+2. **Alerta crítica emergente de Reserva de Oxígeno (≤ 25%):**
+   - Ventana modal emergente con pausa automática de la simulación. Expone los hechos de soporte vital (O₂ remanente, gramos consumidos, potencia metabólica Pandolf en W y distancia a meta).
+   - Opciones operativas: abortar marcha hacia base, continuar bajo propio riesgo con precaución, o solicitar replanificación hacia refugio (`replanEvaRoute`).
+3. **Aviso de hidratación y deshidratación acumulada (≥ 1.0 L transpirado):**
+   - Banner de advertencia fisiológica que alerta de la pérdida de fluidos y sugiere activación de la toma de agua del casco y reposición de sales electrolíticas.
+4. **Aviso de batería PLSS baja (≤ 25%):**
+   - Banner de aviso para limitar el uso de telemetría secundaria y calefacción auxiliar no esencial.
+5. **Estrés térmico e integridad del traje por frío ambiental (< -65 °C o sensación térmica):**
+   - Alerta reactiva cuando la temperatura de la atmósfera desciende de forma severa, recomendando máxima calefacción en botas y guantes.
+6. **Presión barométrica baja en cotas altas (< 680 Pa):**
+   - Alerta informativa en ascensos a cotas elevadas advirtiendo del mayor diferencial de presión en sellos del traje EVA.
+7. **Pruebas unitarias:**
+   - Incorporación de `tests/test_eva_alerts.cjs` con 3 pruebas específicas que validan la transición de umbrales de O₂ (35% y 25%), acumulación hídrica (> 1.0 L) y descarga lineal de batería. Total de pruebas Node.js aumentado a 16.

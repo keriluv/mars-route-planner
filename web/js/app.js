@@ -1551,6 +1551,48 @@
       },
     });
   }
+
+  /* ---------- alerta crítica de oxígeno (reserva <= 25%) ---------- */
+  function criticalOxygenAlert(L) {
+    T.playing = false; renderStatus(); T.alerts++;
+    if (S.panel) togglePanel(null);
+    $("stageCard").hidden = true;
+    const remKm = Math.max(0, L - T.km);
+    const o2Pct = T.evaResources ? T.evaResources.oxygen_pct : 25;
+    const o2G = T.evaResources ? (T.evaResources.o2_used_g || 0) : 0;
+    const watts = T.evaResources ? (T.evaResources.metabolic_power_w || 0) : 0;
+    T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Alerta: Reserva O₂ al ${fmt(o2Pct, 1)}%` });
+    logSys(`Alerta crítica PLSS: Reserva de oxígeno al ${fmt(o2Pct, 1)}% (límite de seguridad de retorno).`);
+    showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta crítica PLSS · Simulación en pausa</span></div>
+      <h2>${MR.ICONS.warn}Reserva crítica de oxígeno (≤ 25%)</h2></div>
+      <div class="mbody">
+        ${factsHtml([
+          [fmt(o2Pct, 1) + "%", "O₂ restante"],
+          [fmt(o2G, 0) + " g", "O₂ consumido"],
+          [fmt(watts, 0) + " W", "Gasto metabólico"],
+          [fmt(remKm, 2) + " km", "Distancia a meta"]
+        ])}
+        <div class="alt">El nivel de oxígeno en el soporte vital ha descendido a la reserva crítica del 25%. Según protocolos EVA, continuar la marcha sin replanificación compromete el margen de retorno seguro hacia un refugio presurizado.</div>
+        <div class="who" style="margin-top:8px">Tanque PLSS calibrado a 650 g O₂ · Reserva de emergencia para desvío a refugio.</div>
+        <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn ghost" data-s>Seguir con precaución</button><button class="btn primary" data-replan>Buscar desvío hacia refugio</button></div></div>`, {
+      cls: "critical", dismiss: false,
+      bind: m => {
+        m.querySelector("[data-s]").addEventListener("click", () => {
+          closeModal();
+          logSys(`Alerta O₂ en km ${fmt(T.km)}: se decide continuar con precaución.`);
+          resumeEva();
+        });
+        m.querySelector("[data-ab]").addEventListener("click", () => confirmAbort(() => criticalOxygenAlert(L)));
+        const btnReplan = m.querySelector("[data-replan]");
+        if (btnReplan) {
+          btnReplan.addEventListener("click", () => {
+            closeModal();
+            replanEvaRoute(`Reserva crítica de O₂ (${fmt(o2Pct, 1)}%)`);
+          });
+        }
+      },
+    });
+  }
   function confirmAbort(back) {
     showModal(`<div class="mhead"><h2>¿Abortar la misión?</h2></div><div class="mbody">
       <p class="who">Volverás a la base. Se conservan la bitácora y los hallazgos registrados.</p>
@@ -1665,7 +1707,7 @@
     if (inZone) v *= 0.6;
     const step = MR.evaStep(T.evaResources, dMin, grade, time().hour, EVA_END, Math.max(0, L - T.km), v);
     dMin = step.minutes;
-    T.evaResources = MR.consumeEvaResources(T.evaResources, dMin, grade);
+    T.evaResources = MR.consumeEvaResources(T.evaResources, dMin, grade, v);
     T.km = Math.min(L, T.km + (v * dMin) / 60); T.simMin += dMin;
     if (step.reason === "resources" || MR.evaResourcesExhausted(T.evaResources)) {
       T.playing = false; renderStatus(); renderProfileMetrics(); toast("EVA en pausa: autonomía demostrativa agotada."); return;
@@ -1690,6 +1732,47 @@
     // peligro crítico por delante (200 m)
     const z = T.hazards.find(z => !T.handled[z.id] && z.startKm - T.km <= 0.2 && z.endKm >= T.km);
     if (z) return criticalAlert(z);
+    // alerta crítica de oxígeno (reserva <= 25%): ventana modal con pausa y replanificación hacia refugio
+    if (T.evaResources && T.evaResources.oxygen_pct <= 25 && !T.flags["o2_25_" + time().sol]) {
+      T.flags["o2_25_" + time().sol] = true;
+      return criticalOxygenAlert(L);
+    }
+    // aviso preventivo de soporte vital (oxígeno al 35%)
+    if (T.evaResources && T.evaResources.oxygen_pct <= 35 && !T.flags["o2_35_" + time().sol]) {
+      T.flags["o2_35_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Aviso de soporte vital: O₂ al 35%",
+        sub: `Consumo: ${fmt(T.evaResources.o2_used_g || 0, 0)} g de 650 g · Restan aprox. ${fmt(T.evaResources.oxygen_pct, 1)}%`,
+        ttl: 6000
+      });
+      T.events.push({ t: T.simMin, c: "var(--caution)", txt: "Aviso PLSS: O₂ al 35%" });
+      logSys(`Aviso PLSS: nivel de oxígeno al ${fmt(T.evaResources.oxygen_pct, 1)}%.`);
+    }
+    // aviso fisiológico de hidratación acumulada (> 1.0 L transpirado)
+    if (T.evaResources && (T.evaResources.water_liters || 0) >= 1.0 && !T.flags["water_1l_" + time().sol]) {
+      T.flags["water_1l_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Aviso de hidratación: 1,0 L transpirado",
+        sub: `Pérdida acumulada: ${fmt(T.evaResources.water_liters, 2)} L · Activar boquilla del casco y reponer sales`,
+        ttl: 6500
+      });
+      T.events.push({ t: T.simMin, c: "var(--warn)", txt: "Aviso fisiológico: hidratación necesaria" });
+      logSys(`Aviso fisiológico: transpiración acumulada superó 1,0 L (${fmt(T.evaResources.water_liters, 2)} L).`);
+    }
+    // aviso de batería de soporte vital baja (25%)
+    if (T.evaResources && T.evaResources.battery_pct <= 25 && !T.flags["bat_25_" + time().sol]) {
+      T.flags["bat_25_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Batería de soporte vital al 25%",
+        sub: "Autonomía eléctrica reducida · Desactivar telemetría secundaria y calefacción no esencial",
+        ttl: 6000
+      });
+      T.events.push({ t: T.simMin, c: "var(--warn)", txt: "Aviso PLSS: batería al 25%" });
+      logSys(`Aviso PLSS: batería restante al ${fmt(T.evaResources.battery_pct, 1)}%.`);
+    }
     // terreno difícil (aviso, no pausa)
     const lz = T.lows.find(z => !T.handled[z.id] && z.startKm - T.km <= 0.4 && z.endKm >= T.km);
     if (lz) { T.handled[lz.id] = 1; banner({ kind: "warn", title: `Terreno difícil en ${fmt(Math.max(0, (lz.startKm - T.km) * 1000), 0)} m`, sub: `Facilidad de paso ${fmt(lz.min, 2)} · se reduce el ritmo`, onClick: () => { const p = posAt(T.route, lz.startKm); MR.Map.centerOn(p[0], p[1], 3); } }); }
@@ -1746,6 +1829,30 @@
       banner({ kind: "warn", title: "Baja la temperatura en 1 h", sub: `Se esperan ${fmt(fut.air, 0)} °C. Revisa la calefacción del traje.` });
     }
     if (T.wx.uv > 12 && !T.flags["uv_" + time().sol]) { T.flags["uv_" + time().sol] = true; banner({ kind: "warn", title: "Radiación UV alta", sub: `${fmt(T.wx.uv, 1)} W/m² · limita la exposición del visor` }); }
+    // estrés térmico e integridad del traje por frío ambiental extremo (< -65 °C)
+    if (T.wx.air < -65 && !T.flags["suit_cold_" + time().sol]) {
+      T.flags["suit_cold_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Estrés térmico en traje EVA: frío extremo",
+        sub: `Temperatura ambiente ${fmt(T.wx.air, 0)} °C · Calefacción activa en botas y guantes al máximo`,
+        ttl: 7000
+      });
+      T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Estrés térmico traje: ${fmt(T.wx.air, 0)} °C` });
+      logSys(`Alerta de traje: estrés térmico por frío extremo (${fmt(T.wx.air, 1)} °C).`);
+    }
+    // aviso de presión barométrica reducida en cotas altas (< 680 Pa)
+    if (T.wx.p < 680 && !T.flags["press_low_" + time().sol]) {
+      T.flags["press_low_" + time().sol] = true;
+      banner({
+        kind: "info",
+        title: `Presión ambiental baja: ${fmt(T.wx.p, 0)} Pa`,
+        sub: `Cota alta (${fmt(p[3], 0)} m) · Mayor diferencial de presión en traje; vigilar sellos`,
+        ttl: 6000
+      });
+      T.events.push({ t: T.simMin, c: "var(--info)", txt: `Presión ambiental reducida: ${fmt(T.wx.p, 0)} Pa` });
+      logSys(`Telemetría barométrica: presión ambiental reducida a ${fmt(T.wx.p, 0)} Pa en cota ${fmt(p[3], 0)} m.`);
+    }
     if (prev || force) renderLive(true);
   }
   function arrive() {
