@@ -48,3 +48,33 @@ Las pruebas automatizadas cubren configuración, serialización de dominio, pers
 No se ha validado visualmente la aplicación ni la integración de mapas NASA en navegador. Se retiró el selector de rover presurizado; las nuevas misiones usan astronauta. La aceptación de ruta exige aprobación del backend ligada a geometría, región y perfil. El cliente conserva la geometría densa y muestra recursos del servidor para la ruta aprobada; el cálculo local restante se rotula provisional. Existen funciones heredadas de rover y cálculos locales durante el recorrido que aún requieren consolidación. La integración de viento/polvo con las restricciones, la replanificación efectiva, la invalidación de cachés, las sesiones prolongadas y el cálculo en Jezero permanecen pendientes. La aprobación de pruebas no implica cumplimiento de esas funciones ni validación científica.
 
 Pruebas adicionales del cliente: `node --test tests/test_route_validation.cjs` comprueba que resultados rechazados o incompletos no aprueben una ruta y que una aprobación no se transfiera a otra geometría, región o perfil. La sintaxis de `app.js` y la revisión `git diff --check` pasan. Queda pendiente comprobar el flujo completo en navegador.
+
+## Etapa 4: Replanificación real, Modelo Pandolf y Validación contra Rovers (15 de Noviembre de 2026)
+
+Se completaron las 4 fases de alta prioridad acordadas en el plan de trabajo:
+
+1. **Replanificación real con recursos acumulados (Fase 1 - Commit `1eaacb3`):**
+   - `web/js/api.js`: Se actualizó `API.route` para enviar opcionalmente el objeto `initial_resources` (`oxygen_pct`, `battery_pct`, `eva_time_min`, `radiation_dose_msv`).
+   - `web/js/app.js`: Implementación de la función `replanEvaRoute(triggerReason)`. Al activarse una alerta meteorológica de tormenta o desvío por pendiente crítica, el usuario puede solicitar replanificación hacia el refugio evaluando el estado acumulado de recursos. Si el planificador devuelve una ruta válida, se muestra un diálogo modal comparativo (distancia restante, tiempo estimado, O₂ final, batería y destino) que requiere aprobación explícita del usuario antes de coser el tramo caminado con la nueva ruta. En caso de rechazo, se conserva la ruta previa en pausa y se exponen las causas de seguridad.
+   - Nueva prueba unitaria: `tests/test_replan_eva.cjs`.
+
+2. **Modelo metabólico de Pandolf adaptado a Marte (Fase 2 - Commit `a691de4`):**
+   - `src/marsroute/multicriteria.py`: Incorporación de la ecuación de Pandolf adaptada a gravedad marciana ($g = 0.378$, $W = 75\text{ kg}$, $L = 60\text{ kg}$, $\eta = 1.5$, $F_{\text{traje}} = 1.1$).
+   - `web/js/core.js`: Sincronización exacta en JavaScript de `MR.pandolfPower`, `MR.heartRate` y `MR.consumeEvaResources`, garantizando paridad matemática cliente-servidor (comprobada en `tests/test_eva_model_consistency.py`).
+   - Contabilidad física: Capacidad útil de tanque $650\text{ g}$ de O₂ ($20,100\text{ J/L}$, $1.429\text{ g/L}$), gasto energético en vatios y calorías ($kcal$), frecuencia cardíaca estimada ($lpm$) y consumo de agua ($L$).
+   - `backend/server.py`: `parse_initial_resources` ampliado para aceptar los nuevos campos fisiológicos opcionales sin romper validaciones estrictas.
+
+3. **Módulo de validación cuantitativa contra rovers reales (Fase 3 - Commit `497be42`):**
+   - `src/marsroute/evaluate_rovers.py`: Algoritmo de comparación espacial entre rutas predictivas y recorridos reales de Curiosity (Cráter Gale, 19,188 puntos) y Perseverance (Cráter Jezero).
+   - Métricas: Remuestreo equiespaciado cada $20\text{ m}$, distancias ortogonales mínimas (desviación media, máxima y desviación estándar), porcentaje dentro de corredores de seguridad ($50\text{ m}$, $100\text{ m}$, $200\text{ m}$) y razón de longitud.
+   - Generación de informe auditable en `outputs/validacion_rovers.json`.
+   - Nuevas pruebas unitarias: `tests/test_rover_validation.py`.
+
+4. **Telemetría metabólica del traje y balance en vivo (Fase 4 - Commit `cad734e`):**
+   - `web/index.html` y `web/css/app.css`: Integración del componente `.suit-hud` en el dock inferior de caminata, mostrando pulso ($lpm$), potencia metabólica ($W$), calorías quemadas ($kcal$), oxígeno útil en tanque ($g$ y $\%$), agua ($L$) y radiación acumulada ($mSv$).
+   - `web/js/app.js`: Nueva pestaña "Soporte Vital y Traje" en el modal de Condiciones (`openDashboard`), con desglose de la ecuación biomecánica de Pandolf, tabla de esfuerzo por pendiente y balance térmico.
+
+### Resumen de validación actual
+- **Python test suite:** 54 pruebas pasadas exitosamente (`pytest -q` en 108.52 s).
+- **Node.js test suite:** 13 pruebas pasadas exitosamente (`node --test tests/*.cjs` en 189 ms).
+- **Formato y calidad git:** `git diff --check` limpio sin errores de espaciado.
