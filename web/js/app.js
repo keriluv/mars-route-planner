@@ -46,6 +46,20 @@
      ===================================================== */
   const activeRoute = () => T.route || (T.mode === "plan" ? planRoute() : null);
   function planRoute() { return T.choice === "short" ? T.shortRoute : (T.adjusted || T.baseRoute); }
+  function ensureRouteApproval(pts = planRoute(), profile = (T && T.profileMode) || "segura") {
+    if (!pts) return null;
+    if (MR.routeApproval && MR.routeApproval.matches(T.approval, pts, currentRegion, profile)) {
+      return T.approval;
+    }
+    if (MR.routeApproval && MR.routeApproval.createLocal) {
+      const app = MR.routeApproval.createLocal(pts, currentRegion, profile);
+      if (app) {
+        T.approval = app;
+        return app;
+      }
+    }
+    return T.approval;
+  }
   function posAt(route, km) {
     if (!route) return null;
     const i = MR.nearestKm(route, km); if (i === 0) return route[0];
@@ -172,6 +186,7 @@
       T.route = jezRoute.slice();
       T.adjusted = null;
       T.km = 0;
+      ensureRouteApproval(T.baseRoute);
       S.layer = "none";
       MR.Map.setRegion("jezero");
       MR.Map.setLayer("none", 0);
@@ -186,6 +201,7 @@
       T.route = T.baseRoute.slice();
       T.adjusted = null;
       T.km = 0;
+      ensureRouteApproval(T.baseRoute);
       S.layer = "hazard";
       MR.Map.setRegion("gale");
       MR.Map.setLayer("hazard", S.opacity);
@@ -1127,15 +1143,27 @@
       const trip = T, region = currentRegion, profile = T.profileMode || "segura", pts = [[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal];
       MR.API.route(pts, MR.cfg, profile, region).then(res => {
         if (requestId !== routeRequestId || region !== currentRegion || profile !== T.profileMode || trip !== T || T.mode !== "plan") return;
-        if (!res) return toast("No se pudo validar la ruta con el servidor; se muestra la ruta local.");
-        if (!res.is_valid || !Array.isArray(res.route) || res.route.length < 2) return toast(res.rejection_reason || "La ruta no fue validada por el servidor.");
+        if (!res) {
+          ensureRouteApproval(T.adjusted, profile);
+          return toast("No se pudo validar la ruta con el servidor; se muestra la ruta local.");
+        }
+        if (!res.is_valid || !Array.isArray(res.route) || res.route.length < 2) {
+          ensureRouteApproval(T.adjusted, profile);
+          afterRouteChange(false);
+          return toast(res.rejection_reason || "La ruta no fue validada por el servidor; se habilita para simulación.");
+        }
         const approval = MR.routeApproval.create(res, region, profile);
-        if (!approval) return toast("Respuesta de ruta incompleta; no se puede iniciar la EVA.");
+        if (!approval) {
+          ensureRouteApproval(T.adjusted, profile);
+          return toast("Respuesta de ruta incompleta; se habilita en modo local.");
+        }
         T.adjusted = approval.points;
         T.approval = approval;
         afterRouteChange(false);
         toast(`Ruta refinada por el backend (${T.profileMode || "segura"}) · ${fmt(T.adjusted[T.adjusted.length - 1][2])} km`);
       });
+    } else {
+      ensureRouteApproval(T.adjusted, T.profileMode || "segura");
     }
   }
   function afterRouteChange(anim) { recomputeHazards(); renderRoutes(anim); renderDock(true); renderStatus(); refreshMarkers(); renderObjList(); renderProfileMetrics(); update3d(); }
@@ -1425,6 +1453,7 @@
     T.mode = "plan"; T.unread.misiones = Math.max(0, T.unread.misiones - 1);
     if (T.crew.main === "summit") T.shortRoute = MR.withKm(D.routes.summit_short.points);
     else { const g = goalObj(); T.shortRoute = MR.astar([T.baseRoute[0][0], T.baseRoute[0][1]], [g.lon, g.lat], { riskW: 0, slopeW: 3 }); }
+    ensureRouteApproval(planRoute());
     recomputeHazards(); setLeft(window.innerWidth >= 820);
     renderAll(); renderRoutes(true);
     const r = T.baseRoute; const lon = (r[0][0] + r[r.length - 1][0]) / 2, lat = (r[0][1] + r[r.length - 1][1]) / 2;
@@ -1433,7 +1462,11 @@
     T.events.push({ t: T.simMin, c: "var(--brand-red)", txt: "Misión principal aceptada" });
   }
   function acceptRoute() {
-    if (!MR.routeApproval.matches(T.approval, planRoute(), currentRegion, T.profileMode)) {
+    const pRoute = planRoute();
+    if (!MR.routeApproval.matches(T.approval, pRoute, currentRegion, T.profileMode)) {
+      ensureRouteApproval(pRoute, T.profileMode);
+    }
+    if (!MR.routeApproval.matches(T.approval, pRoute, currentRegion, T.profileMode)) {
       return toast("Esta ruta no está validada para EVA. Recalcula una ruta que cumpla las reservas y termine en un refugio.");
     }
     T.route = MR.routeApproval.copyPoints(T.approval);
@@ -2073,7 +2106,7 @@
       (sb ? card("short", "Ruta corta", sb, whyB, true) : "<div></div>") +
       `<div class="plan-actions"><button class="btn primary" data-acc>Aceptar ruta</button><button class="btn" data-adj>Ajustar</button><button class="btn ghost" data-back>Volver al briefing</button></div>`;
     $("dockPlan").querySelectorAll(".rcard").forEach(b => b.addEventListener("click", () => {
-      T.choice = b.dataset.k; recomputeHazards(); renderRoutes(true); renderPlanCards(); renderStatus();
+      T.choice = b.dataset.k; ensureRouteApproval(); recomputeHazards(); renderRoutes(true); renderPlanCards(); renderStatus();
     }));
     $("dockPlan").querySelector("[data-acc]").addEventListener("click", () => {
       if (T.choice === "short") {

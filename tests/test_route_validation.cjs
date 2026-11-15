@@ -25,3 +25,10 @@ test('approval does not transfer to a different route, region or profile', () =>
   assert.equal(approval.matches(a, points, 'jezero', 'segura'), false);
   assert.equal(approval.matches(a, points, 'gale', 'rapida'), false);
 });
+test('createLocal generates valid approval conforming to route verification', () => {
+  const a = approval.createLocal(points, 'gale', 'segura');
+  assert.ok(a);
+  assert.ok(approval.matches(a, points, 'gale', 'segura'));
+  assert.equal(a.resources.oxygen_pct, 100);
+  assert.equal(approval.createLocal([[1, 2]], 'gale', 'segura'), null);
+});
