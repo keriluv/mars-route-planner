@@ -156,6 +156,18 @@ class MultiCriteriaPlanner:
         c = min(self.grid_size - 1, max(0, int((lon - w) / (e - w) * self.grid_size)))
         return r, c
 
+    def stop_adjustments(self, stops: List[Tuple[float, float]]) -> list[dict]:
+        """Expone la aproximación de cada parada al centro de su celda."""
+        result = []
+        for lon, lat in stops:
+            cell = self._lonlat_to_cell(lon, lat)
+            actual_lon, actual_lat = route_lonlat(np.asarray([cell]), self.bbox, self.grid_size)[0]
+            dlat = math.radians(actual_lat - lat) * MARS_RADIUS_M
+            dlon = math.radians(actual_lon - lon) * MARS_RADIUS_M * math.cos(math.radians((actual_lat + lat) / 2))
+            result.append({"requested": [lon, lat], "grid": [float(actual_lon), float(actual_lat)],
+                           "distance_m": math.hypot(dlon, dlat)})
+        return result
+
     @staticmethod
     def _find_nearest_free(blocked: np.ndarray, r: int, c: int, max_radius: int = 15) -> Tuple[int, int]:
         """Encuentra la celda transitable más cercana si el punto cae en el margen de bloqueo."""

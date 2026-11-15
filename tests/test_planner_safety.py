@@ -82,3 +82,11 @@ def test_shelter_check_uses_actual_grid_endpoint():
     assert not result.is_valid
     assert "no es un refugio" in result.rejection_reason
     assert result.explanation["refugio_alcanzado"] == "Ninguno"
+
+
+def test_stop_adjustments_expose_requested_and_grid_coordinates():
+    planner = MultiCriteriaPlanner({}, (137.4, -4.8, 137.6, -4.6), 5)
+    adjustment = planner.stop_adjustments([(137.441, -4.641)])[0]
+    assert adjustment["requested"] == [137.441, -4.641]
+    assert adjustment["grid"] == pytest.approx([137.46, -4.66])
+    assert adjustment["distance_m"] > 1000

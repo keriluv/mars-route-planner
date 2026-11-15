@@ -202,6 +202,7 @@ def plan_route(b):
     start = (float(stops[0][0]), float(stops[0][1]))
     targets = [(float(p[0]), float(p[1])) for p in stops[1:-1]]
     final_dest = (float(stops[-1][0]), float(stops[-1][1]))
+    adjustments = planner.stop_adjustments([start, *targets, final_dest])
 
     require_shelter = b.get("require_shelter", True)
 
@@ -220,6 +221,7 @@ def plan_route(b):
             "cells": len(first.points),
             "is_valid": first.is_valid,
             "rejection_reason": first.rejection_reason,
+            "stop_adjustments": adjustments,
         }
 
     alt = planner.plan_alternative(
@@ -236,6 +238,7 @@ def plan_route(b):
         "alternative": alt.to_dict(),
         "is_valid": alt.is_valid,
         "rejection_reason": alt.rejection_reason,
+        "stop_adjustments": adjustments,
     }
 
 

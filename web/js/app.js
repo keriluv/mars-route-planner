@@ -334,7 +334,9 @@
         <p>Duración: ${fmt(resources.eva_time_min, 1)} min</p>
         <p>Oxígeno restante: ${fmt(resources.oxygen_pct, 1)}%</p>
         <p>Batería restante: ${fmt(resources.battery_pct, 1)}%</p>
-        <p>Dosis estimada: ${fmt(resources.radiation_dose_msv, 3)} mSv</p>`;
+        <p>Dosis estimada: ${fmt(resources.radiation_dose_msv, 3)} mSv</p>
+        <p>Ajuste de paradas a la grilla: ${T.approval.adjustments.map((s, i) => `${i === 0 ? "Inicio" : i === T.approval.adjustments.length - 1 ? "Destino" : `Parada ${i}`}: ${fmt(s.distance_m, 1)} m`).join(" · ")}</p>
+        <p>Al aceptar la ruta se aceptan estos ajustes.</p>`;
       return;
     }
     const res = MR.routeResources(r, "astronaut");
