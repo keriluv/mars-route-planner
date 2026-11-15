@@ -4,11 +4,28 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const source = fs.readFileSync(require('node:path').join(__dirname, '../web/js/api.js'), 'utf8');
 function client(storage, fetch) {
-  const window = { MR: {}, addEventListener() {} };
+  const window = { MR: {}, addEventListener() {}, setInterval(fn) { this.poll = fn; } };
   vm.runInNewContext(source, { window, localStorage: storage, fetch, AbortController,
     setTimeout, clearTimeout, location: { protocol: 'http:' }, document: { getElementById() { return null; } } });
+  window.MR.API.poll = window.poll;
   return window.MR.API;
 }
+test('periodic health check retries reports after the server returns', async () => {
+  let data = '{}';
+  const storage = { getItem: () => data, setItem: (_, value) => { data = value; } };
+  let available = false;
+  const api = client(storage, async (url) => {
+    if (!available) throw Error('server unavailable');
+    return { ok: true, json: async () => url.endsWith('health') ? { status: 'ok' } : { ok: true } };
+  });
+  await api.sendReporte({ id: 'retry' });
+  assert.equal(await api.init(), false);
+  available = true;
+  api.poll();
+  await api.init();
+  assert.equal(api.online, true);
+  assert.deepEqual(JSON.parse(data), {});
+});
 test('offline report survives reload and failed retry, then clears after acknowledgement', async () => {
   let data = '{}';
   const storage = { getItem: () => data, setItem: (_, value) => { data = value; } };

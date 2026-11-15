@@ -12,6 +12,7 @@
   const REPORT_KEY = "galex_pending_reports_v1";
   let reports = {};
   let flushingReports = false;
+  let checkingConnection = null;
   try {
     const saved = JSON.parse(localStorage.getItem(REPORT_KEY) || "{}");
     if (saved && typeof saved === "object" && !Array.isArray(saved)) reports = saved;
@@ -44,11 +45,15 @@
   }
   API.init = async function () {
     if (!/^https?:$/.test(location.protocol)) return false;
-    try { const h = await req("health"); API.online = h && h.status === "ok"; } catch (e) { API.online = false; }
-    const b = document.getElementById("connBadge");
-    if (b) { b.textContent = API.online ? "Backend conectado" : "Modo local"; b.dataset.on = API.online ? "1" : "0"; }
-    if (API.online) { API.flush(); await API.flushReports(); }
-    return API.online;
+    if (checkingConnection) return checkingConnection;
+    checkingConnection = (async () => {
+      try { const h = await req("health"); API.online = !!(h && h.status === "ok"); } catch (e) { API.online = false; }
+      const b = document.getElementById("connBadge");
+      if (b) { b.textContent = API.online ? "Backend conectado" : "Modo local"; b.dataset.on = API.online ? "1" : "0"; }
+      if (API.online) { await API.flush(); await API.flushReports(); }
+      return API.online;
+    })();
+    try { return await checkingConnection; } finally { checkingConnection = null; }
   };
   // envía; si falla, guarda en cola ("Sin señal: se enviará al reconectar")
   API.send = async function (kind, payload) {
@@ -89,4 +94,5 @@
     return { ok: !pending, queued: pending, persisted: pending && persisted };
   };
   window.addEventListener("online", () => API.init());
+  window.setInterval(() => API.init(), 30000);
 })();
