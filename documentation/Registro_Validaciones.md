@@ -2,6 +2,8 @@
 
 ## Persistencia de reportes sin conexión
 
+El servidor valida autor, coordenadas y formato de adjuntos antes de guardar un reporte; los datos inválidos reciben un error de entrada en vez de provocar un fallo de integridad de SQLite. `tests/test_report_validation.py` cubre estos casos y coordenadas cero.
+
 La conexión con el servidor se comprueba cada 30 segundos, además del evento de reconexión del navegador. Esto permite reintentar reportes cuando vuelve el backend aunque la red del dispositivo no haya cambiado; las comprobaciones simultáneas se consolidan.
 
 Los reportes con ID se conservan en localStorage antes del envío y se recuperan al iniciar la aplicación. Se reintentan al reconectar; la entrada se elimina tras confirmación del servidor. El endpoint de reportes usa reemplazo por ID, por lo que un reintento no duplica el reporte. Los fallos de almacenamiento se comunican al registrar un hallazgo. Se retiró el aviso de envío a Tierra y el deshacer exclusivamente visual que no eliminaba el registro persistido. Esta cola cubre reportes; mensajes, misiones y telemetría todavía requieren persistencia e idempotencia propias.

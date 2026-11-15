@@ -93,6 +93,29 @@ def _crew(v):
     return v
 
 
+def parse_report(body):
+    """Valida el reporte antes de intentar guardarlo en SQLite."""
+    lon = _num(body.get("lon"), -180, 180)
+    lat = _num(body.get("lat"), -90, 90)
+    if lon is None or lat is None:
+        raise ValueError("coordenadas obligatorias")
+    attachments = body.get("attachments", body.get("adjuntos", {}))
+    if not isinstance(attachments, dict):
+        raise ValueError("adjuntos debe ser un objeto")
+    return Report(
+        id=_txt(body.get("id"), 50, True),
+        author=_crew(body.get("author") or body.get("autor")),
+        type=_txt(body.get("type") or body.get("tipo"), 30, True),
+        lon=lon, lat=lat,
+        elev_m=_num(body.get("elev_m") or body.get("elev"), -20000, 30000) or 0.0,
+        sol_min=_num(body.get("sol_min") or body.get("simMin"), 0, 1e7) or 0.0,
+        km=_num(body.get("km"), 0, 10000) or 0.0,
+        text=_txt(body.get("text") or body.get("texto"), 1000, True),
+        attachments=attachments,
+        sync_status=_txt(body.get("sync_status"), 20) or "local",
+    )
+
+
 def save_hallazgo(b):
     tipo = b.get("type")
     if tipo not in ("mineral", "roca", "otro"):
@@ -339,19 +362,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("se espera un objeto JSON")
             name = url.path[5:] if url.path.startswith("/api/") else ""
             if name == "reportes":
-                rep = Report(
-                    id=_txt(body.get("id"), 50, True),
-                    author=_txt(body.get("author") or body.get("autor"), 20, True),
-                    type=_txt(body.get("type") or body.get("tipo"), 30, True),
-                    lon=_num(body.get("lon"), -180, 180),
-                    lat=_num(body.get("lat"), -90, 90),
-                    elev_m=_num(body.get("elev_m") or body.get("elev"), -20000, 30000) or 0.0,
-                    sol_min=_num(body.get("sol_min") or body.get("simMin"), 0, 1e7) or 0.0,
-                    km=_num(body.get("km"), 0, 10000) or 0.0,
-                    text=_txt(body.get("text") or body.get("texto"), 1000, True),
-                    attachments=body.get("attachments") or body.get("adjuntos") or {},
-                    sync_status=_txt(body.get("sync_status"), 20) or "local",
-                )
+                rep = parse_report(body)
                 storage.save_report(rep)
                 return self._json(201, {"ok": True, "id": rep.id})
             handlers = {"hallazgos": save_hallazgo, "bitacora": save_mensaje, "misiones": save_mision, "telemetria": save_telemetria}
