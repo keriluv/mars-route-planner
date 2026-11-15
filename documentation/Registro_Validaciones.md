@@ -2,6 +2,8 @@
 
 ## Precisión de recursos EVA
 
+Al aceptar una ruta se copian sus puntos y distancias del servidor sin recalcularlos en el cliente. La aprobación rechaza puntos incompletos, valores no finitos y distancias acumuladas decrecientes. `tests/test_route_validation.cjs` verifica la copia y el rechazo. Los desvíos y recálculos durante la marcha todavía usan cálculo local y no reciben validación integral del recorrido restante.
+
 La comprobación del refugio utiliza el centro de la celda final realmente devuelto por A*, en lugar de la coordenada solicitada. `tests/test_planner_safety.py` cubre el caso en que el ajuste de grilla sitúa ese punto fuera del radio permitido. La respuesta incluye coordenadas solicitadas, centros de celda y distancias de ajuste; el panel muestra las distancias antes de aceptar la ruta. No se ha comprobado visualmente este flujo en navegador.
 
 Las restricciones de oxígeno, batería, tiempo y radiación se evalúan con los valores de recursos sin redondear. Se eliminó del cálculo EVA el modelo heredado de rover presurizado; solo admite astronautas. `tests/test_eva_resources.py` comprueba una reserva de 24,96 % frente al umbral del 25 % y el rechazo del modelo de rover. La ruta densa conserva la precisión de distancia, elevación y transitabilidad para calcular esos recursos; `tests/test_planner_safety.py` verifica esa precisión. Los parámetros siguen siendo demostrativos, no validados científicamente.

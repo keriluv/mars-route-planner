@@ -6,12 +6,18 @@
       const alt = result && result.alternative;
       if (!result || result.is_valid !== true || !alt || alt.is_valid !== true ||
           !Array.isArray(alt.points) || alt.points.length < 2 || !alt.resources) return null;
+      if (!alt.points.every((p, i) => Array.isArray(p) && p.length >= 7 &&
+          p.slice(0, 7).every(Number.isFinite) &&
+          (i === 0 ? p[2] === 0 : p[2] >= alt.points[i - 1][2]))) return null;
       if (!Array.isArray(result.stop_adjustments) || result.stop_adjustments.length < 2 ||
           !result.stop_adjustments.every(s => s && Number.isFinite(s.distance_m) && s.distance_m >= 0)) return null;
       return { points: alt.points, resources: alt.resources, adjustments: result.stop_adjustments, region, profile };
     },
     matches(approval, points, region, profile) {
       return !!approval && approval.points === points && approval.region === region && approval.profile === profile;
+    },
+    copyPoints(approval) {
+      return approval.points.map(point => point.slice());
     }
   };
 })();

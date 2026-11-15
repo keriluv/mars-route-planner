@@ -1302,7 +1302,7 @@
     if (!MR.routeApproval.matches(T.approval, planRoute(), currentRegion, T.profileMode)) {
       return toast("Esta ruta no está validada para EVA. Recalcula una ruta que cumpla las reservas y termine en un refugio.");
     }
-    T.route = MR.withKm(planRoute().map(p => p.slice()));
+    T.route = MR.routeApproval.copyPoints(T.approval);
     T.mode = "walk"; T.km = 0; T.stages = makeStages(T.route); T.stageIdx = 0; T.playing = false;
     recomputeHazards(); setLeft(false);
     renderAll(); renderRoutes();
