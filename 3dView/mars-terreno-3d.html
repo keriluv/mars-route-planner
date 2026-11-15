@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marte 3D · Terreno desde NASA Mars Trek</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0b0605; overflow: hidden;
+    font: 13px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; color: #f2e6df; }
+  canvas { display: block; touch-action: none; }
+  #hud { position: fixed; top: 12px; left: 12px; width: 280px; max-width: calc(100vw - 24px);
+    background: rgba(20,10,8,.82); backdrop-filter: blur(6px); border: 1px solid #4a2a20;
+    border-radius: 10px; padding: 12px; }
+  #hud h1 { font-size: 14px; margin: 0 0 8px; color: #ff9b6b; }
+  #hud label { display: block; margin: 8px 0 2px; color: #cdb2a6; font-size: 12px; }
+  #hud input[type=range] { width: 100%; }
+  #hud input[type=text], #hud select { width: 100%; box-sizing: border-box; background: #2a1812;
+    color: inherit; border: 1px solid #5a3426; border-radius: 6px; padding: 4px 6px; font-size: 12px; }
+  #hud button { background: #3a2018; color: inherit; border: 1px solid #6a3c2c; border-radius: 6px;
+    padding: 4px 8px; margin: 2px 2px 0 0; cursor: pointer; font-size: 12px; }
+  #hud button:hover { background: #5a3022; }
+  #status { margin-top: 8px; font-size: 12px; color: #ffcfb5; min-height: 1.4em; }
+  #coords { position: fixed; bottom: 10px; left: 12px; font-size: 12px; color: #e8cfc2;
+    background: rgba(20,10,8,.7); padding: 4px 8px; border-radius: 6px; }
+  #help { position: fixed; bottom: 10px; right: 12px; font-size: 12px; color: #cdb2a6;
+    background: rgba(20,10,8,.7); padding: 4px 8px; border-radius: 6px; text-align: right; }
+  details summary { cursor: pointer; color: #cdb2a6; margin-top: 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>Marte 3D · NASA Mars Trek</h1>
+
+  <label>Exageración vertical: <b id="exagVal">6</b>×</label>
+  <input id="exag" type="range" min="1" max="30" step="0.5" value="6">
+
+  <label>Lugares</label>
+  <div>
+    <button data-go="-133.8,18.65,14">Olympus Mons</button>
+    <button data-go="-59,-14,22">Valles Marineris</button>
+    <button data-go="70,-42,16">Hellas</button>
+    <button data-go="137.4,-5.4,3">Gale</button>
+    <button data-go="77.5,18.4,3">Jezero</button>
+    <button data-go="0,0,150">Global</button>
+  </div>
+
+  <details>
+    <summary>Fuentes de datos (avanzado)</summary>
+    <label>Carpeta local de teselas DEM (generada con tile_dem.py; vacío = usar NASA)</label>
+    <input id="localDem" type="text" value="dem_tiles">
+    <label>Capa de altitud remota (DEM, escala de grises)</label>
+    <input id="demLayer" type="text" value="mola128_mola64_merge_90Nto90S_SimpleC_clon0">
+    <label>Extensión del DEM (si falla una, prueba la otra automáticamente)</label>
+    <select id="demExt"><option value="png">png</option><option value="jpg">jpg</option></select>
+    <label>Elevación mínima / máxima en metros (gris 0 → 255)</label>
+    <div style="display:flex;gap:6px">
+      <input id="hmin" type="text" value="-8200"><input id="hmax" type="text" value="21200">
+    </div>
+    <label>Capa de color / relieve sombreado</label>
+    <input id="colLayer" type="text" value="Mars_MGS_MOLA_ClrShade_merge_global_463m">
+    <label>Zoom máximo de teselas</label>
+    <input id="maxZ" type="text" value="6">
+    <label>Proxy CORS (opcional, prefijo de URL)</label>
+    <input id="proxy" type="text" placeholder="https://mi-proxy.example/?url=">
+    <button id="reload" style="margin-top:8px">Recargar terreno</button>
+  </details>
+  <div id="status">Iniciando…</div>
+</div>
+<div id="coords"></div>
+<div id="help">Arrastrar: mover · Rueda/pellizco: zoom · Clic derecho / Ctrl+arrastrar: inclinar y rotar</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { MapControls } from 'three/addons/controls/MapControls.js';
+
+/* ---------- Configuración ---------- */
+const BASE = 'https://trek.nasa.gov/tiles/Mars/EQ';
+const TILE_PX = 256;
+const SEGS = 64;                 // resolución de malla por tesela
+const RADIUS = 3;                // teselas alrededor del centro (7x7)
+const M_PER_DEG = 59200;         // ~metros por grado en Marte
+const $ = id => document.getElementById(id);
+
+let cfg = {};
+function readCfg() {
+  cfg = {
+    dem: $('demLayer').value.trim(),
+    col: $('colLayer').value.trim(),
+    maxZ: Math.max(0, Math.min(8, parseInt($('maxZ').value) || 6)),
+    proxy: $('proxy').value.trim(),
+    exag: parseFloat($('exag').value),
+    demExt: $('demExt').value,
+    local: $('localDem').value.trim().replace(/\/+$/, ''),
+    hmin: parseFloat($('hmin').value),
+    hmax: parseFloat($('hmax').value),
+  };
+  if (!isFinite(cfg.hmin)) cfg.hmin = -8200;
+  if (!isFinite(cfg.hmax)) cfg.hmax = 21200;
+}
+const tileURL = (layer, z, r, c, ext = 'jpg') => {
+  const u = `${BASE}/${layer}/1.0.0/default/default028mm/${z}/${r}/${c}.${ext}`;
+  return cfg.proxy ? cfg.proxy + encodeURIComponent(u) : u;
+};
+
+/* ---------- Escena ---------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const sky = new THREE.Color(0x1a0d09);
+scene.background = sky;
+scene.fog = new THREE.Fog(sky, 10, 50);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.001, 2000);
+camera.position.set(0, 120, 60);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const sun = new THREE.DirectionalLight(0xfff0e0, 1.1);
+sun.position.set(-1, 1.5, 0.6);
+scene.add(sun);
+
+const controls = new MapControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.screenSpacePanning = false;   // paneo sobre el plano del mapa
+controls.minDistance = 0.03;
+controls.maxDistance = 260;
+controls.maxPolarAngle = Math.PI * 0.44;
+controls.target.set(0, 0, 0);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------- Utilidades ---------- */
+function loadImage(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error('fallo ' + url));
+    img.src = url;
+  });
+}
+// ruido de valor simple para el modo de respaldo (si el DEM no se puede leer)
+function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  return (hash(xi, yi) * (1 - u) + hash(xi + 1, yi) * u) * (1 - v) +
+         (hash(xi, yi + 1) * (1 - u) + hash(xi + 1, yi + 1) * u) * v;
+}
+function fbm(lon, lat) {
+  let a = 0.5, f = 0.08, s = 0;
+  for (let i = 0; i < 6; i++) { s += a * vnoise(lon * f, lat * f); f *= 2; a *= 0.5; }
+  return s;
+}
+// mapa de color hipsométrico (0..1)
+function ramp(t) {
+  const stops = [[0,[40,20,40]],[0.25,[120,50,30]],[0.5,[190,110,60]],[0.75,[225,170,120]],[1,[250,240,235]]];
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+    const [t0,c0] = stops[i-1], [t1,c1] = stops[i], k = (t - t0) / (t1 - t0);
+    return c0.map((v, j) => (v + (c1[j] - v) * k) / 255);
+  }
+  return [1,1,1];
+}
+
+/* ---------- Teselas ---------- */
+const tiles = new Map();       // clave -> {mesh, z}
+const pending = new Set();
+let fallbackUsed = false, errorCount = 0;
+
+const tilesX = z => 2 ** (z + 1), tilesY = z => 2 ** z;
+const tileDeg = z => 180 / 2 ** z;
+
+async function buildTile(z, r, c) {
+  const key = `${z}/${r}/${c}`;
+  const td = tileDeg(z);
+  const lon0 = -180 + c * td, lat1 = 90 - r * td;
+
+  const loadDem = async () => {
+    if (cfg.local) {
+      try { return { img: await loadImage(`${cfg.local}/${z}/${r}/${c}.png`), terr: true }; } catch (e) {}
+    }
+    try { return { img: await loadImage(tileURL(cfg.dem, z, r, c, cfg.demExt)), terr: false }; } catch (e) {}
+    try { return { img: await loadImage(tileURL(cfg.dem, z, r, c, cfg.demExt === 'png' ? 'jpg' : 'png')), terr: false }; } catch (e) {}
+    return null;
+  };
+  const [demRes, colImg] = await Promise.all([
+    loadDem(),
+    loadImage(tileURL(cfg.col, z, r, c, 'jpg')).catch(() => null),
+  ]);
+  const demImg = demRes && demRes.img;
+  const terr = !!(demRes && demRes.terr);
+
+  // Leer píxeles del DEM (requiere CORS)
+  let pix = null;
+  if (demImg) {
+    try {
+      const cv = document.createElement('canvas');
+      cv.width = demImg.width; cv.height = demImg.height;
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(demImg, 0, 0);
+      pix = ctx.getImageData(0, 0, cv.width, cv.height);
+    } catch (e) { pix = null; }
+  }
+  if (!pix) { fallbackUsed = true; errorCount++; }
+
+  const n = SEGS + 1;
+  const pos = new Float32Array(n * n * 3);
+  const uvs = new Float32Array(n * n * 2);
+  const colors = new Float32Array(n * n * 3);
+  const idx = [];
+  const k = cfg.exag / M_PER_DEG;
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const u = j / SEGS, v = i / SEGS;
+      const lon = lon0 + u * td, lat = lat1 - v * td;
+      let t, meters; // t: 0..1 normalizado
+      if (pix) {
+        const px = Math.min(pix.width - 1, Math.round(u * (pix.width - 1)));
+        const py = Math.min(pix.height - 1, Math.round(v * (pix.height - 1)));
+        const o = (py * pix.width + px) * 4;
+        if (terr) {   // PNG Terrarium generado por tile_dem.py: metros exactos
+          meters = pix.data[o] * 256 + pix.data[o + 1] + pix.data[o + 2] / 256 - 32768;
+          t = Math.min(1, Math.max(0, (meters - cfg.hmin) / (cfg.hmax - cfg.hmin)));
+        } else {      // DEM de la NASA en escala de grises
+          t = pix.data[o] / 255;
+          meters = cfg.hmin + t * (cfg.hmax - cfg.hmin);
+        }
+      } else {
+        t = Math.min(1, Math.max(0, fbm(lon, lat) * 1.3 - 0.1));
+        meters = cfg.hmin + t * (cfg.hmax - cfg.hmin);
+      }
+      const p = (i * n + j) * 3;
+      // Las teselas gruesas se bajan para que nunca tapen a las de más detalle
+      pos[p] = lon; pos[p + 1] = meters * k - (cfg.maxZ - z) * 0.1 * cfg.exag; pos[p + 2] = -lat;
+      uvs[(i * n + j) * 2] = u; uvs[(i * n + j) * 2 + 1] = 1 - v;
+      const col = ramp(t);
+      colors[p] = col[0]; colors[p + 1] = col[1]; colors[p + 2] = col[2];
+    }
+  }
+  for (let i = 0; i < SEGS; i++) for (let j = 0; j < SEGS; j++) {
+    const a = i * n + j, b = a + 1, c2 = a + n, d = c2 + 1;
+    idx.push(a, c2, b, b, c2, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setIndex(idx);
+
+  let mat;
+  const po = { polygonOffset: true, polygonOffsetFactor: -z, polygonOffsetUnits: -z };
+  if (colImg) {
+    const tex = new THREE.Texture(colImg);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    tex.needsUpdate = true;
+    mat = new THREE.MeshBasicMaterial({ map: tex, ...po });   // el relieve ya viene sombreado por la NASA
+  } else {
+    geo.computeVertexNormals();
+    mat = new THREE.MeshLambertMaterial({ vertexColors: true, ...po });
+  }
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = true;
+  return { key, mesh, z };
+}
+
+function disposeTile(t) {
+  scene.remove(t.mesh);
+  t.mesh.geometry.dispose();
+  if (t.mesh.material.map) t.mesh.material.map.dispose();
+  t.mesh.material.dispose();
+}
+
+function ensure(z, r, c) {
+  const key = `${z}/${r}/${c}`;
+  if (tiles.has(key) || pending.has(key)) return;
+  pending.add(key);
+  buildTile(z, r, c).then(t => {
+    pending.delete(key);
+    if (!alive) { disposeTile(t); return; }
+    tiles.set(key, t);
+    scene.add(t.mesh);
+    cleanup();
+    setStatus();
+  });
+}
+
+let currentNeeded = new Set();
+let currentZ = 0;
+let alive = true;
+
+function chooseZoom() {
+  const h = Math.max(0.01, camera.position.distanceTo(controls.target));
+  const span = 0.93 * h * (innerWidth / innerHeight > 1 ? 1 : innerHeight / innerWidth); // grados visibles aprox.
+  const z = Math.round(Math.log2((180 * 3) / span));
+  return Math.max(0, Math.min(cfg.maxZ, z));
+}
+
+function updateTiles() {
+  const z = chooseZoom();
+  currentZ = z;
+  const td = tileDeg(z);
+  const lon = controls.target.x, lat = -controls.target.z;
+  const cc = Math.floor((lon + 180) / td), cr = Math.floor((90 - lat) / td);
+  currentNeeded = new Set();
+  // base global (siempre presente, contexto)
+  for (let c = 0; c < tilesX(0); c++) { currentNeeded.add(`0/0/${c}`); ensure(0, 0, c); }
+  for (let dr = -RADIUS; dr <= RADIUS; dr++) for (let dc = -RADIUS; dc <= RADIUS; dc++) {
+    const r = cr + dr, c = cc + dc;
+    if (r < 0 || r >= tilesY(z) || c < 0 || c >= tilesX(z)) continue;
+    currentNeeded.add(`${z}/${r}/${c}`);
+    ensure(z, r, c);
+  }
+  cleanup();
+  setStatus();
+}
+
+// Elimina teselas obsoletas solo cuando las nuevas ya están listas (evita huecos)
+function cleanup() {
+  for (const key of currentNeeded) if (!tiles.has(key)) return;
+  for (const [key, t] of tiles) if (!currentNeeded.has(key)) { disposeTile(t); tiles.delete(key); }
+}
+
+function setStatus() {
+  let s = `Zoom ${currentZ}/${cfg.maxZ} · ${tiles.size} teselas`;
+  if (pending.size) s += ` · cargando ${pending.size}…`;
+  if (fallbackUsed) s += '<br>⚠ No se pudo leer el DEM de la NASA (posible bloqueo CORS o nombre de capa). Se usa relieve procedural en esas teselas; prueba un proxy CORS en “Fuentes de datos”.';
+  $('status').innerHTML = s;
+}
+
+/* ---------- UI ---------- */
+function resetTerrain() {
+  for (const t of tiles.values()) disposeTile(t);
+  tiles.clear(); pending.clear(); currentNeeded.clear();
+  fallbackUsed = false; errorCount = 0;
+  readCfg(); updateTiles();
+}
+$('exag').addEventListener('input', () => { $('exagVal').textContent = $('exag').value; });
+$('exag').addEventListener('change', resetTerrain);
+$('reload').addEventListener('click', resetTerrain);
+
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => {
+  const [lon, lat, h] = b.dataset.go.split(',').map(Number);
+  flyTo(lon, lat, h);
+}));
+
+let fly = null;
+function flyTo(lon, lat, h) {
+  const t1 = new THREE.Vector3(lon, 0, -lat);
+  const p1 = new THREE.Vector3(lon, h, -lat + h * 0.7);
+  fly = { t0: controls.target.clone(), p0: camera.position.clone(), t1, p1, s: performance.now(), d: 1600 };
+}
+
+/* ---------- Bucle ---------- */
+let lastKey = '';
+function frame(now) {
+  if (fly) {
+    const k = Math.min(1, (now - fly.s) / fly.d), e = k < .5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2) / 2;
+    controls.target.lerpVectors(fly.t0, fly.t1, e);
+    camera.position.lerpVectors(fly.p0, fly.p1, e);
+    if (k >= 1) fly = null;
+  }
+  controls.update();
+
+  // limitar el objetivo a los límites del mapa
+  controls.target.x = Math.max(-180, Math.min(180, controls.target.x));
+  controls.target.z = Math.max(-90, Math.min(90, controls.target.z));
+
+  const dist = camera.position.distanceTo(controls.target);
+  scene.fog.near = dist * 1.3;
+  scene.fog.far = dist * 2.6 + 2;
+  controls.rotateSpeed = 0.7;
+  controls.panSpeed = 1.0;
+
+  const key = `${chooseZoom()}|${Math.floor(controls.target.x * 4 / tileDeg(chooseZoom()))}|${Math.floor(controls.target.z * 4 / tileDeg(chooseZoom()))}`;
+  if (key !== lastKey) { lastKey = key; updateTiles(); }
+
+  $('coords').textContent =
+    `Lon ${controls.target.x.toFixed(2)}°  Lat ${(-controls.target.z).toFixed(2)}°  ·  Altura de cámara ${(dist * M_PER_DEG / 1000).toFixed(0)} km`;
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+readCfg();
+flyTo(-80, 5, 60);
+updateTiles();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
