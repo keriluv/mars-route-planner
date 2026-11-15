@@ -168,15 +168,15 @@
       doneMesh = tube(st.route.slice(0, Math.max(2, i + 1)), 0x46c882, 0.3);
     }
     if (!astro) {
-      astro = new THREE.Mesh(new THREE.SphereGeometry(0.45, 20, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 }));
+      astro = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.5, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 }));
       scene.add(astro);
       scene.add(beacon);
     }
     if (st.pos) {
-      const p = toXYZ(st.pos[0], st.pos[1], 0.45);
+      const p = toXYZ(st.pos[0], st.pos[1], 0.85);
       astro.position.copy(p);
-      beacon.position.set(p.x, p.y + 0.9, p.z);
+      beacon.position.set(p.x, p.y + 2.25, p.z);
       astro.material.color.set(st.color || "#1E64DC");
       astro.visible = beacon.visible = true;
       if (follow) {
@@ -209,36 +209,37 @@
       const isMin = m.type === "mineral" || m.isMineral;
       const c = isMin ? (m.mineral && m.mineral.category === "Carbonatos / Olivino" ? 0x00d26a : 0x2f7fb8) : (col[m.type] || 0xffffff);
 
-      const stickH = 1.4;
+      const stickH = 3.6;
+      const stickR = 0.11;
       const stick = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.035, 0.035, stickH, 6),
+        new THREE.CylinderGeometry(stickR, stickR, stickH, 8),
         new THREE.MeshBasicMaterial({ color: c })
       );
       stick.position.set(base.x, base.y + stickH / 2, base.z);
 
       let head;
-      const headY = base.y + stickH + 0.38;
+      const headY = base.y + stickH + 0.9;
       if (isMin) {
         head = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.42),
-          new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.55 })
+          new THREE.OctahedronGeometry(1.2),
+          new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.65 })
         );
         head.position.set(base.x, headY, base.z);
         const ring = new THREE.Mesh(
-          new THREE.RingGeometry(0.18, 0.45, 16),
-          new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+          new THREE.RingGeometry(0.5, 1.3, 16),
+          new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
         );
         ring.rotation.x = Math.PI / 2;
-        ring.position.set(base.x, base.y + 0.04, base.z);
+        ring.position.set(base.x, base.y + 0.1, base.z);
         g.add(ring);
         g.userData = { isMineral: true, mineral: m.mineral || m, onClick: m.onClick, label: m.label };
       } else {
         head = new THREE.Mesh(
           m.type === "meta"
-            ? new THREE.ConeGeometry(0.42, 0.85, 4)
+            ? new THREE.ConeGeometry(1.2, 2.2, 6)
             : m.type === "refugio"
-            ? new THREE.CylinderGeometry(0.32, 0.36, 0.6, 6)
-            : new THREE.OctahedronGeometry(0.36),
+            ? new THREE.CylinderGeometry(0.9, 1.0, 1.5, 6)
+            : new THREE.OctahedronGeometry(1.0),
           new THREE.MeshBasicMaterial({ color: c })
         );
         head.position.set(base.x, headY, base.z);
@@ -247,6 +248,7 @@
 
       g.add(stick);
       g.add(head);
+      g._head = head;
       scene.add(g);
       pins.push(g);
     });
@@ -329,8 +331,8 @@
       // Rotación suave de cristales minerales
       const tSec = now * 0.002;
       pins.forEach(p => {
-        if (p.userData && p.userData.isMineral && p.children[1]) {
-          p.children[1].rotation.y = tSec;
+        if (p._head && p.userData && p.userData.isMineral) {
+          p._head.rotation.y = tSec;
         }
       });
 
