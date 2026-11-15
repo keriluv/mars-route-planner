@@ -1,5 +1,11 @@
 # Registro de implementación y validaciones
 
+## Persistencia de reportes sin conexión
+
+Los reportes con ID se conservan en localStorage antes del envío y se recuperan al iniciar la aplicación. Se reintentan al reconectar; la entrada se elimina tras confirmación del servidor. El endpoint de reportes usa reemplazo por ID, por lo que un reintento no duplica el reporte. Los fallos de almacenamiento se comunican al registrar un hallazgo. Se retiró el aviso de envío a Tierra y el deshacer exclusivamente visual que no eliminaba el registro persistido. Esta cola cubre reportes; mensajes, misiones y telemetría todavía requieren persistencia e idempotencia propias.
+
+`tests/test_report_queue.cjs` verifica recarga, fallo de red, reintento concurrente y agotamiento de almacenamiento. No sustituye la comprobación en navegador ni garantiza sincronización entre múltiples pestañas.
+
 ## Cambios implementados
 
 - Validación de solicitudes: región soportada, forma de paradas, coordenadas finitas dentro de cobertura y perfil conocido.

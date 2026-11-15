@@ -9,6 +9,30 @@
   "use strict";
   const MR = window.MR;
   const API = (MR.API = { online: false, queue: [] });
+  const REPORT_KEY = "galex_pending_reports_v1";
+  let reports = {};
+  let flushingReports = false;
+  try {
+    const saved = JSON.parse(localStorage.getItem(REPORT_KEY) || "{}");
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) reports = saved;
+  } catch (_) { /* El estado de persistencia se comprobará al guardar. */ }
+  function persistReports() {
+    try { localStorage.setItem(REPORT_KEY, JSON.stringify(reports)); return true; }
+    catch (_) { return false; }
+  }
+  API.flushReports = async function () {
+    if (!API.online || flushingReports) return;
+    flushingReports = true;
+    try {
+      for (const [id, report] of Object.entries(reports)) {
+        try {
+          await req("reportes", { method: "POST", body: JSON.stringify(report) });
+          if (reports[id] === report) delete reports[id];
+          persistReports();
+        } catch (_) { /* Conservar hasta una reconexión; el ID hace el reenvío idempotente. */ }
+      }
+    } finally { flushingReports = false; }
+  };
 
   async function req(path, opts = {}, timeout = 2500) {
     const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), timeout);
@@ -23,7 +47,7 @@
     try { const h = await req("health"); API.online = h && h.status === "ok"; } catch (e) { API.online = false; }
     const b = document.getElementById("connBadge");
     if (b) { b.textContent = API.online ? "Backend conectado" : "Modo local"; b.dataset.on = API.online ? "1" : "0"; }
-    if (API.online) API.flush();
+    if (API.online) { API.flush(); await API.flushReports(); }
     return API.online;
   };
   // envía; si falla, guarda en cola ("Sin señal: se enviará al reconectar")
@@ -57,6 +81,12 @@
     try { return await req("reportes"); } catch (e) { return []; }
   };
   API.sendReporte = async function (rep) {
-    return await API.send("reportes", rep);
+    if (!rep || typeof rep.id !== "string" || !rep.id) return { ok: false, error: "Reporte sin identificador" };
+    reports[rep.id] = JSON.parse(JSON.stringify(rep));
+    const persisted = persistReports();
+    await API.flushReports();
+    const pending = Object.prototype.hasOwnProperty.call(reports, rep.id);
+    return { ok: !pending, queued: pending, persisted: pending && persisted };
   };
+  window.addEventListener("online", () => API.init());
 })();

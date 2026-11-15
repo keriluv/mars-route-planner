@@ -1179,12 +1179,12 @@
       text: `Hallazgo geológico [${tn}]: ${note || "Sin nota"}`,
       attachments: { type, solTime: MR.solTime(T.simMin).label },
       sync_status: "local"
+    }).then(result => {
+      toast(result.ok ? "Reporte guardado en el servidor local" : result.persisted
+        ? "Reporte conservado en este navegador · pendiente de envío al servidor local"
+        : "No se pudo guardar el reporte de forma persistente; conserva una copia antes de cerrar.");
     });
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Hallazgo registrado: ${tn}` });
-    toast("Guardado · enviado a la Tierra", "Deshacer", () => {
-      T.findings = T.findings.filter(x => x !== f); T.log = T.log.filter(x => x !== msg);
-      bump("hallazgos", -1); refreshMarkers(); renderPanel(); toast("Hallazgo eliminado");
-    });
     renderPanel();
   }
   function openFindingCard(f) {
