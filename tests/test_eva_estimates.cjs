@@ -22,4 +22,6 @@ test('elapsed EVA time consumes resources across walking and rest without mutati
   assert.equal(afterRest.radiation_dose_msv, 0.05);
   assert.throws(() => MR.consumeEvaResources(initial, -1), RangeError);
   assert.throws(() => MR.consumeEvaResources({ ...initial, oxygen_pct: NaN }, 1), RangeError);
+  assert.equal(MR.evaResourcesExhausted(afterRest), false);
+  assert.equal(MR.evaResourcesExhausted(MR.consumeEvaResources(initial, 480)), true);
 });

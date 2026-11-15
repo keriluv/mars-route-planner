@@ -27,7 +27,7 @@
     const base = MR.withKm(D.routes[c.main].points);
     return {
       crew: c, mode: "base", choice: "model", baseRoute: base, adjusted: null, shortRoute: null, route: null,
-      profileMode: "segura", mobility: "astronaut", approval: null, alertTriggered: false,
+      profileMode: "segura", mobility: "astronaut", approval: null, alertTriggered: false, evaResources: null,
       km: 0, simMin: EVA_START * 60, playing: false, speed: 1, stages: [], stageIdx: 0,
       findings: [], missions: [], log: [], ai: [], handled: {}, events: [], proposed: {},
       unread: { misiones: 1, bitacora: 0, hallazgos: 0 }, briefed: false, wx: null, lastWx: -1e9,
@@ -797,6 +797,8 @@
   function togglePlay() {
     if (T.mode !== "walk") return;
     if (!$("modal").hidden && $("modal").classList.contains("critical")) return;
+    if (!T.playing && MR.evaResourcesExhausted(T.evaResources)) return toast("EVA en pausa: autonomía demostrativa agotada.");
+    if (!T.playing && (time().hour >= EVA_END || time().hour < EVA_START)) return toast("La simulación permanece en pausa: descanso nocturno sin refugio validado.");
     T.playing = !T.playing;
     if (T.playing) { $("stageCard").hidden = true; }
     renderStatus();
@@ -1279,6 +1281,7 @@
       return toast("Esta ruta no está validada para EVA. Recalcula una ruta que cumpla las reservas y termine en un refugio.");
     }
     T.route = MR.routeApproval.copyPoints(T.approval);
+    T.evaResources = { oxygen_pct: 100, battery_pct: 100, eva_time_min: 0, radiation_dose_msv: 0 };
     T.mode = "walk"; T.km = 0; T.stages = makeStages(T.route); T.stageIdx = 0; T.playing = false;
     recomputeHazards(); setLeft(false);
     renderAll(); renderRoutes();
@@ -1435,8 +1438,9 @@
         <p>${fmt(T.km)} km recorridos · quedan ${fmt(L - T.km)} km. Caminar de noche no está permitido.</p>
         <div class="next"><div class="stat"><span class="v num">${fmt(night, 0)} °C</span><span class="k">mínima esta noche</span></div>
         <div class="stat"><span class="v num">${nxt.label}</span><span class="k">reanudación</span></div></div>
-        <div class="actions"><button class="btn primary" data-r>Descansar hasta las 08:00</button></div>`;
-      card.querySelector("[data-r]").addEventListener("click", () => { restUntilMorning(); });
+        <p>No hay descanso nocturno ni reposición de recursos validados en este punto.</p>
+        <div class="actions"><button class="btn primary" data-r>Entendido</button></div>`;
+      card.querySelector("[data-r]").addEventListener("click", () => { toast("La simulación permanece en pausa."); });
     } else {
       const done = T.stageIdx; const a = T.stages[done - 1] || 0, b = T.stages[done] || L;
       const seg = T.route.filter(p => p[2] >= a && p[2] <= b);
@@ -1451,22 +1455,12 @@
           <div class="stat"><span class="v num">${fmt(minT, 0)} °C</span><span class="k">al final del tramo</span></div>
           <div class="stat"><span class="v num">${hz}</span><span class="k">tramos empinados</span></div></div>
         <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn primary" data-c>Continuar</button></div>`;
-      card.querySelector("[data-r]").addEventListener("click", () => { T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h."); renderStatus(); updateWeather(true); });
+      card.querySelector("[data-r]").addEventListener("click", () => { T.evaResources = MR.consumeEvaResources(T.evaResources, 60); T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h; recursos EVA consumidos."); renderStatus(); updateWeather(true); if (MR.evaResourcesExhausted(T.evaResources)) toast("EVA en pausa: autonomía demostrativa agotada."); });
       card.querySelector("[data-c]").addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
     }
     card.hidden = false;
     card.querySelector(".btn.primary").focus({ preventScroll: true });
   }
-  function restUntilMorning() {
-    $("stageCard").hidden = true;
-    T.simMin = (Math.floor(T.simMin / 1440) + 1) * 1440 + EVA_START * 60;
-    T.flags["eva1h_" + time().sol] = false;
-    logSys(`Descanso nocturno. Reanudación ${time().label}.`);
-    T.events.push({ t: T.simMin, c: "var(--text-2)", txt: `Inicio del ${time().label.split(" · ")[0]}` });
-    renderStatus(); updateWeather(true);
-    banner({ kind: "info", title: `Buenos días · ${time().label}`, sub: "Pulsa ▶ para continuar.", ttl: 4000 });
-  }
-
   /* =====================================================
      SIMULACIÓN EN TIEMPO REAL
      ===================================================== */
@@ -1498,10 +1492,15 @@
   function advance(dMin) {
     const R = T.route, L = R[R.length - 1][2];
     const i = MR.nearestKm(R, T.km);
-    let v = (T.mobility === "rover" ? MR.roverSpeed(R[i][4], R[i][6]) : MR.walkSpeed(MR.gradeAt(R, i), R[i][6]));
+    const grade = MR.gradeAt(R, i);
+    let v = MR.walkSpeed(grade, R[i][6]);
     const inZone = T.hazards.find(z => T.km >= z.startKm - 0.05 && T.km <= z.endKm + 0.05);
     if (inZone) v *= 0.6;
+    T.evaResources = MR.consumeEvaResources(T.evaResources, dMin, grade);
     T.km = Math.min(L, T.km + (v * dMin) / 60); T.simMin += dMin;
+    if (MR.evaResourcesExhausted(T.evaResources)) {
+      T.playing = false; renderStatus(); toast("EVA en pausa: autonomía demostrativa agotada."); return;
+    }
     // datos de condiciones cada 10 min marcianos
     if (T.simMin - T.lastWx >= 10) updateWeather();
     if (T.simMin - T.lastTele >= 30) { T.lastTele = T.simMin; const p = curPos(); MR.API.send("telemetria", { crew: T.crew.id, t: T.simMin, km: T.km, lon: p[0], lat: p[1], elev: p[3], wx: T.wx }); }

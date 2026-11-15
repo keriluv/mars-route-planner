@@ -181,6 +181,7 @@
       radiation_dose_msv: state.radiation_dose_msv + minutes / 60 * 0.025,
     };
   };
+  MR.evaResourcesExhausted = state => !!state && (state.oxygen_pct <= 0 || state.battery_pct <= 0 || state.eva_time_min >= 480);
   MR.gradeAt = function (pts, i) {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
     const d = (b[2] - a[2]) * 1000;

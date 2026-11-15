@@ -2,7 +2,7 @@
 
 ## Precisión de recursos EVA
 
-`MR.consumeEvaResources` calcula consumo por minutos con las tasas demostrativas del servidor, incluyendo mayor consumo de oxígeno en pendientes ascendentes y descanso sin pendiente. `tests/test_eva_estimates.cjs` comprueba acumulación, inmutabilidad y entradas inválidas. Es una función preparatoria aún no conectada al reloj: falta definir cómo representar el descanso nocturno, el refugio y cualquier reposición, y evitar divergencias entre las constantes de cliente y servidor.
+`MR.consumeEvaResources` calcula consumo por minutos con las tasas demostrativas del servidor, incluyendo mayor consumo de oxígeno en pendientes ascendentes y descanso sin pendiente. La simulación mantiene ese balance durante la marcha y descansos de una hora, y se pausa al agotar oxígeno, batería o las ocho horas nominales. El salto nocturno queda deshabilitado mientras no se compruebe refugio y reposición. `tests/test_eva_estimates.cjs` comprueba la función y el agotamiento; falta validar el flujo completo en navegador y evitar divergencias entre constantes de cliente y servidor. El balance aún no alimenta la API de replanificación ni constituye una validación científica.
 
 Las estimaciones locales de duración y recursos usan por defecto la caminata EVA; antes algunas llamadas sin modo explícito utilizaban velocidad de rover. `tests/test_eva_estimates.cjs` verifica el comportamiento predeterminado. Estas estimaciones locales siguen siendo provisionales y difieren del cálculo del servidor.
 
