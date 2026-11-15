@@ -23,7 +23,7 @@ from marsroute.domain import (
     RouteProfile,
     Shelter,
 )
-from marsroute.planner import astar, build_cost_surface, route_lonlat, simplify
+from marsroute.planner import astar, build_cost_surface, route_lonlat
 
 MARS_RADIUS_M = 3396190.0
 ROOT = Path(__file__).resolve().parents[2]
@@ -154,6 +154,8 @@ class MultiCriteriaPlanner:
 
     def _lonlat_to_cell(self, lon: float, lat: float) -> Tuple[int, int]:
         w, s, e, n = self.bbox
+        if not (math.isfinite(lon) and math.isfinite(lat) and w <= lon <= e and s <= lat <= n):
+            raise ValueError("Coordenadas fuera de la región")
         r = min(self.grid_size - 1, max(0, int((n - lat) / (n - s) * self.grid_size)))
         c = min(self.grid_size - 1, max(0, int((lon - w) / (e - w) * self.grid_size)))
         return r, c
@@ -208,6 +210,9 @@ class MultiCriteriaPlanner:
         # Bloqueos dinámicos (ej. tormenta detectada por MDA)
         if blocked_dynamic_cells is not None:
             blocked = blocked | blocked_dynamic_cells
+        if "valid" in self.layers:
+            blocked = blocked | ~self.layers["valid"].astype(bool)
+        blocked = blocked | ~np.isfinite(self.layers["dem"])
 
         # Construir secuencia de paradas: inicio -> objetivos -> refugio final
         all_stops = [start_lonlat] + target_lonlats
@@ -215,7 +220,6 @@ class MultiCriteriaPlanner:
             all_stops.append(final_shelter_lonlat)
 
         cells = [self._lonlat_to_cell(lon, lat) for lon, lat in all_stops]
-        cells = [self._find_nearest_free(blocked, r, c) for r, c in cells]
 
         # Validar restricción dura de refugio final
         alerts: List[Alert] = []
@@ -276,8 +280,7 @@ class MultiCriteriaPlanner:
             )
 
         # Simplificar y convertir a coordenadas
-        simplified = simplify(np.asarray(full_cells, dtype="int32"), tolerance=1.2)
-        ll = route_lonlat(simplified, self.bbox, self.grid_size)
+        ll = route_lonlat(np.asarray(full_cells, dtype="int32"), self.bbox, self.grid_size)
 
         # Construir puntos completos con elevación, pendiente, rugosidad y transitabilidad
         dem = self.layers["dem"]
@@ -299,8 +302,24 @@ class MultiCriteriaPlanner:
             points.append([float(lon), float(lat), round(cum_km, 3), round(elev, 1), round(sl, 1), round(ro, 2), round(tr, 2)])
 
         # Evaluar recursos y tiempos (astronauta en distancias cortas, rover presurizado en expediciones largas)
-        active_mobility = mobility or ("rover" if cum_km > 15.0 else "astronaut")
+        active_mobility = mobility or "astronaut"
+        if active_mobility != "astronaut":
+            raise ValueError("El planificador EVA solo admite astronautas; los rovers son fuentes de información")
         total_km, total_hours, resources = compute_path_resources(points, profile, mobility=active_mobility)
+
+        settings = yaml.safe_load((ROOT / "config" / "route_profiles.yaml").read_text(encoding="utf-8"))
+        limits = settings["hard_constraints"]
+        reserve = settings["profiles"][profile.id].get("min_reserve_pct", 0)
+        checks = [
+            (resources.oxygen_pct < max(reserve, limits["min_oxygen_reserve_pct"]), "Reserva de oxígeno insuficiente"),
+            (resources.battery_pct < max(reserve, limits["min_battery_reserve_pct"]), "Reserva de batería insuficiente"),
+            (resources.eva_time_min > limits["max_eva_hours"] * 60, "Duración EVA excedida"),
+            (resources.radiation_dose_msv > limits["max_radiation_dose_msv"], "Dosis de radiación excedida"),
+        ]
+        violations = [reason for failed, reason in checks if failed]
+        if violations:
+            is_valid = False
+            rejection_reason = rejection_reason or "; ".join(violations)
 
         # Validaciones de supervivencia adicionales (conservando rechazos previos por refugio ausente)
         if not rejection_reason:

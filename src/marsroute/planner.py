@@ -39,7 +39,7 @@ def build_cost_surface(
     risk = 1.0 - np.clip(traversability, 0.0, 1.0)
     slope_penalty = np.clip((slope - caution_slope_deg) / max(max_slope_deg - caution_slope_deg, 1e-6), 0.0, 1.0)
     cost = 1.0 + risk_weight * risk**2 + slope_weight * slope_penalty**2
-    blocked = (slope > max_slope_deg) | (traversability < min_traversability)
+    blocked = (~np.isfinite(slope)) | (~np.isfinite(traversability)) | (slope > max_slope_deg) | (traversability < min_traversability)
     if margin_cells > 0:
         blocked = ndimage.binary_dilation(blocked, iterations=margin_cells)
     return cost.astype("float32"), blocked
@@ -59,8 +59,12 @@ def astar(cost: np.ndarray, blocked: np.ndarray, start, goal) -> Route:
     goal_index = goal_row * columns + goal_column
     best[start_index] = 0.0
 
+    minimum_cost = float(np.min(cost[~blocked]))
+    if not np.isfinite(minimum_cost) or minimum_cost < 0:
+        raise ValueError("Invalid traversal cost")
+
     def heuristic(row: int, column: int) -> float:
-        return math.hypot(row - goal_row, column - goal_column)
+        return minimum_cost * math.hypot(row - goal_row, column - goal_column)
 
     heap = [(heuristic(start_row, start_column), start_index)]
     closed = np.zeros(size, dtype=bool)
@@ -80,6 +84,8 @@ def astar(cost: np.ndarray, blocked: np.ndarray, start, goal) -> Route:
             next_row = row + delta_row
             next_column = column + delta_column
             if next_row < 0 or next_row >= rows or next_column < 0 or next_column >= columns:
+                continue
+            if delta_row and delta_column and (blocked[row + delta_row, column] or blocked[row, column + delta_column]):
                 continue
             next_index = next_row * columns + next_column
             if closed[next_index] or blocked[next_row, next_column]:
