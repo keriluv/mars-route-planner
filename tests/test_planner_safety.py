@@ -55,3 +55,18 @@ def test_short_eva_reaches_shelter_with_reserves():
     assert result.resources.oxygen_pct >= 25
     assert result.resources.battery_pct >= 25
     assert len(result.points) == 5
+
+
+def test_route_keeps_measurement_precision_for_resource_calculation():
+    layers = {"dem": np.full((5, 5), 0.046), "slope": np.zeros((5, 5)),
+              "traversability": np.full((5, 5), 0.9876)}
+    planner = MultiCriteriaPlanner(layers, (137.4, -4.61, 137.41, -4.6), 5)
+    goal = (137.409, -4.609)
+    result = planner.plan_alternative("segura", (137.401, -4.601), [], goal,
+                                      [{"lon": goal[0], "lat": goal[1], "name": "Refugio"}])
+    assert result.is_valid
+    assert result.points[-1][2] == result.total_km
+    assert result.points[-1][2] != round(result.points[-1][2], 3)
+    assert result.points[-1][3] == pytest.approx(0.046)
+    assert result.points[-1][6] == pytest.approx(0.9876)
+    assert result.estimated_hours * 60 == pytest.approx(result.resources.eva_time_min)

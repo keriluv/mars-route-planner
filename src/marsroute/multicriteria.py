@@ -120,7 +120,7 @@ def compute_path_resources(
         radiation_dose_msv=dose_msv,
         reserve_to_next_shelter_pct=reserve_pct,
     )
-    return round(total_km, 2), round(total_hours, 2), res
+    return total_km, total_hours, res
 
 
 def check_shelter_proximity(
@@ -303,7 +303,7 @@ class MultiCriteriaPlanner:
                 dlat = (lat - prev_lat) * (math.pi / 180.0) * (MARS_RADIUS_M / 1000.0)
                 dlon = (lon - prev_lon) * (math.pi / 180.0) * (MARS_RADIUS_M / 1000.0) * math.cos(math.radians((lat + prev_lat) / 2.0))
                 cum_km += math.hypot(dlon, dlat)
-            points.append([float(lon), float(lat), round(cum_km, 3), round(elev, 1), round(sl, 1), round(ro, 2), round(tr, 2)])
+            points.append([float(lon), float(lat), cum_km, elev, sl, ro, tr])
 
         # Evaluar recursos y tiempos de la caminata EVA.
         active_mobility = mobility or "astronaut"
