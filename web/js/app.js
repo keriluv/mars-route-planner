@@ -966,21 +966,15 @@
   }
   let routeRequestId = 0;
   function recalcRoute() {
+    if (T.mode === "walk") {
+      T.playing = false; renderStatus();
+      return toast("Replanificación durante la EVA aún no disponible: la ruta actual se conserva en pausa.");
+    }
     const requestId = ++routeRequestId;
     T.approval = null;
     const g = goalObj(); const goal = [g.lon, g.lat];
     const stops = T.stops.map(stopLL).filter(Boolean)
       .sort((a, b) => MR.nearestIdx(T.baseRoute, a).i - MR.nearestIdx(T.baseRoute, b).i);
-    if (T.mode === "walk") {
-      const p = curPos(); const i = MR.nearestKm(T.route, T.km);
-      const rest = MR.chain([[p[0], p[1]], ...stops, goal]);
-      if (!rest) return toast("No hay ruta posible con esos límites. Sube la pendiente máxima.");
-      T.route = MR.withKm(T.route.slice(0, i).concat([p], rest.slice(1)));
-      T.stages = makeStages(T.route).map(k => Math.max(k, T.km));
-      afterRouteChange(); toast("Ruta recalculada desde tu posición");
-      logSys("Ruta recalculada desde la posición actual con nuevos pesos.");
-      return;
-    }
     const t0 = performance.now();
     const r = MR.chain([[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal]);
     if (!r) return toast("No hay ruta posible con esos límites. Sube la pendiente máxima.");
@@ -1351,8 +1345,7 @@
   function proposeOwn(st) {
     const m = { id: uid("m"), name: st.name, type: st.type, origin: "propia", lon: st.lon, lat: st.lat, note: st.note, status: "propuesta", by: T.crew.short };
     T.missions.push(m);
-    activateMission(m);
-    sendToEarth(`Nueva misión propia: ${m.name} (${m.type})`, [m.lon, m.lat], "mision");
+    if (activateMission(m)) sendToEarth(`Nueva misión propia: ${m.name} (${m.type})`, [m.lon, m.lat], "mision");
   }
   // Secundaria asignada (propuesta por el sistema o la Tierra)
   function openSecondaryBriefing(m) {
@@ -1360,31 +1353,22 @@
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg own">Misión asignada · Secundaria</span><span style="color:var(--text-2)">${esc(m.by)}</span></div>
       <h2></h2><div class="who n"></div></div>
       <div class="mbody">${factsHtml([[fmt(d, 1) + " km", p ? "desde tu posición" : "desde la ruta"], [fmt(MR.sample("slope", m.lon, m.lat), 0) + "°", "pendiente en el punto"], [fmt(MR.sample("traversability", m.lon, m.lat), 2), "facilidad de paso"]])}
-      <div class="who">Si aceptas, el mapa calcula un desvío y regresa a la ruta principal.</div>
+      <div class="who">En planificación se añade como parada. Durante la EVA queda propuesta hasta que sea posible validar un desvío.</div>
       <div class="actions"><button class="btn ghost spacer" data-r>Rechazar</button><button class="btn" data-n>Ahora no</button><button class="btn primary" data-a>Aceptar misión</button></div></div>`, {
       bind: el => {
         el.querySelector("h2").textContent = m.name; el.querySelector(".n").textContent = m.note || "";
         el.querySelector("[data-n]").addEventListener("click", closeModal);
         el.querySelector("[data-r]").addEventListener("click", () => { closeModal(); T.missions = T.missions.filter(x => x !== m); bump("misiones", -1); refreshMarkers(); renderPanel(); logSys(`Misión secundaria rechazada: ${m.name}.`); });
-        el.querySelector("[data-a]").addEventListener("click", () => { closeModal(); bump("misiones", -1); activateMission(m); });
+        el.querySelector("[data-a]").addEventListener("click", () => { closeModal(); if (activateMission(m)) bump("misiones", -1); });
       },
     });
   }
   function activateMission(m) {
     if (T.mode === "walk") {
-      const p = curPos(); const i = MR.nearestKm(T.route, T.km);
-      const re = MR.nearestIdx(T.route, [m.lon, m.lat], Math.min(T.route.length - 1, i + 1));
-      const rejoin = Math.min(T.route.length - 1, Math.max(re.i, i + 1));
-      const a = MR.astar([p[0], p[1]], [m.lon, m.lat]), b = a && MR.astar([m.lon, m.lat], [T.route[rejoin][0], T.route[rejoin][1]]);
-      if (!a || !b) { m.status = "propuesta"; toast("No se encontró un desvío seguro hasta ese punto"); return; }
-      const det = MR.withKm(a.concat(b.slice(1)));
-      const extra = Math.max(0, det[det.length - 1][2] - (T.route[rejoin][2] - T.km));
-      T.route = MR.withKm(T.route.slice(0, i).concat([p], det.slice(1), T.route.slice(rejoin + 1)));
-      const L = T.route[T.route.length - 1][2];
-      T.stages = makeStages(T.route).map(k => Math.max(k, T.km)); T.stageIdx = T.stages.findIndex(k => k > T.km + 0.01); if (T.stageIdx < 0) T.stageIdx = T.stages.length - 1;
-      m.path = MR.withKm(det); m.status = "aceptada";
-      recomputeHazards();
-      banner({ kind: "sec", title: `Desvío calculado: ${m.name}`, sub: `+${fmt(extra, 1)} km de desvío · ruta total ${fmt(L)} km`, ttl: 6000 });
+      m.status = "propuesta";
+      T.playing = false; renderStatus();
+      toast("La misión queda propuesta: aún no se pueden validar desvíos durante la EVA.");
+      return false;
     } else {
       // en Planear o Mapa base: se convierte en parada de la ruta
       m.status = "aceptada";
@@ -1396,6 +1380,7 @@
     T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secundaria aceptada: ${m.name}` });
     MR.API.send("misiones", { crew: T.crew.id, kind: "secundaria", name: m.name, origin: m.origin, lon: m.lon, lat: m.lat, status: m.status });
     renderStops(); renderRoutes(); refreshMarkers(); renderPanel(); renderDock(true); renderStatus(); update3d();
+    return true;
   }
 
   /* ---------- alerta crítica ---------- */
@@ -1403,35 +1388,17 @@
     T.playing = false; renderStatus(); T.alerts++;
     if (S.panel) togglePanel(null);
     $("stageCard").hidden = true;
-    const p = curPos(); const dist = Math.max(0, (z.startKm - T.km) * 1000);
-    const targetKm = Math.min(T.route[T.route.length - 1][2], z.endKm + 0.9);
-    const tp = posAt(T.route, targetKm);
-    const alt = MR.astar([p[0], p[1]], [tp[0], tp[1]], { maxSlope: Math.max(10, MR.cfg.critSlope - 2), slopeW: 7 });
-    const altMax = alt ? Math.max(...alt.map(q => q[4])) : null;
-    const altLen = alt ? alt[alt.length - 1][2] : null, direct = targetKm - T.km;
-    const extraM = alt ? Math.max(0, (altLen - direct) * 1000) : 0;
-    const okAlt = alt && altMax <= MR.cfg.critSlope && extraM < 2500;
+    const dist = Math.max(0, (z.startKm - T.km) * 1000);
     T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Alerta: pendiente ${fmt(z.max, 0)}°` });
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta crítica · simulación en pausa</span></div>
       <h2>${MR.ICONS.warn}Pendiente fuerte en ${fmt(dist, 0)} m</h2></div>
       <div class="mbody">${factsHtml([[fmt(z.max, 0) + "°", "pendiente máxima"], [fmt(z.rough, 0) + " m", "rugosidad"], [fmt((z.endKm - z.startKm) * 1000 + 50, 0) + " m", "largo del tramo"]])}
-      <div class="alt">${okAlt ? `<b>Alternativa:</b> desvío de ${fmt(extraM, 0)} m extra con pendiente máxima ${fmt(altMax, 0)}°.`
-        : alt && altMax <= MR.cfg.critSlope ? `<b>Sin desvío corto:</b> la alternativa segura más cercana suma ${fmt(extraM / 1000, 1)} km. Avanza despacio o aborta.` : "<b>Sin desvío seguro</b> en los alrededores: avanza despacio o aborta."}</div>
+      <div class="alt">La validación de desvíos durante la EVA todavía no está disponible.</div>
       <div class="who" style="margin-top:8px">Umbral de alerta: ${MR.cfg.critSlope}° (configurable en Ruta → Umbrales).</div>
-      <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn" data-s>Seguir con precaución</button><button class="btn primary" data-d ${okAlt ? "" : "disabled"}>Desviar</button></div></div>`, {
+      <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn" data-s>Seguir con precaución</button></div></div>`, {
       cls: "critical", dismiss: false,
       bind: m => {
         m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "seguir"; closeModal(); logSys(`Alerta en km ${fmt(z.startKm)}: se sigue con precaución.`); T.playing = true; renderStatus(); });
-        m.querySelector("[data-d]").addEventListener("click", () => {
-          T.handled[z.id] = "desvio"; closeModal(); T.detours++;
-          const i = MR.nearestKm(T.route, T.km), j = MR.nearestKm(T.route, targetKm);
-          T.route = MR.withKm(T.route.slice(0, i).concat([p], alt.slice(1), T.route.slice(j + 1)));
-          T.stages = makeStages(T.route).map(k => Math.max(k, T.km));
-          T.stageIdx = Math.max(0, T.stages.findIndex(k => k > T.km + 0.01));
-          recomputeHazards(); T.hazards.forEach(h => { if (h.startKm < T.km + 0.05) T.handled[h.id] = 1; });
-          renderRoutes(); renderDock(true); logSys(`Desvío aplicado en km ${fmt(T.km)} para evitar ${fmt(z.max, 0)}°.`);
-          banner({ kind: "ok", title: "Desvío aplicado", sub: "Nueva ruta dibujada. Pulsa ▶ para continuar.", ttl: 4000 });
-        });
         m.querySelector("[data-ab]").addEventListener("click", () => confirmAbort(() => criticalAlert(z)));
       },
     });
