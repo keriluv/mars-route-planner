@@ -545,22 +545,22 @@
       const yBase = loc.elev * k;
 
       // Anillo en la base sutil
-      const ringGeo = new THREE.RingGeometry(0.012, 0.028, 24);
+      const ringGeo = new THREE.RingGeometry(0.035, 0.08, 24);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({ color: loc.color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       group.add(ring);
 
-      // Haz cilíndrico luminoso sutil y compacto
-      const beamGeo = new THREE.CylinderGeometry(0.002, 0.005, 0.10, 12);
-      beamGeo.translate(0, 0.05, 0);
+      // Haz cilíndrico luminoso notable pero contenido
+      const beamGeo = new THREE.CylinderGeometry(0.008, 0.015, 0.26, 12);
+      beamGeo.translate(0, 0.13, 0);
       const beamMat = new THREE.MeshBasicMaterial({ color: loc.color, transparent: true, opacity: 0.75 });
       const beam = new THREE.Mesh(beamGeo, beamMat);
       group.add(beam);
 
       // Prisma octaédrico flotante
-      const octaGeo = new THREE.OctahedronGeometry(0.02, 0);
-      octaGeo.translate(0, 0.12, 0);
+      const octaGeo = new THREE.OctahedronGeometry(0.055, 0);
+      octaGeo.translate(0, 0.32, 0);
       const octaMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
       const diamond = new THREE.Mesh(octaGeo, octaMat);
       group.add(diamond);
@@ -590,16 +590,16 @@
     }
     pins.length = 0;
 
-    // Dimensiones adaptadas a la escala del relieve (calibradas para exag = 6.0)
-    const exagFactor = Math.max(0.5, Math.min(4.0, (cfg.exag || 6.0) / 6.0));
-    const stemH = 0.045 * exagFactor;
-    const stemR = 0.002 * exagFactor;
-    const headSize = 0.016 * exagFactor;
-    const ringR = 0.022 * exagFactor;
+    // Dimensiones adaptadas al relieve (calibradas para exag = 6.0, notables y legibles)
+    const exagFactor = Math.max(0.6, Math.min(3.5, (cfg.exag || 6.0) / 6.0));
+    const stemH = 0.13 * exagFactor;
+    const stemR = 0.0055 * exagFactor;
+    const headSize = 0.045 * exagFactor;
+    const ringR = 0.06 * exagFactor;
 
     (list || []).forEach(m => {
       const g = new THREE.Group();
-      const pos = toGlobeXYZ(m.lon, m.lat, 0.001);
+      const pos = toGlobeXYZ(m.lon, m.lat, 0.002);
       g.position.copy(pos);
 
       const isMin = m.type === "mineral" || m.isMineral;
@@ -612,12 +612,12 @@
       // Anillo de brillo en la base sobre el terreno
       const ringGeo = new THREE.RingGeometry(ringR * 0.4, ringR, 16);
       ringGeo.rotateX(-Math.PI / 2);
-      const ringMat = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+      const ringMat = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.position.y = 0.0005;
+      ring.position.y = 0.001;
       g.add(ring);
 
-      // Mástil vertical proporcional al relieve
+      // Mástil vertical visible y estilizado
       const stemGeo = new THREE.CylinderGeometry(stemR, stemR, stemH, 8);
       stemGeo.translate(0, stemH / 2, 0);
       const stemMat = new THREE.MeshBasicMaterial({ color: c });
@@ -632,7 +632,7 @@
         const octaMat = new THREE.MeshLambertMaterial({
           color: c,
           emissive: c,
-          emissiveIntensity: 0.55
+          emissiveIntensity: 0.65
         });
         head = new THREE.Mesh(octaGeo, octaMat);
         g.userData = {
@@ -645,13 +645,13 @@
       } else {
         let headGeo;
         if (m.type === "meta") {
-          headGeo = new THREE.ConeGeometry(headSize * 1.1, headSize * 1.8, 6);
+          headGeo = new THREE.ConeGeometry(headSize * 1.15, headSize * 1.9, 6);
           headGeo.translate(0, headY, 0);
         } else if (m.type === "refugio") {
-          headGeo = new THREE.CylinderGeometry(headSize, headSize * 1.1, headSize * 1.2, 6);
+          headGeo = new THREE.CylinderGeometry(headSize, headSize * 1.1, headSize * 1.25, 6);
           headGeo.translate(0, headY, 0);
         } else if (m.type === "base") {
-          headGeo = new THREE.CylinderGeometry(headSize * 1.1, headSize * 1.1, headSize * 1.2, 12);
+          headGeo = new THREE.CylinderGeometry(headSize * 1.1, headSize * 1.1, headSize * 1.25, 12);
           headGeo.translate(0, headY, 0);
         } else if (m.type === "hallazgo") {
           headGeo = new THREE.OctahedronGeometry(headSize, 0);
@@ -1145,39 +1145,25 @@
       scene.fog.near = dist * 1.3;
       scene.fog.far = dist * 2.8 + 6;
 
-      // Las balizas regionales de Gale y Jezero son exclusivamente para vista orbital global.
-      // Cuando la cámara se aproxima a nivel de cráter (dist < 18.0), se OCULTAN TOTALMENTE
-      // para que el cráter quede limpio y no haya ninguna columna o cilindro tapando el terreno.
+      // Balizas regionales (Gale, Jezero) y puntos planetarios notables y elegantes
       const tSec = now * 0.0025;
       beacons.forEach((b, idx) => {
         const u = b.userData;
         if (!u || !u.loc) return;
 
-        if (u.loc.id === "gale" || u.loc.id === "jezero") {
-          // Ocultar totalmente cuando estamos explorando el cráter
-          if (dist < 18.0) {
-            b.visible = false;
-            return;
-          }
-          // En vista global lejana (> 18), se muestra sutilmente como faro orbital
-          b.visible = true;
-          const s = Math.min(1.8, (dist / 120) * 1.8);
-          b.scale.set(s, s, s);
-        } else {
-          // Hitos globales gigantes (Olympus Mons, Valles Marineris, Hellas)
-          b.visible = dist >= 10.0;
-          const s = Math.min(1.8, (dist / 120) * 1.8);
-          b.scale.set(s, s, s);
-        }
+        // Escala adaptativa: visible y notable pero contenida para no tapar el cráter
+        const s = Math.max(0.4, Math.min(1.8, (dist / 10) * 1.0));
+        b.visible = true;
+        b.scale.set(s, s, s);
 
         if (u.diamond) {
           u.diamond.rotation.y = tSec + idx;
-          u.diamond.position.y = 0.12 + Math.sin(tSec * 2 + idx) * 0.01;
+          u.diamond.position.y = 0.32 + Math.sin(tSec * 2 + idx) * 0.02;
         }
       });
 
-      // Animación de cristales minerales y escala adaptativa contenida de pines
-      const pinScale = Math.max(0.4, Math.min(2.0, dist / 4.5));
+      // Animación de cristales minerales y escala adaptativa notable de pines
+      const pinScale = Math.max(0.75, Math.min(2.2, (dist / 4.5) * 1.0));
       if (pinsGroup) {
         pinsGroup.children.forEach((p, idx) => {
           p.scale.set(pinScale, pinScale, pinScale);
