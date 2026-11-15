@@ -1466,7 +1466,13 @@
           <div class="stat"><span class="v num">${fmt(minT, 0)} °C</span><span class="k">al final del tramo</span></div>
           <div class="stat"><span class="v num">${hz}</span><span class="k">tramos empinados</span></div></div>
         <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn primary" data-c>Continuar</button></div>`;
-      card.querySelector("[data-r]").addEventListener("click", () => { T.evaResources = MR.consumeEvaResources(T.evaResources, 60); T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h; recursos EVA consumidos."); renderStatus(); renderProfileMetrics(); updateWeather(true); if (MR.evaResourcesExhausted(T.evaResources)) toast("EVA en pausa: autonomía demostrativa agotada."); });
+      card.querySelector("[data-r]").addEventListener("click", () => {
+        const reason = MR.evaRestBlock(T.evaResources, time().hour, 60, EVA_START, EVA_END);
+        if (reason) return toast(reason);
+        T.evaResources = MR.consumeEvaResources(T.evaResources, 60); T.simMin += 60;
+        card.hidden = true; logSys("Descanso de 1 h; recursos EVA consumidos.");
+        renderStatus(); renderProfileMetrics(); updateWeather(true);
+      });
       card.querySelector("[data-c]").addEventListener("click", () => { resumeEva(); });
     }
     card.hidden = false;

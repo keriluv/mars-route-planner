@@ -34,3 +34,12 @@ test('elapsed EVA time consumes resources across walking and rest without mutati
   assert.equal(MR.evaResourcesExhausted(afterRest), false);
   assert.equal(MR.evaResourcesExhausted(MR.consumeEvaResources(initial, 480)), true);
 });
+
+test('rest is rejected before advancing when it exhausts resources or reaches night', () => {
+  const state = { oxygen_pct: 20, battery_pct: 20, eva_time_min: 100, radiation_dose_msv: 0 };
+  assert.equal(MR.evaRestBlock(state, 14, 60, 8, 17), null);
+  assert.ok(MR.evaRestBlock({ ...state, oxygen_pct: 10 }, 14, 60, 8, 17));
+  assert.ok(MR.evaRestBlock({ ...state, eva_time_min: 450 }, 14, 60, 8, 17));
+  assert.ok(MR.evaRestBlock(state, 16, 60, 8, 17));
+  assert.equal(state.oxygen_pct, 20);
+});

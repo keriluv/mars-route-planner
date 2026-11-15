@@ -189,6 +189,14 @@
     if (!Number.isFinite(hour) || hour >= end || hour < start) return "La simulación permanece en pausa: descanso nocturno sin refugio validado.";
     return null;
   };
+  MR.evaRestBlock = function (state, hour, minutes, start, end) {
+    const reason = MR.evaResumeBlock(state, hour, start, end);
+    if (reason) return reason;
+    if (!Number.isFinite(minutes) || minutes <= 0) return "Duración de descanso inválida.";
+    if (hour + minutes / 60 >= end) return "El descanso superaría el horario EVA disponible.";
+    if (MR.evaResourcesExhausted(MR.consumeEvaResources(state, minutes))) return "El descanso agotaría la autonomía EVA demostrativa.";
+    return null;
+  };
   MR.gradeAt = function (pts, i) {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
     const d = (b[2] - a[2]) * 1000;

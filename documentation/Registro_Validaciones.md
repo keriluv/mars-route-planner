@@ -8,6 +8,8 @@ Durante la marcha, el panel de recursos muestra el balance acumulado y advierte 
 
 Los controles de inicio, etapa y alertas comparten la comprobación de recursos y horario antes de reanudar. La tarjeta nocturna no promete una reanudación automática. `tests/test_eva_estimates.cjs` cubre estados agotados, ausentes e inválidos y el límite horario; queda pendiente la prueba de interacción completa en navegador.
 
+El descanso de una hora se valida antes de avanzar el tiempo: se rechaza si agotaría recursos, llegaría al límite temporal EVA o alcanzaría el horario nocturno. La marcha se detiene después de cada paso de simulación de hasta 0,5 minutos; todavía puede sobrepasar un límite por una fracción de ese intervalo.
+
 `tests/test_eva_model_consistency.py` compara el consumo de cliente y servidor para una hora en terreno llano y en ascenso, y verifica el límite temporal configurado. Las tasas siguen duplicadas, pero las pruebas detectan divergencias en esos escenarios; el cliente se pausa al alcanzar el límite, mientras el servidor rechaza si se supera.
 
 Las estimaciones locales de duración y recursos usan por defecto la caminata EVA; antes algunas llamadas sin modo explícito utilizaban velocidad de rover. `tests/test_eva_estimates.cjs` verifica el comportamiento predeterminado. Estas estimaciones locales siguen siendo provisionales y difieren del cálculo del servidor.
