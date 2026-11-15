@@ -10,8 +10,17 @@
   let renderer, scene, camera, controls, terrain, routeMesh, doneMesh, secMeshes = [], astro, beacon, pins = [], host;
   let exag = 6.0, follow = true, running = false;
   let raycaster, mouse;
-  const SIZE = 100;                       // el terreno mide 100 × 100 unidades (≈ 53 km)
-  const KM_PER_UNIT = 53.2 / SIZE;
+  const SIZE = 100;                       // el terreno mide 100 × 100 unidades
+  let layerVisible = true;
+  let mineralsVisible = true;
+
+  function getKmPerUnit() {
+    const bbox = (MR.activeRegion && MR.activeRegion.bbox) || MR.bbox || (MR.D && MR.D.bbox);
+    if (!bbox) return 53.2 / SIZE;
+    const midLat = (bbox[1] + bbox[3]) / 2;
+    const kmWidth = MR.distKm ? MR.distKm([bbox[0], midLat], [bbox[2], midLat]) : 53.2;
+    return Math.max(0.1, kmWidth / SIZE);
+  }
 
   function getDemInfo() {
     if (MR.currentRegion === "jezero" && MR.F.jezero_dem && window.JEZERO_DATA && window.JEZERO_DATA.dem) {
@@ -23,7 +32,8 @@
   function heightAt(lon, lat) {
     const z = MR.sample("dem", lon, lat);
     const info = getDemInfo();
-    return ((z - info.min) / 1000 / KM_PER_UNIT) * exag;
+    const kpu = getKmPerUnit();
+    return ((z - info.min) / 1000 / kpu) * exag;
   }
 
   function toXYZ(lon, lat, lift = 0.25) {
@@ -81,12 +91,16 @@
     const pos = geo.attributes.position;
     const info = getDemInfo();
     const Z = info.Z, lo = info.min;
+    const kpu = getKmPerUnit();
     for (let i = 0; i < pos.count; i++) {
-      pos.setY(i, ((Z[i] - lo) / 1000 / KM_PER_UNIT) * exag);
+      pos.setY(i, ((Z[i] - lo) / 1000 / kpu) * exag);
     }
     geo.computeVertexNormals();
 
     const baseImg = document.getElementById("basemap");
+    if (!S3.textureCanvas || S3.builtRegion !== MR.currentRegion) {
+      S3.setTexture(baseImg, null, 1);
+    }
     const tex = new THREE.Texture(S3.textureCanvas || baseImg);
     tex.needsUpdate = true;
     tex.anisotropy = 4;
@@ -97,6 +111,7 @@
       new THREE.MeshLambertMaterial({ map: tex, emissive: 0x777777, emissiveMap: tex })
     );
     scene.add(terrain);
+    S3.builtRegion = MR.currentRegion;
   }
 
   // Compone mapa base + capa de análisis en una textura
@@ -104,10 +119,18 @@
     const c = document.createElement("canvas");
     c.width = c.height = 1200;
     const ctx = c.getContext("2d");
-    try {
-      ctx.drawImage(baseImg, 0, 0, 1200, 1200);
-    } catch (e) {
-      /* imagen aún no cargada */
+    const isReady = baseImg && (baseImg.complete || baseImg.naturalWidth > 0);
+    if (isReady) {
+      try {
+        ctx.drawImage(baseImg, 0, 0, 1200, 1200);
+      } catch (e) {
+        /* imagen no disponible aún */
+      }
+    } else if (baseImg) {
+      baseImg.addEventListener("load", function onImgLd() {
+        baseImg.removeEventListener("load", onImgLd);
+        S3.setTexture(baseImg, overlayCanvas, opacity);
+      });
     }
     if (overlayCanvas) {
       ctx.globalAlpha = opacity;
@@ -115,7 +138,7 @@
       ctx.drawImage(overlayCanvas, 0, 0, 1200, 1200);
     }
     S3.textureCanvas = c;
-    if (terrain) {
+    if (terrain && isReady) {
       const tx = new THREE.Texture(c);
       tx.needsUpdate = true;
       if (THREE.sRGBEncoding) tx.encoding = THREE.sRGBEncoding;
@@ -249,8 +272,24 @@
       g.add(stick);
       g.add(head);
       g._head = head;
+      if (isMin) g.visible = mineralsVisible;
       scene.add(g);
       pins.push(g);
+    });
+  };
+
+  S3.setLayerVisible = function (v) {
+    layerVisible = !!v;
+    const ov = layerVisible ? document.getElementById("overlay") : null;
+    S3.setTexture(document.getElementById("basemap"), ov, 0.7);
+  };
+
+  S3.setMineralsVisible = function (v) {
+    mineralsVisible = !!v;
+    pins.forEach(p => {
+      if (p.userData && p.userData.isMineral) {
+        p.visible = mineralsVisible;
+      }
     });
   };
 

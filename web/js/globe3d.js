@@ -905,7 +905,9 @@
     if (b2d) {
       b2d.addEventListener("click", () => {
         card.hidden = true;
-        if (window.MR && window.MR.setRegion) {
+        if (window.MR && window.MR.switchRegion) {
+          window.MR.switchRegion(loc.id);
+        } else if (window.MR && window.MR.setRegion) {
           window.MR.setRegion(loc.id);
           const sel = $("regionSelect"); if (sel) sel.value = loc.id;
         }
@@ -917,7 +919,9 @@
     if (b3d) {
       b3d.addEventListener("click", () => {
         card.hidden = true;
-        if (window.MR && window.MR.setRegion) {
+        if (window.MR && window.MR.switchRegion) {
+          window.MR.switchRegion(loc.id);
+        } else if (window.MR && window.MR.setRegion) {
           window.MR.setRegion(loc.id);
           const sel = $("regionSelect"); if (sel) sel.value = loc.id;
         }

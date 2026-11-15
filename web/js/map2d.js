@@ -71,25 +71,43 @@
       if (e.key === "-") M.zoom(1 / 1.3);
     });
     window.addEventListener("resize", () => apply());
-    M.fit(false);
+    if (mapEl && mapEl.clientWidth > 0 && mapEl.clientHeight > 0) {
+      M.fit(false);
+    }
   };
 
   function zoomAt(px, py, f) {
-    const ns = Math.min(8, Math.max(M.minScale(), t.s * f));
-    const k = ns / t.s; t.x = px - (px - t.x) * k; t.y = py - (py - t.y) * k; t.s = ns; apply();
+    const ns = Math.min(8, Math.max(M.minScale(), (t.s || 1) * f));
+    const k = t.s ? ns / t.s : 1;
+    t.x = px - (px - t.x) * k;
+    t.y = py - (py - t.y) * k;
+    t.s = ns;
+    apply();
   }
-  M.minScale = () => Math.min(mapEl.clientWidth, mapEl.clientHeight) / 1200 * 0.6;
-  M.zoom = f => zoomAt(mapEl.clientWidth / 2, mapEl.clientHeight / 2, f);
+  M.minScale = () => {
+    const w = (mapEl && mapEl.clientWidth) ? mapEl.clientWidth : (window.innerWidth || 1200);
+    const h = (mapEl && mapEl.clientHeight) ? mapEl.clientHeight : (window.innerHeight || 1200);
+    return Math.max(0.2, (Math.min(w, h) / 1200) * 0.6);
+  };
+  M.zoom = f => {
+    const w = (mapEl && mapEl.clientWidth) ? mapEl.clientWidth : 1200;
+    const h = (mapEl && mapEl.clientHeight) ? mapEl.clientHeight : 800;
+    zoomAt(w / 2, h / 2, f);
+  };
   M.fit = function (anim = true) {
+    if (!mapEl) return;
     const w = mapEl.clientWidth, h = mapEl.clientHeight;
+    if (w <= 0 || h <= 0) return;
     const s = Math.max(w / 1200, h / 1200) * 1.01;
     tween({ s, x: (w - 1200 * s) / 2, y: (h - 1200 * s) / 2 }, anim);
   };
   M.centerOn = function (lon, lat, scale, anim = true) {
-    const [wx, wy] = MR.toWorld(lon, lat), s = scale || Math.max(t.s, 1.4);
+    if (!mapEl || mapEl.clientWidth <= 0 || mapEl.clientHeight <= 0) return;
+    const [wx, wy] = MR.toWorld(lon, lat), s = scale || Math.max(t.s || 1, 1.4);
     tween({ s, x: mapEl.clientWidth / 2 - wx * s, y: mapEl.clientHeight / 2 - wy * s }, anim);
   };
   M.keepInView = function (lon, lat) {
+    if (!mapEl || mapEl.clientWidth <= 0 || mapEl.clientHeight <= 0) return;
     const [sx, sy] = M.project(lon, lat), w = mapEl.clientWidth, h = mapEl.clientHeight;
     if (sx < w * 0.25 || sx > w * 0.75 || sy < h * 0.2 || sy > h * 0.65) {
       const [wx, wy] = MR.toWorld(lon, lat);
@@ -97,6 +115,13 @@
     }
   };
   function apply() {
+    if (t.s <= 0 || isNaN(t.s)) {
+      const w = (mapEl && mapEl.clientWidth) || 1200;
+      const h = (mapEl && mapEl.clientHeight) || 1200;
+      t.s = Math.max(w / 1200, h / 1200) * 1.01;
+      t.x = (w - 1200 * t.s) / 2;
+      t.y = (h - 1200 * t.s) / 2;
+    }
     worldEl.style.transform = `translate(${t.x}px,${t.y}px) scale(${t.s})`;
     placeMarkers();
   }
@@ -159,7 +184,9 @@
     M.drawTraverse(true);
     M.drawCrism(true);
     drawContours();
-    M.fit(false);
+    if (mapEl && mapEl.clientWidth > 0 && mapEl.clientHeight > 0) {
+      M.fit(false);
+    }
     placeMarkers();
   };
 

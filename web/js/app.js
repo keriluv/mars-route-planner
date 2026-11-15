@@ -209,12 +209,15 @@
       renderLegend();
     }
 
-    if (S.view === "3d" && MR.Scene3D && MR.Scene3D.ready) {
+    if (MR.Scene3D && MR.Scene3D.ready) {
       MR.Scene3D.rebuild();
       sync3dTexture();
-      const p = curPos();
-      if (p) MR.Scene3D.focus(p[0], p[1]);
-    } else if (S.view === "globe" && MR.Globe3D && MR.Globe3D.ready) {
+      if (S.view === "3d") {
+        const p = curPos();
+        if (p) MR.Scene3D.focus(p[0], p[1]);
+      }
+    }
+    if (S.view === "globe" && MR.Globe3D && MR.Globe3D.ready) {
       MR.Globe3D.goToRegion(regionId);
     }
 
@@ -228,6 +231,7 @@
     renderProfileMetrics();
     update3d();
   }
+  MR.switchRegion = switchRegion;
 
   function toggleLanguage() {
     currentLang = currentLang === "es" ? "en" : "es";
@@ -1085,10 +1089,13 @@
       document.querySelectorAll("[data-lptab]").forEach(x => x.setAttribute("aria-selected", x === b));
       document.querySelectorAll("[data-lpsec]").forEach(s => (s.hidden = s.dataset.lpsec !== b.dataset.lptab));
     }));
+    const bmEl = $("basemap");
+    if (bmEl) {
+      bmEl.addEventListener("load", () => sync3dTexture());
+    }
     document.querySelectorAll("#baseSeg button").forEach(b => b.addEventListener("click", () => {
       S.base = b.dataset.base; MR.Map.setBase(S.base);
       document.querySelectorAll("#baseSeg button").forEach(x => x.setAttribute("aria-checked", x === b));
-      $("basemap").onload = () => sync3dTexture();
     }));
     renderLayerList("gale");
     $("opacity").addEventListener("input", e => { S.opacity = +e.target.value; $("overlay").style.opacity = S.opacity; sync3dTexture(); });
@@ -2376,7 +2383,13 @@
 
     if (v === "3d") {
       if (MR.Globe3D && MR.Globe3D.ready) MR.Globe3D.stop();
-      MR.Scene3D.init(); sync3dTexture(); update3d(); MR.Scene3D.start();
+      MR.Scene3D.init();
+      if (MR.Scene3D.builtRegion !== currentRegion) {
+        MR.Scene3D.rebuild();
+      }
+      sync3dTexture();
+      update3d();
+      MR.Scene3D.start();
       const p = curPos(); if (p) MR.Scene3D.focus(p[0], p[1]);
     } else if (v === "globe") {
       if (MR.Scene3D && MR.Scene3D.ready) MR.Scene3D.stop();
@@ -2389,6 +2402,12 @@
     } else {
       if (MR.Scene3D && MR.Scene3D.ready) MR.Scene3D.stop();
       if (MR.Globe3D && MR.Globe3D.ready) MR.Globe3D.stop();
+      if (MR.Map) {
+        MR.Map.fit(false);
+        MR.Map.setLayer(S.layer, S.opacity);
+      }
+      renderRoutes(true);
+      refreshMarkers();
     }
   }
   function sync3dTexture() { if (MR.Scene3D.ready) MR.Scene3D.setTexture($("basemap"), S.layer !== "none" ? $("overlay") : null, S.opacity); }
