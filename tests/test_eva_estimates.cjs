@@ -43,3 +43,15 @@ test('rest is rejected before advancing when it exhausts resources or reaches ni
   assert.ok(MR.evaRestBlock(state, 16, 60, 8, 17));
   assert.equal(state.oxygen_pct, 20);
 });
+
+test('walking step stops at the first resource, night, or destination boundary', () => {
+  const state = { oxygen_pct: 100, battery_pct: 100, eva_time_min: 0, radiation_dose_msv: 0 };
+  assert.deepEqual(MR.evaStep({ ...state, eva_time_min: 479.9 }, 0.5, 0, 12, 17, 10, 2), { minutes: 480 - 479.9, reason: 'resources' });
+  const night = MR.evaStep(state, 0.5, 0, 16.999, 17, 10, 2);
+  assert.equal(night.reason, 'night');
+  assert.ok(Math.abs(night.minutes - 0.06) < 1e-9);
+  const arrival = MR.evaStep(state, 0.5, 0, 12, 17, 0.001, 2);
+  assert.equal(arrival.reason, 'arrival');
+  assert.ok(Math.abs(arrival.minutes - 0.03) < 1e-9);
+  assert.equal(MR.evaStep({ ...state, oxygen_pct: 0.01 }, 1, 0.2, 12, 17, 10, 2).reason, 'resources');
+});

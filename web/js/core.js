@@ -181,7 +181,7 @@
       radiation_dose_msv: state.radiation_dose_msv + minutes / 60 * 0.025,
     };
   };
-  MR.evaResourcesExhausted = state => !!state && (state.oxygen_pct <= 0 || state.battery_pct <= 0 || state.eva_time_min >= 480);
+  MR.evaResourcesExhausted = state => !!state && (state.oxygen_pct <= 1e-9 || state.battery_pct <= 1e-9 || state.eva_time_min >= 480 - 1e-9);
   MR.evaResumeBlock = function (state, hour, start, end) {
     if (!state || ![state.oxygen_pct, state.battery_pct, state.eva_time_min, state.radiation_dose_msv].every(Number.isFinite) ||
         state.oxygen_pct > 100 || state.battery_pct > 100 || state.eva_time_min < 0 || state.radiation_dose_msv < 0 ||
@@ -196,6 +196,26 @@
     if (hour + minutes / 60 >= end) return "El descanso superaría el horario EVA disponible.";
     if (MR.evaResourcesExhausted(MR.consumeEvaResources(state, minutes))) return "El descanso agotaría la autonomía EVA demostrativa.";
     return null;
+  };
+  MR.evaStep = function (state, requested, grade, hour, end, remainingKm, speedKmh) {
+    if (!Number.isFinite(requested) || requested < 0 || !Number.isFinite(grade) ||
+        !Number.isFinite(hour) || !Number.isFinite(end) || !Number.isFinite(remainingKm) ||
+        remainingKm < 0 || !Number.isFinite(speedKmh) || speedKmh <= 0) throw new RangeError("Paso EVA inválido");
+    // Validar el estado con la misma función que realiza el consumo.
+    MR.consumeEvaResources(state, 0, grade);
+    const oxygenRate = 1.2 * (grade > 0.14 ? 1.3 : 1);
+    const limits = [
+      [Math.max(0, state.oxygen_pct * 576 / (100 * oxygenRate)), "resources"],
+      [Math.max(0, state.battery_pct * 5), "resources"],
+      [Math.max(0, 480 - state.eva_time_min), "resources"],
+      [Math.max(0, (end - hour) * 60), "night"],
+      [remainingKm / speedKmh * 60, "arrival"],
+    ];
+    let minutes = requested, reason = null;
+    for (const [limit, kind] of limits) {
+      if (limit <= minutes && (reason === null || limit < minutes)) { minutes = limit; reason = kind; }
+    }
+    return { minutes, reason };
   };
   MR.gradeAt = function (pts, i) {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];

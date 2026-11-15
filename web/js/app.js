@@ -1513,11 +1513,15 @@
     let v = MR.walkSpeed(grade, R[i][6]);
     const inZone = T.hazards.find(z => T.km >= z.startKm - 0.05 && T.km <= z.endKm + 0.05);
     if (inZone) v *= 0.6;
+    const step = MR.evaStep(T.evaResources, dMin, grade, time().hour, EVA_END, Math.max(0, L - T.km), v);
+    dMin = step.minutes;
     T.evaResources = MR.consumeEvaResources(T.evaResources, dMin, grade);
     T.km = Math.min(L, T.km + (v * dMin) / 60); T.simMin += dMin;
-    if (MR.evaResourcesExhausted(T.evaResources)) {
+    if (step.reason === "resources" || MR.evaResourcesExhausted(T.evaResources)) {
       T.playing = false; renderStatus(); renderProfileMetrics(); toast("EVA en pausa: autonomía demostrativa agotada."); return;
     }
+    if (step.reason === "night") { stageCard("night"); renderProfileMetrics(); return; }
+    if (step.reason === "arrival") { T.km = L; arrive(); return; }
     // datos de condiciones cada 10 min marcianos
     if (T.simMin - T.lastWx >= 10) updateWeather();
     if (T.simMin - T.lastTele >= 30) { T.lastTele = T.simMin; const p = curPos(); MR.API.send("telemetria", { crew: T.crew.id, t: T.simMin, km: T.km, lon: p[0], lat: p[1], elev: p[3], wx: T.wx }); }
@@ -1526,7 +1530,7 @@
   function checkEvents(L) {
     const h = time().hour;
     // llegada
-    if (T.km >= L - 0.005) return arrive();
+    if (T.km >= L) return arrive();
     // evento meteorológico crítico reproducible a las 11:30 LTST
     if (!T.handled["mda_storm_1130"] && time().hour === 11 && time().minute >= 30) {
       T.handled["mda_storm_1130"] = 1;
