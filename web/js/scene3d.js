@@ -8,7 +8,7 @@
   const MR = window.MR;
   const S3 = (MR.Scene3D = { ready: false });
   let renderer, scene, camera, controls, terrain, routeMesh, doneMesh, secMeshes = [], astro, beacon, pins = [], host;
-  let exag = 2.5, follow = true, running = false;
+  let exag = 6.0, follow = true, running = false;
   let raycaster, mouse;
   const SIZE = 100;                       // el terreno mide 100 × 100 unidades (≈ 53 km)
   const KM_PER_UNIT = 53.2 / SIZE;
@@ -168,15 +168,15 @@
       doneMesh = tube(st.route.slice(0, Math.max(2, i + 1)), 0x46c882, 0.3);
     }
     if (!astro) {
-      astro = new THREE.Mesh(new THREE.SphereGeometry(0.7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
+      astro = new THREE.Mesh(new THREE.SphereGeometry(0.35, 20, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.2, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
       scene.add(astro);
       scene.add(beacon);
     }
     if (st.pos) {
-      const p = toXYZ(st.pos[0], st.pos[1], 0.8);
+      const p = toXYZ(st.pos[0], st.pos[1], 0.35);
       astro.position.copy(p);
-      beacon.position.set(p.x, p.y + 3, p.z);
+      beacon.position.set(p.x, p.y + 0.6, p.z);
       astro.material.color.set(st.color || "#1E64DC");
       astro.visible = beacon.visible = true;
       if (follow) {
@@ -209,37 +209,39 @@
       const isMin = m.type === "mineral" || m.isMineral;
       const c = isMin ? (m.mineral && m.mineral.category === "Carbonatos / Olivino" ? 0x00d26a : 0x2f7fb8) : (col[m.type] || 0xffffff);
 
+      const stickH = 0.8;
       const stick = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.06, 3, 6),
+        new THREE.CylinderGeometry(0.02, 0.02, stickH, 6),
         new THREE.MeshBasicMaterial({ color: c })
       );
-      stick.position.set(base.x, base.y + 1.5, base.z);
+      stick.position.set(base.x, base.y + stickH / 2, base.z);
 
       let head;
+      const headY = base.y + stickH + 0.25;
       if (isMin) {
         head = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.75),
+          new THREE.OctahedronGeometry(0.28),
           new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.4 })
         );
-        head.position.set(base.x, base.y + 3.4, base.z);
+        head.position.set(base.x, headY, base.z);
         const ring = new THREE.Mesh(
-          new THREE.RingGeometry(0.4, 0.9, 16),
+          new THREE.RingGeometry(0.12, 0.28, 16),
           new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.5 })
         );
         ring.rotation.x = Math.PI / 2;
-        ring.position.set(base.x, base.y + 0.1, base.z);
+        ring.position.set(base.x, base.y + 0.02, base.z);
         g.add(ring);
         g.userData = { isMineral: true, mineral: m.mineral || m, onClick: m.onClick, label: m.label };
       } else {
         head = new THREE.Mesh(
           m.type === "meta"
-            ? new THREE.ConeGeometry(0.7, 1.4, 4)
+            ? new THREE.ConeGeometry(0.28, 0.55, 4)
             : m.type === "refugio"
-            ? new THREE.CylinderGeometry(0.5, 0.6, 1.0, 6)
-            : new THREE.OctahedronGeometry(0.55),
+            ? new THREE.CylinderGeometry(0.22, 0.25, 0.4, 6)
+            : new THREE.OctahedronGeometry(0.24),
           new THREE.MeshBasicMaterial({ color: c })
         );
-        head.position.set(base.x, base.y + 3.3, base.z);
+        head.position.set(base.x, headY, base.z);
         g.userData = { isMineral: false, target: m, onClick: m.onClick, label: m.label };
       }
 

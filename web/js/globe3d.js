@@ -544,23 +544,23 @@
       const k = cfg.exag / M_PER_DEG;
       const yBase = loc.elev * k;
 
-      // Anillo de pulso en la base (dimensiones refinadas para escala planetaria)
-      const ringGeo = new THREE.RingGeometry(0.04, 0.10, 24);
+      // Anillo en la base sutil
+      const ringGeo = new THREE.RingGeometry(0.012, 0.028, 24);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({ color: loc.color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       group.add(ring);
 
-      // Haz cilíndrico luminoso
-      const beamGeo = new THREE.CylinderGeometry(0.008, 0.016, 0.45, 12);
-      beamGeo.translate(0, 0.225, 0);
+      // Haz cilíndrico luminoso sutil y compacto
+      const beamGeo = new THREE.CylinderGeometry(0.002, 0.005, 0.10, 12);
+      beamGeo.translate(0, 0.05, 0);
       const beamMat = new THREE.MeshBasicMaterial({ color: loc.color, transparent: true, opacity: 0.75 });
       const beam = new THREE.Mesh(beamGeo, beamMat);
       group.add(beam);
 
       // Prisma octaédrico flotante
-      const octaGeo = new THREE.OctahedronGeometry(0.07, 0);
-      octaGeo.translate(0, 0.52, 0);
+      const octaGeo = new THREE.OctahedronGeometry(0.02, 0);
+      octaGeo.translate(0, 0.12, 0);
       const octaMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
       const diamond = new THREE.Mesh(octaGeo, octaMat);
       group.add(diamond);
@@ -590,9 +590,16 @@
     }
     pins.length = 0;
 
+    // Dimensiones adaptadas a la escala del relieve (calibradas para exag = 6.0)
+    const exagFactor = Math.max(0.5, Math.min(4.0, (cfg.exag || 6.0) / 6.0));
+    const stemH = 0.045 * exagFactor;
+    const stemR = 0.002 * exagFactor;
+    const headSize = 0.016 * exagFactor;
+    const ringR = 0.022 * exagFactor;
+
     (list || []).forEach(m => {
       const g = new THREE.Group();
-      const pos = toGlobeXYZ(m.lon, m.lat, 0.002);
+      const pos = toGlobeXYZ(m.lon, m.lat, 0.001);
       g.position.copy(pos);
 
       const isMin = m.type === "mineral" || m.isMineral;
@@ -603,24 +610,25 @@
       }
 
       // Anillo de brillo en la base sobre el terreno
-      const ringGeo = new THREE.RingGeometry(0.12, 0.32, 16);
+      const ringGeo = new THREE.RingGeometry(ringR * 0.4, ringR, 16);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.position.y = 0.01;
+      ring.position.y = 0.0005;
       g.add(ring);
 
-      // Mástil vertical luminoso
-      const stemGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.9, 8);
-      stemGeo.translate(0, 0.45, 0);
+      // Mástil vertical proporcional al relieve
+      const stemGeo = new THREE.CylinderGeometry(stemR, stemR, stemH, 8);
+      stemGeo.translate(0, stemH / 2, 0);
       const stemMat = new THREE.MeshBasicMaterial({ color: c });
       const stem = new THREE.Mesh(stemGeo, stemMat);
       g.add(stem);
 
       let head;
+      const headY = stemH + headSize;
       if (isMin) {
-        const octaGeo = new THREE.OctahedronGeometry(0.24, 0);
-        octaGeo.translate(0, 1.05, 0);
+        const octaGeo = new THREE.OctahedronGeometry(headSize, 0);
+        octaGeo.translate(0, headY, 0);
         const octaMat = new THREE.MeshLambertMaterial({
           color: c,
           emissive: c,
@@ -637,20 +645,20 @@
       } else {
         let headGeo;
         if (m.type === "meta") {
-          headGeo = new THREE.ConeGeometry(0.22, 0.45, 6);
-          headGeo.translate(0, 1.05, 0);
+          headGeo = new THREE.ConeGeometry(headSize * 1.1, headSize * 1.8, 6);
+          headGeo.translate(0, headY, 0);
         } else if (m.type === "refugio") {
-          headGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.35, 6);
-          headGeo.translate(0, 1.0, 0);
+          headGeo = new THREE.CylinderGeometry(headSize, headSize * 1.1, headSize * 1.2, 6);
+          headGeo.translate(0, headY, 0);
         } else if (m.type === "base") {
-          headGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.35, 12);
-          headGeo.translate(0, 1.0, 0);
+          headGeo = new THREE.CylinderGeometry(headSize * 1.1, headSize * 1.1, headSize * 1.2, 12);
+          headGeo.translate(0, headY, 0);
         } else if (m.type === "hallazgo") {
-          headGeo = new THREE.OctahedronGeometry(0.22, 0);
-          headGeo.translate(0, 1.05, 0);
+          headGeo = new THREE.OctahedronGeometry(headSize, 0);
+          headGeo.translate(0, headY, 0);
         } else {
-          headGeo = new THREE.OctahedronGeometry(0.18, 0);
-          headGeo.translate(0, 1.0, 0);
+          headGeo = new THREE.OctahedronGeometry(headSize * 0.9, 0);
+          headGeo.translate(0, headY, 0);
         }
         const headMat = new THREE.MeshBasicMaterial({ color: c });
         head = new THREE.Mesh(headGeo, headMat);
@@ -1137,53 +1145,39 @@
       scene.fog.near = dist * 1.3;
       scene.fog.far = dist * 2.8 + 6;
 
-      // Animación orbital y escala adaptativa de balizas planetarias (Gale, Jezero, etc.)
+      // Las balizas regionales de Gale y Jezero son exclusivamente para vista orbital global.
+      // Cuando la cámara se aproxima a nivel de cráter (dist < 18.0), se OCULTAN TOTALMENTE
+      // para que el cráter quede limpio y no haya ninguna columna o cilindro tapando el terreno.
       const tSec = now * 0.0025;
-      const baseBeaconScale = Math.max(0.12, Math.min(2.8, dist * 0.035));
       beacons.forEach((b, idx) => {
         const u = b.userData;
         if (!u || !u.loc) return;
 
-        // Distancia euclidiana entre la cámara y la posición de la baliza
-        const bDist = camera.position.distanceTo(b.position);
-
-        // Si la cámara se aproxima a nivel regional/local (< 7.0 grados),
-        // atenuar y reducir progresivamente los marcadores de Gale y Jezero
-        // para que no tapen el cráter, la ruta ni los puntos de la misión
         if (u.loc.id === "gale" || u.loc.id === "jezero") {
-          if (bDist < 7.0) {
-            const fade = Math.max(0, (bDist - 2.8) / 4.2); // 0 a bDist <= 2.8, 1 a bDist >= 7.0
-            if (fade <= 0.01) {
-              b.visible = false;
-            } else {
-              b.visible = true;
-              const s = baseBeaconScale * Math.max(0.15, fade);
-              b.scale.set(s, s, s);
-              if (u.ring && u.ring.material) u.ring.material.opacity = 0.8 * fade;
-              if (u.beam && u.beam.material) u.beam.material.opacity = 0.75 * fade;
-              if (u.diamond && u.diamond.material) u.diamond.material.opacity = fade;
-            }
-          } else {
-            b.visible = true;
-            b.scale.set(baseBeaconScale, baseBeaconScale, baseBeaconScale);
-            if (u.ring && u.ring.material) u.ring.material.opacity = 0.8;
-            if (u.beam && u.beam.material) u.beam.material.opacity = 0.75;
-            if (u.diamond && u.diamond.material) u.diamond.material.opacity = 1.0;
+          // Ocultar totalmente cuando estamos explorando el cráter
+          if (dist < 18.0) {
+            b.visible = false;
+            return;
           }
-        } else {
-          // Otros hitos planetarios globales (Olympus, Valles Marineris, Hellas)
+          // En vista global lejana (> 18), se muestra sutilmente como faro orbital
           b.visible = true;
-          b.scale.set(baseBeaconScale, baseBeaconScale, baseBeaconScale);
+          const s = Math.min(1.8, (dist / 120) * 1.8);
+          b.scale.set(s, s, s);
+        } else {
+          // Hitos globales gigantes (Olympus Mons, Valles Marineris, Hellas)
+          b.visible = dist >= 10.0;
+          const s = Math.min(1.8, (dist / 120) * 1.8);
+          b.scale.set(s, s, s);
         }
 
         if (u.diamond) {
           u.diamond.rotation.y = tSec + idx;
-          u.diamond.position.y = 0.52 + Math.sin(tSec * 2 + idx) * 0.03;
+          u.diamond.position.y = 0.12 + Math.sin(tSec * 2 + idx) * 0.01;
         }
       });
 
-      // Animación de cristales minerales y escala adaptativa de pines
-      const pinScale = Math.max(0.035, Math.min(1.2, dist * 0.045));
+      // Animación de cristales minerales y escala adaptativa contenida de pines
+      const pinScale = Math.max(0.4, Math.min(2.0, dist / 4.5));
       if (pinsGroup) {
         pinsGroup.children.forEach((p, idx) => {
           p.scale.set(pinScale, pinScale, pinScale);
