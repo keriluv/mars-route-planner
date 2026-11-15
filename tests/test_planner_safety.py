@@ -7,6 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from marsroute.planner import astar, build_cost_surface
 from marsroute.multicriteria import MultiCriteriaPlanner
+from marsroute.domain import ResourceState
 
 
 def test_nonfinite_cells_are_blocked():
@@ -90,3 +91,17 @@ def test_stop_adjustments_expose_requested_and_grid_coordinates():
     assert adjustment["requested"] == [137.441, -4.641]
     assert adjustment["grid"] == pytest.approx([137.46, -4.66])
     assert adjustment["distance_m"] > 1000
+
+
+def test_planner_checks_reserves_after_prior_consumption():
+    layers = {"dem": np.zeros((5, 5)), "slope": np.zeros((5, 5)),
+              "traversability": np.ones((5, 5))}
+    planner = MultiCriteriaPlanner(layers, (137.4, -4.61, 137.41, -4.6), 5)
+    goal = (137.409, -4.609)
+    args = ((137.401, -4.601), [], goal, [{"lon": goal[0], "lat": goal[1], "name": "Refugio"}])
+    normal = planner.plan_alternative("segura", *args)
+    remaining = planner.plan_alternative("segura", *args, initial_resources=ResourceState(oxygen_pct=25))
+    assert normal.is_valid
+    assert not remaining.is_valid
+    assert "oxígeno" in remaining.rejection_reason
+    assert remaining.resources.oxygen_pct < 25

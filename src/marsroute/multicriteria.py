@@ -199,6 +199,7 @@ class MultiCriteriaPlanner:
         blocked_dynamic_cells: Optional[np.ndarray] = None,
         require_final_shelter: bool = True,
         mobility: Optional[str] = None,
+        initial_resources: Optional[ResourceState] = None,
     ) -> RouteAlternative:
         """Calcula una alternativa bajo el perfil especificado y evalúa restricciones duras."""
         if profile_id not in self.profiles:
@@ -330,7 +331,9 @@ class MultiCriteriaPlanner:
         active_mobility = mobility or "astronaut"
         if active_mobility != "astronaut":
             raise ValueError("El planificador EVA solo admite astronautas; los rovers son fuentes de información")
-        total_km, total_hours, resources = compute_path_resources(points, profile, mobility=active_mobility)
+        total_km, total_hours, resources = compute_path_resources(
+            points, profile, mobility=active_mobility, initial_resources=initial_resources
+        )
 
         settings = yaml.safe_load((ROOT / "config" / "route_profiles.yaml").read_text(encoding="utf-8"))
         limits = settings["hard_constraints"]
@@ -401,6 +404,7 @@ class MultiCriteriaPlanner:
         shelters_catalog: List[Dict[str, Any]],
         blocked_dynamic_cells: Optional[np.ndarray] = None,
         require_final_shelter: bool = True,
+        initial_resources: Optional[ResourceState] = None,
     ) -> Dict[str, RouteAlternative]:
         """Calcula las 3 alternativas simultáneamente para permitir la comparación directa."""
         results = {}
@@ -413,5 +417,6 @@ class MultiCriteriaPlanner:
                 shelters_catalog=shelters_catalog,
                 blocked_dynamic_cells=blocked_dynamic_cells,
                 require_final_shelter=require_final_shelter,
+                initial_resources=initial_resources,
             )
         return results
