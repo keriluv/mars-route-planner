@@ -143,6 +143,24 @@ def plan_route(b):
     from marsroute.layers import load_layers
     from marsroute.multicriteria import MultiCriteriaPlanner
 
+    region = b.get("region", "gale")
+    if region != "gale":
+        raise ValueError("planificación en esta región no disponible; solo Gale tiene capas verificadas")
+    stops = b.get("stops")
+    if not isinstance(stops, list) or not 2 <= len(stops) <= 8:
+        raise ValueError("se necesitan entre 2 y 8 puntos")
+    cfg = yaml.safe_load((ROOT / "config" / "mission.yaml").read_text(encoding="utf-8"))
+    west, south, east, north = cfg["bbox"]
+    for point in stops:
+        if not isinstance(point, (list, tuple)) or len(point) != 2:
+            raise ValueError("cada punto debe contener longitud y latitud")
+        lon, lat = _num(point[0], west, east), _num(point[1], south, north)
+        if lon is None or lat is None:
+            raise ValueError("coordenadas obligatorias")
+    requested_profile = b.get("profile", "segura")
+    if requested_profile not in ("all", "segura", "rapida", "cientifica"):
+        raise ValueError("perfil de ruta desconocido")
+
     if "planner_instance" not in _planner:
         cfg = yaml.safe_load((ROOT / "config" / "mission.yaml").read_text(encoding="utf-8"))
         gale_cfg = yaml.safe_load((ROOT / "config" / "regions" / "gale.yaml").read_text(encoding="utf-8"))
@@ -162,7 +180,6 @@ def plan_route(b):
     targets = [(float(p[0]), float(p[1])) for p in stops[1:-1]]
     final_dest = (float(stops[-1][0]), float(stops[-1][1]))
 
-    requested_profile = b.get("profile", "segura")
     require_shelter = b.get("require_shelter", True)
 
     if requested_profile == "all":
@@ -178,6 +195,8 @@ def plan_route(b):
             "alternatives": {k: v.to_dict() for k, v in alts.items()},
             "route": [[p[0], p[1]] for p in first.points],
             "cells": len(first.points),
+            "is_valid": first.is_valid,
+            "rejection_reason": first.rejection_reason,
         }
 
     alt = planner.plan_alternative(
