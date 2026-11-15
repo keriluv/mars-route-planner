@@ -1,5 +1,9 @@
 # Registro de implementación y validaciones
 
+## Precisión de recursos EVA
+
+Las restricciones de oxígeno, batería, tiempo y radiación se evalúan con los valores de recursos sin redondear. Se eliminó del cálculo EVA el modelo heredado de rover presurizado; solo admite astronautas. `tests/test_eva_resources.py` comprueba una reserva de 24,96 % frente al umbral del 25 % y el rechazo del modelo de rover. Las distancias de los puntos aún se cuantizan a metros, y los parámetros siguen siendo demostrativos, no validados científicamente.
+
 ## Persistencia de reportes sin conexión
 
 El servidor valida autor, coordenadas y formato de adjuntos antes de guardar un reporte; los datos inválidos reciben un error de entrada en vez de provocar un fallo de integridad de SQLite. `tests/test_report_validation.py` cubre estos casos y coordenadas cero.

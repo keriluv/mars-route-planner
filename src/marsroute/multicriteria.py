@@ -77,13 +77,14 @@ def compute_path_resources(
     radiation_msv_per_h: float = 0.025,
 ) -> Tuple[float, float, ResourceState]:
     """Evalúa la distancia total, horas estimadas y recursos de supervivencia a lo largo de la ruta."""
+    if mobility != "astronaut":
+        raise ValueError("El modelo de recursos EVA solo admite astronautas")
     if not points:
         return 0.0, 0.0, ResourceState()
 
     total_km = points[-1][2]
     total_hours = 0.0
     total_o2_liters = 0.0
-    is_rover = (mobility == "rover")
 
     for i in range(1, len(points)):
         prev = points[i - 1]
@@ -93,36 +94,31 @@ def compute_path_resources(
         grade = (d_elev_m / (d_km * 1000.0)) if d_km > 0.001 else 0.0
         trav = curr[6] if len(curr) > 6 else 0.5
 
-        speed = tobler_eva_speed_kmh(grade, trav, profile.speed_factor * (3.0 if is_rover else 1.0))
+        speed = tobler_eva_speed_kmh(grade, trav, profile.speed_factor)
         step_hours = d_km / speed
         total_hours += step_hours
 
-        # En rover presurizado el soporte vital es suministrado por cabina
-        rate = (base_o2_l_min * 0.2) if is_rover else (base_o2_l_min * (1.3 if grade > 0.14 else 1.0))
+        rate = base_o2_l_min * (1.3 if grade > 0.14 else 1.0)
         total_o2_liters += rate * (step_hours * 60.0)
 
-    # Capacidad: Astronauta traje EVA (8 h a 1.2 L/min = 576 L), Rover presurizado (72 h = 5184 L)
-    o2_capacity = 5184.0 if is_rover else 576.0
+    # Capacidad demostrativa del traje EVA: 8 h a 1.2 L/min.
+    o2_capacity = 576.0
     o2_pct = max(0.0, 100.0 - (total_o2_liters / o2_capacity) * 100.0)
 
-    # Batería: 12% por hora traje, 3% por hora en rover presurizado
-    bat_rate = 3.0 if is_rover else battery_pct_per_h
-    battery_pct = max(0.0, 100.0 - total_hours * bat_rate)
+    battery_pct = max(0.0, 100.0 - total_hours * battery_pct_per_h)
 
-    # Dosis de radiación ionizante acumulada (blindaje de rover reduce al 40%)
-    rad_factor = 0.4 if is_rover else 1.0
-    dose_msv = total_hours * radiation_msv_per_h * rad_factor
+    dose_msv = total_hours * radiation_msv_per_h
 
     # Reserva al refugio (oxígeno restante al llegar al punto final)
     reserve_pct = o2_pct
 
     res = ResourceState(
-        oxygen_pct=round(o2_pct, 1),
-        battery_pct=round(battery_pct, 1),
-        eva_time_min=round(total_hours * 60.0, 1),
-        max_eva_time_min=4320.0 if is_rover else 480.0,
-        radiation_dose_msv=round(dose_msv, 3),
-        reserve_to_next_shelter_pct=round(reserve_pct, 1),
+        oxygen_pct=o2_pct,
+        battery_pct=battery_pct,
+        eva_time_min=total_hours * 60.0,
+        max_eva_time_min=480.0,
+        radiation_dose_msv=dose_msv,
+        reserve_to_next_shelter_pct=reserve_pct,
     )
     return round(total_km, 2), round(total_hours, 2), res
 
@@ -287,7 +283,7 @@ class MultiCriteriaPlanner:
                 rejection_reason=rejection_reason,
             )
 
-        # Simplificar y convertir a coordenadas
+        # Convertir la ruta densa a coordenadas
         ll = route_lonlat(np.asarray(full_cells, dtype="int32"), self.bbox, self.grid_size)
 
         # Construir puntos completos con elevación, pendiente, rugosidad y transitabilidad
@@ -309,7 +305,7 @@ class MultiCriteriaPlanner:
                 cum_km += math.hypot(dlon, dlat)
             points.append([float(lon), float(lat), round(cum_km, 3), round(elev, 1), round(sl, 1), round(ro, 2), round(tr, 2)])
 
-        # Evaluar recursos y tiempos (astronauta en distancias cortas, rover presurizado en expediciones largas)
+        # Evaluar recursos y tiempos de la caminata EVA.
         active_mobility = mobility or "astronaut"
         if active_mobility != "astronaut":
             raise ValueError("El planificador EVA solo admite astronautas; los rovers son fuentes de información")
