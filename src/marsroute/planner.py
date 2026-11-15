@@ -46,7 +46,18 @@ def build_cost_surface(
 
 
 def astar(cost: np.ndarray, blocked: np.ndarray, start, goal) -> Route:
+    if cost.ndim != 2 or cost.shape != blocked.shape or cost.size == 0:
+        raise ValueError("Cost and blocked grids must have the same nonempty 2D shape")
+    blocked = np.asarray(blocked, dtype=bool)
     rows, columns = cost.shape
+    for point in (start, goal):
+        if len(point) != 2 or any(not isinstance(v, (int, np.integer)) for v in point):
+            raise ValueError("Start and goal must be integer cells")
+        if not (0 <= point[0] < rows and 0 <= point[1] < columns):
+            raise ValueError("Start or goal is outside the grid")
+    usable_costs = cost[~blocked]
+    if np.any(~np.isfinite(usable_costs)) or np.any(usable_costs < 0):
+        raise ValueError("Invalid traversal cost")
     start_row, start_column = start
     goal_row, goal_column = goal
     if blocked[start_row, start_column] or blocked[goal_row, goal_column]:
@@ -59,7 +70,7 @@ def astar(cost: np.ndarray, blocked: np.ndarray, start, goal) -> Route:
     goal_index = goal_row * columns + goal_column
     best[start_index] = 0.0
 
-    minimum_cost = float(np.min(cost[~blocked]))
+    minimum_cost = float(np.min(usable_costs))
     if not np.isfinite(minimum_cost) or minimum_cost < 0:
         raise ValueError("Invalid traversal cost")
 

@@ -186,6 +186,14 @@ class MultiCriteriaPlanner:
         mobility: Optional[str] = None,
     ) -> RouteAlternative:
         """Calcula una alternativa bajo el perfil especificado y evalúa restricciones duras."""
+        if profile_id not in self.profiles:
+            raise ValueError("Perfil de ruta desconocido")
+        if mobility not in (None, "astronaut"):
+            raise ValueError("El planificador EVA solo admite astronautas")
+        if not target_lonlats and final_shelter_lonlat is None:
+            raise ValueError("La ruta requiere al menos un destino")
+        if blocked_dynamic_cells is not None and blocked_dynamic_cells.shape != self.layers["dem"].shape:
+            raise ValueError("La máscara dinámica no coincide con la región")
         profile = self.profiles.get(profile_id, self.profiles["segura"])
         trav = self.layers["traversability"]
         slope = self.layers["slope"]

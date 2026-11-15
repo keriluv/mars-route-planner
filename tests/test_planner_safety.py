@@ -16,6 +16,20 @@ def test_nonfinite_cells_are_blocked():
     assert blocked[1, 1]
 
 
+@pytest.mark.parametrize("bad", [float("inf"), float("nan"), -1.0])
+def test_invalid_cost_anywhere_in_free_grid_is_rejected(bad):
+    cost = np.ones((3, 3))
+    cost[0, 2] = bad
+    with pytest.raises(ValueError, match="Invalid traversal cost"):
+        astar(cost, np.zeros((3, 3), dtype=bool), (0, 0), (2, 2))
+
+
+@pytest.mark.parametrize("start", [(-1, 0), (3, 0), (0.5, 0)])
+def test_invalid_start_cannot_wrap_around_grid(start):
+    with pytest.raises(ValueError):
+        astar(np.ones((3, 3)), np.zeros((3, 3), dtype=bool), start, (2, 2))
+
+
 def test_diagonal_cannot_cross_blocked_corners():
     blocked = np.array([[False, True], [True, False]])
     with pytest.raises(ValueError, match="No route"):
