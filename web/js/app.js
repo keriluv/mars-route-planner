@@ -454,12 +454,13 @@
     if (!box) return;
     if (T.mode === "walk" && T.evaResources) {
       const state = T.evaResources;
-      box.innerHTML = `<p>Balance acumulado EVA · simulación demostrativa</p>
-        <p>Tiempo transcurrido: ${fmt(state.eva_time_min, 1)} min</p>
-        <p>Oxígeno restante: ${fmt(state.oxygen_pct, 1)}%</p>
-        <p>Batería restante: ${fmt(state.battery_pct, 1)}%</p>
-        <p>Dosis acumulada: ${fmt(state.radiation_dose_msv, 3)} mSv</p>
-        <p>La ruta restante aún no se ha reevaluado con este balance ni con el clima.</p>`;
+      const o2G = Math.max(0, 650.0 * (state.oxygen_pct / 100.0));
+      box.innerHTML = `<p><b>Telemetría fisiológica del traje EVA (Modelo Pandolf)</b></p>
+        <p>Tiempo transcurrido: <b>${fmt(state.eva_time_min, 1)} min</b> · Ritmo cardíaco: <b>${fmt(state.heart_rate_bpm || 70, 0)} lpm</b></p>
+        <p>Potencia metabólica: <b>${fmt(state.metabolic_power_w || 0, 0)} W</b> · Energía: <b>${fmt(state.calories_kcal || 0, 0)} kcal</b></p>
+        <p>Oxígeno restante: <b>${fmt(state.oxygen_pct, 1)}% (${fmt(o2G, 0)} g de 650 g)</b></p>
+        <p>Batería PLSS: <b>${fmt(state.battery_pct, 1)}%</b> · Agua consumida: <b>${fmt(state.water_liters || 0, 2)} L</b></p>
+        <p>Dosis de radiación acumulada: <b>${fmt(state.radiation_dose_msv, 3)} mSv</b></p>`;
       return;
     }
     const r = activeRoute() || T.baseRoute;
@@ -1947,7 +1948,7 @@
     dock.hidden = !(T.mode === "plan" || T.mode === "walk");
     plan.hidden = T.mode !== "plan"; walk.hidden = T.mode !== "walk";
     if (T.mode === "plan") renderPlanCards();
-    if (T.mode === "walk") { renderProfile(); renderLive(true); }
+    if (T.mode === "walk") { renderProfile(); renderSuitHud(); renderLive(true); }
   }
   function renderPlanCards() {
     const A = T.adjusted || T.baseRoute, B = T.shortRoute;
@@ -1986,6 +1987,50 @@
     $("dockPlan").querySelector("[data-back]").addEventListener("click", () => {
       T.mode = "base"; T.adjusted = null; renderAll(); openMainBriefing();
     });
+  }
+  function renderSuitHud() {
+    const box = $("suitHud");
+    if (!box) return;
+    if (T.mode !== "walk" || !T.evaResources) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    const st = T.evaResources;
+    const watts = st.metabolic_power_w || 0;
+    const kcal = st.calories_kcal || 0;
+    const hr = st.heart_rate_bpm || 70;
+    const o2Pct = st.oxygen_pct || 0;
+    const o2G = Math.max(0, 650.0 * (o2Pct / 100.0));
+    const water = st.water_liters || 0;
+    const rad = st.radiation_dose_msv || 0;
+
+    box.innerHTML = `<div class="suit-hud-pill">
+      <span class="hud-item hud-hr" title="Frecuencia cardíaca estimada">
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" style="color:var(--danger);vertical-align:-2px"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <b>${fmt(hr, 0)}</b> <small>lpm</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-power" title="Gasto metabólico Pandolf (W)">
+        <b style="color:var(--accent)">${fmt(watts, 0)}</b> <small>W</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-cal" title="Gasto calórico acumulado">
+        <b>${fmt(kcal, 0)}</b> <small>kcal</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-o2" title="Oxígeno útil restante en tanque PLSS (650 g máx)">
+        <b style="color:${o2Pct < 25 ? "var(--danger)" : o2Pct < 35 ? "var(--caution)" : "var(--nominal)"}">${fmt(o2Pct, 1)}%</b> <small>O₂ (${fmt(o2G, 0)}g)</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-water" title="Agua estimada consumida">
+        <b>${fmt(water, 2)}</b> <small>L H₂O</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-rad" title="Dosis acumulada de radiación (límite 5 mSv)">
+        <b>${fmt(rad, 3)}</b> <small>mSv</small>
+      </span>
+    </div>`;
   }
   function renderProfile() {
     if (T.mode !== "walk") return;
@@ -2160,6 +2205,10 @@
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
         Modelo Predictivo
       </button>
+      <button role="tab" class="dash-tab-btn" data-tab="suit" aria-selected="${dashTab === "suit"}">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        Soporte Vital y Traje
+      </button>
     </div>
     <div class="mbody dash-modal-body" id="dashBody"></div>
     <div class="dash-modal-foot">
@@ -2196,7 +2245,8 @@
     if (!body) return;
     if (dashTab === "atm") dashAtm(body);
     else if (dashTab === "ter") dashTerrain(body);
-    else dashModel(body);
+    else if (dashTab === "mod") dashModel(body);
+    else if (dashTab === "suit") dashSuit(body);
   }
 
   function renderDashboard() {
@@ -2281,6 +2331,80 @@
         <li>División espacial 70/15/15 a lo largo del recorrido para que el modelo no “haga trampa” viendo zonas vecinas.</li>
         <li>La probabilidad se usa como costo en A*: <span class="num">costo = 1 + ${MR.cfg.riskW}·(1 − p)² + ${MR.cfg.slopeW}·pendiente²</span>; las celdas con pendiente &gt; ${MR.cfg.maxSlope}° se bloquean.</li></ul></div>`;
     MR.barH($("fiBars"), Object.entries(FI).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: names[k], value: v, text: fmt(v * 100, 0) + " %", color: css("--accent") })), { max: 0.5, labelW: 140 });
+  }
+
+  function dashSuit(body) {
+    const st = T.evaResources || {
+      oxygen_pct: 100, battery_pct: 100, eva_time_min: 0,
+      radiation_dose_msv: 0, metabolic_power_w: 249.7,
+      calories_kcal: 0, heart_rate_bpm: 72, water_liters: 0, o2_used_g: 0
+    };
+    const o2RemainingG = Math.max(0, 650.0 * (st.oxygen_pct / 100.0));
+    const p = curPos() || (T.route ? T.route[0] : [137.4, -4.6, 0, 0, 0, 0, 1]);
+    const slopeDeg = p ? (p[4] || 0) : 0;
+
+    body.innerHTML = `
+      <div class="grid-3">
+        <div class="card"><div class="kpi">
+          <span class="v num" style="color:var(--accent)">${fmt(st.metabolic_power_w || 250, 0)} <small style="font-size:16px">W</small></span>
+          <span class="k">Potencia metabólica Pandolf · ${fmt(st.calories_kcal || 0, 0)} kcal quemadas acumuladas.</span>
+        </div></div>
+        <div class="card"><div class="kpi">
+          <span class="v num" style="color:${st.oxygen_pct < 25 ? 'var(--danger)' : st.oxygen_pct < 35 ? 'var(--caution)' : 'var(--nominal)'}">${fmt(st.oxygen_pct, 1)} %</span>
+          <span class="k">Oxígeno PLSS restante · ${fmt(o2RemainingG, 0)} g de 650 g (${fmt(st.o2_used_g || 0, 1)} g consumidos).</span>
+        </div></div>
+        <div class="card"><div class="kpi">
+          <span class="v num">${fmt(st.heart_rate_bpm || 72, 0)} <small style="font-size:16px">lpm</small></span>
+          <span class="k">Frecuencia cardíaca estimada · Batería: ${fmt(st.battery_pct, 1)}% · H₂O: ${fmt(st.water_liters || 0, 2)} L.</span>
+        </div></div>
+      </div>
+      <div class="grid-2" style="margin-top:16px">
+        <div class="card">
+          <h3>Ecuación de Pandolf en Gravedad Marciana</h3>
+          <p class="desc">
+            El modelo calcula el gasto metabólico real del astronauta considerando masa corporal (75 kg), traje presurizado (60 kg) y gravedad marciana (0.378 g):
+          </p>
+          <div style="background:var(--panel-2);border-radius:var(--r-m);padding:10px 12px;font-family:monospace;font-size:11.5px;line-height:1.5;margin-bottom:8px">
+            M = F_traje · [1.5·W + G_marte · (2·(W+L)·(L/W)² + η·(W+L)·(1.5·V² + 0.35·V·G))]
+          </div>
+          <ul style="font-size:12px;color:var(--text-2);padding-left:18px;margin:0 0 8px">
+            <li><b>W:</b> 75 kg (astronauta), <b>L:</b> 60 kg (soporte vital + traje)</li>
+            <li><b>G_marte:</b> 0.378 (3.71 / 9.81 m/s² gravedad marciana)</li>
+            <li><b>η:</b> 1.5 (factor de terreno de regolito suelto)</li>
+            <li><b>F_traje:</b> 1.1 (penalización por presurización de traje)</li>
+            <li><b>G:</b> pendiente porcentual actual: ${fmt(slopeDeg, 1)}°</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Balance Fisiológico y Presupuesto de Misión</h3>
+          <p class="desc">
+            Comparación de esfuerzo biomecánico y márgenes de seguridad para la caminata EVA:
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Terreno llano (0°)</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text)">~250 W</div>
+              <div style="color:var(--text-2);font-size:11px">Autonomía nominal: ~8 h (650 g O₂)</div>
+            </div>
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Pendiente fuerte (15°–20°)</div>
+              <div style="font-size:16px;font-weight:600;color:var(--caution)">~400–450 W</div>
+              <div style="color:var(--text-2);font-size:11px">Consumo O₂: +60% por minuto</div>
+            </div>
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Descanso / Pausa</div>
+              <div style="font-size:16px;font-weight:600;color:var(--nominal)">~195 W</div>
+              <div style="color:var(--text-2);font-size:11px">Metabolismo basal asistido</div>
+            </div>
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Dosis de radiación</div>
+              <div style="font-size:16px;font-weight:600;color:var(--accent)">${fmt(st.radiation_dose_msv, 3)} mSv</div>
+              <div style="color:var(--text-2);font-size:11px">Tasa: 0.025 mSv/h (máx 5.0 mSv)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
   const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
