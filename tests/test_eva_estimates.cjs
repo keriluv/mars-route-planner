@@ -11,6 +11,15 @@ test('default route duration uses walking instead of rover speed', () => {
   assert.equal(MR.routeResources(points).hours, MR.estimateHours(points, 'astronaut'));
 });
 
+test('resuming EVA requires available resources and daylight', () => {
+  const state = { oxygen_pct: 50, battery_pct: 50, eva_time_min: 60, radiation_dose_msv: 0 };
+  assert.equal(MR.evaResumeBlock(state, 12, 8, 17), null);
+  assert.ok(MR.evaResumeBlock(state, 17, 8, 17));
+  assert.ok(MR.evaResumeBlock({ ...state, oxygen_pct: 0 }, 12, 8, 17));
+  assert.ok(MR.evaResumeBlock(null, 12, 8, 17));
+  assert.ok(MR.evaResumeBlock({ ...state, battery_pct: NaN }, 12, 8, 17));
+});
+
 test('elapsed EVA time consumes resources across walking and rest without mutation', () => {
   const initial = { oxygen_pct: 100, battery_pct: 100, eva_time_min: 0, radiation_dose_msv: 0 };
   const walking = MR.consumeEvaResources(initial, 60, 0.2);

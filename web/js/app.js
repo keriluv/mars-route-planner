@@ -262,7 +262,7 @@
         el.querySelector("[data-ignore]").addEventListener("click", () => {
           closeModal();
           banner({ kind: "warn", title: "Alerta simulada ignorada", sub: "Se conserva la ruta anterior; las condiciones no se han incorporado a su evaluación.", ttl: 5000 });
-          T.playing = true; renderStatus();
+          resumeEva();
         });
         el.querySelector("[data-pause]").addEventListener("click", () => {
           closeModal();
@@ -804,14 +804,17 @@
     T.speed = v;
     document.querySelectorAll(".speed button").forEach(b => b.setAttribute("aria-checked", +b.dataset.speed === v));
   }
+  function resumeEva() {
+    if (T.mode !== "walk") return false;
+    const reason = MR.evaResumeBlock(T.evaResources, time().hour, EVA_START, EVA_END);
+    if (reason) { T.playing = false; renderStatus(); toast(reason); return false; }
+    T.playing = true; $("stageCard").hidden = true; renderStatus(); return true;
+  }
   function togglePlay() {
     if (T.mode !== "walk") return;
     if (!$("modal").hidden && $("modal").classList.contains("critical")) return;
-    if (!T.playing && MR.evaResourcesExhausted(T.evaResources)) return toast("EVA en pausa: autonomía demostrativa agotada.");
-    if (!T.playing && (time().hour >= EVA_END || time().hour < EVA_START)) return toast("La simulación permanece en pausa: descanso nocturno sin refugio validado.");
-    T.playing = !T.playing;
-    if (T.playing) { $("stageCard").hidden = true; }
-    renderStatus();
+    if (!T.playing) return resumeEva();
+    T.playing = false; renderStatus();
   }
   function renderStatus() {
     const modeTxt = { base: "Mapa base", plan: "Planear", walk: "Recorrer", done: "Misión completada" }[T.mode];
@@ -1393,7 +1396,7 @@
       <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn" data-s>Seguir con precaución</button></div></div>`, {
       cls: "critical", dismiss: false,
       bind: m => {
-        m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "seguir"; closeModal(); logSys(`Alerta en km ${fmt(z.startKm)}: se sigue con precaución.`); T.playing = true; renderStatus(); });
+        m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "seguir"; closeModal(); logSys(`Alerta en km ${fmt(z.startKm)}: se sigue con precaución.`); resumeEva(); });
         m.querySelector("[data-ab]").addEventListener("click", () => confirmAbort(() => criticalAlert(z)));
       },
     });
@@ -1442,12 +1445,10 @@
     const L = T.route[T.route.length - 1][2], n = T.stages.length;
     const card = $("stageCard");
     if (kind === "night") {
-      const nxt = MR.solTime((Math.floor(T.simMin / 1440) + 1) * 1440 + EVA_START * 60);
       const night = MR.weather(4, curPos()[3], T.crew.profile).air;
       card.innerHTML = `<h3>${MR.ICONS.info} Fin de la jornada EVA (${EVA_END}:00)</h3>
         <p>${fmt(T.km)} km recorridos · quedan ${fmt(L - T.km)} km. Caminar de noche no está permitido.</p>
-        <div class="next"><div class="stat"><span class="v num">${fmt(night, 0)} °C</span><span class="k">mínima esta noche</span></div>
-        <div class="stat"><span class="v num">${nxt.label}</span><span class="k">reanudación</span></div></div>
+        <div class="next"><div class="stat"><span class="v num">${fmt(night, 0)} °C</span><span class="k">mínima esta noche</span></div></div>
         <p>No hay descanso nocturno ni reposición de recursos validados en este punto.</p>
         <div class="actions"><button class="btn primary" data-r>Entendido</button></div>`;
       card.querySelector("[data-r]").addEventListener("click", () => { toast("La simulación permanece en pausa."); });
@@ -1466,7 +1467,7 @@
           <div class="stat"><span class="v num">${hz}</span><span class="k">tramos empinados</span></div></div>
         <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn primary" data-c>Continuar</button></div>`;
       card.querySelector("[data-r]").addEventListener("click", () => { T.evaResources = MR.consumeEvaResources(T.evaResources, 60); T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h; recursos EVA consumidos."); renderStatus(); renderProfileMetrics(); updateWeather(true); if (MR.evaResourcesExhausted(T.evaResources)) toast("EVA en pausa: autonomía demostrativa agotada."); });
-      card.querySelector("[data-c]").addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
+      card.querySelector("[data-c]").addEventListener("click", () => { resumeEva(); });
     }
     card.hidden = false;
     card.querySelector(".btn.primary").focus({ preventScroll: true });

@@ -182,6 +182,13 @@
     };
   };
   MR.evaResourcesExhausted = state => !!state && (state.oxygen_pct <= 0 || state.battery_pct <= 0 || state.eva_time_min >= 480);
+  MR.evaResumeBlock = function (state, hour, start, end) {
+    if (!state || ![state.oxygen_pct, state.battery_pct, state.eva_time_min, state.radiation_dose_msv].every(Number.isFinite) ||
+        state.oxygen_pct > 100 || state.battery_pct > 100 || state.eva_time_min < 0 || state.radiation_dose_msv < 0 ||
+        MR.evaResourcesExhausted(state)) return "EVA en pausa: autonomía demostrativa agotada o no disponible.";
+    if (!Number.isFinite(hour) || hour >= end || hour < start) return "La simulación permanece en pausa: descanso nocturno sin refugio validado.";
+    return null;
+  };
   MR.gradeAt = function (pts, i) {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
     const d = (b[2] - a[2]) * 1000;
