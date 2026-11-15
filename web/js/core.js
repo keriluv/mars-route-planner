@@ -161,24 +161,64 @@
   /* ---------- modelo de caminata (Tobler adaptado a traje EVA) ----------
      v = 6·e^(−3.5·|pendiente_firmada + 0.05|) km/h  (función de Tobler)
      × 0.55 por traje presurizado y × (1 − 0.35·(1 − facilidad de paso))   */
-  MR.walkSpeed = function (grade, trav) {
+  MR.walkSpeed = function (grade, trav, speedFactor = 0.85) {
     const tob = 6 * Math.exp(-3.5 * Math.abs(grade + 0.05));
-    return Math.max(0.4, tob * 0.55 * (1 - 0.35 * (1 - trav)));
+    const factor = Number.isFinite(speedFactor) ? speedFactor : 0.85;
+    const t = trav != null ? Math.max(0, Math.min(1, trav)) : 1.0;
+    return Math.max(0.4, Math.min(3.8, tob * 0.55 * (1 - 0.35 * (1 - t)) * factor));
   };
-  // Tasas demostrativas compartidas con el modelo EVA del servidor.
-  MR.consumeEvaResources = function (state, minutes, grade = 0) {
+
+  /* ---------- modelo metabólico (Pandolf adaptado a la gravedad marciana) ---------- */
+  const G_MARS_FACTOR = 3.71 / 9.81;
+  const MASS_ASTRONAUT_KG = 75.0;
+  const MASS_SUIT_PLSS_KG = 60.0;
+  const ETA_TERRAIN = 1.5;
+  const SUIT_PENALTY_FACTOR = 1.1;
+  const J_PER_L_O2 = 20100.0;
+  const G_PER_L_O2 = 1.429;
+  const O2_TANK_G = 650.0;
+
+  MR.pandolfPower = function (v_ms, grade = 0) {
+    const w = MASS_ASTRONAUT_KG, l = MASS_SUIT_PLSS_KG;
+    const g_slope = Math.max(grade, 0.0) * 100.0;
+    const base = 1.5 * w;
+    const carga = 2.0 * (w + l) * Math.pow(l / w, 2);
+    const v = Math.max(0.0, v_ms || 0.0);
+    const marcha = ETA_TERRAIN * (w + l) * (1.5 * Math.pow(v, 2) + 0.35 * v * g_slope);
+    return SUIT_PENALTY_FACTOR * (base + G_MARS_FACTOR * (carga + marcha));
+  };
+
+  MR.heartRate = function (watts) {
+    return Math.max(65.0, Math.min(70.0 + (watts - 120.0) * 0.17, 190.0));
+  };
+
+  // Tasas de consumo metabólico y consumibles compartidas con el servidor.
+  MR.consumeEvaResources = function (state, minutes, grade = 0, speedKmh = null) {
     if (!state || ![state.oxygen_pct, state.battery_pct, state.eva_time_min,
       state.radiation_dose_msv, minutes, grade].every(Number.isFinite) ||
       state.oxygen_pct < 0 || state.oxygen_pct > 100 || state.battery_pct < 0 ||
       state.battery_pct > 100 || state.eva_time_min < 0 || state.radiation_dose_msv < 0 || minutes < 0) {
       throw new RangeError("Estado o duración EVA inválidos");
     }
-    const oxygenRate = 1.2 * (grade > 0.14 ? 1.3 : 1);
+    const speed = speedKmh != null ? speedKmh : (minutes > 0 ? MR.walkSpeed(grade, 1.0, 0.85) : 0);
+    const v_ms = speed / 3.6;
+    const watts = MR.pandolfPower(v_ms, grade);
+    const seconds = minutes * 60;
+    const o2_g = (watts * seconds / J_PER_L_O2) * G_PER_L_O2;
+    const o2_drop_pct = (o2_g / O2_TANK_G) * 100;
+    const kcal = (watts * seconds) / 4184;
+    const water = (0.10 + Math.max(0, watts - 180) * 0.0007) * (minutes / 60);
+
     return {
-      oxygen_pct: Math.max(0, state.oxygen_pct - oxygenRate * minutes / 576 * 100),
+      oxygen_pct: Math.max(0, state.oxygen_pct - o2_drop_pct),
       battery_pct: Math.max(0, state.battery_pct - minutes / 60 * 12),
       eva_time_min: state.eva_time_min + minutes,
       radiation_dose_msv: state.radiation_dose_msv + minutes / 60 * 0.025,
+      metabolic_power_w: watts,
+      calories_kcal: (state.calories_kcal || 0) + kcal,
+      heart_rate_bpm: MR.heartRate(watts),
+      water_liters: (state.water_liters || 0) + water,
+      o2_used_g: (state.o2_used_g || 0) + o2_g,
     };
   };
   MR.evaResourcesExhausted = state => !!state && (state.oxygen_pct <= 1e-9 || state.battery_pct <= 1e-9 || state.eva_time_min >= 480 - 1e-9);
@@ -194,7 +234,7 @@
     if (reason) return reason;
     if (!Number.isFinite(minutes) || minutes <= 0) return "Duración de descanso inválida.";
     if (hour + minutes / 60 >= end) return "El descanso superaría el horario EVA disponible.";
-    if (MR.evaResourcesExhausted(MR.consumeEvaResources(state, minutes))) return "El descanso agotaría la autonomía EVA demostrativa.";
+    if (MR.evaResourcesExhausted(MR.consumeEvaResources(state, minutes, 0, 0))) return "El descanso agotaría la autonomía EVA demostrativa.";
     return null;
   };
   MR.evaStep = function (state, requested, grade, hour, end, remainingKm, speedKmh) {
@@ -202,10 +242,12 @@
         !Number.isFinite(hour) || !Number.isFinite(end) || !Number.isFinite(remainingKm) ||
         remainingKm < 0 || !Number.isFinite(speedKmh) || speedKmh <= 0) throw new RangeError("Paso EVA inválido");
     // Validar el estado con la misma función que realiza el consumo.
-    MR.consumeEvaResources(state, 0, grade);
-    const oxygenRate = 1.2 * (grade > 0.14 ? 1.3 : 1);
+    MR.consumeEvaResources(state, 0, grade, speedKmh);
+    const v_ms = speedKmh / 3.6;
+    const watts = MR.pandolfPower(v_ms, grade);
+    const pctPerMin = (watts * 60 / J_PER_L_O2 * G_PER_L_O2 / O2_TANK_G) * 100;
     const limits = [
-      [Math.max(0, state.oxygen_pct * 576 / (100 * oxygenRate)), "resources"],
+      [Math.max(0, pctPerMin > 0 ? state.oxygen_pct / pctPerMin : 480), "resources"],
       [Math.max(0, state.battery_pct * 5), "resources"],
       [Math.max(0, 480 - state.eva_time_min), "resources"],
       [Math.max(0, (end - hour) * 60), "night"],

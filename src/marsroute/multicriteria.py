@@ -57,6 +57,40 @@ def load_profiles() -> Dict[str, RouteProfile]:
     return profiles
 
 
+# Constantes físicas y fisiológicas para la ecuación de Pandolf adaptada a Marte
+G_MARS_FACTOR = 3.71 / 9.81   # Gravedad relativa Marte/Tierra (~0.3781855)
+MASS_ASTRONAUT_KG = 75.0      # Masa del explorador (kg)
+MASS_SUIT_PLSS_KG = 60.0      # Masa del traje presurizado + soporte vital (kg)
+ETA_TERRAIN = 1.5             # Factor de terreno Pandolf para regolito marciano
+SUIT_PENALTY_FACTOR = 1.1     # Penalización biomecánica por presurización de articulaciones
+J_PER_L_O2 = 20100.0          # Julios liberados por litro de O2 consumido
+G_PER_L_O2 = 1.429            # Gramos por litro de O2
+O2_TANK_G = 650.0             # Capacidad útil del tanque de O2 PLSS (g)
+
+
+def pandolf_metabolic_power(v_ms: float, slope_grade: float) -> float:
+    """Calcula el gasto metabólico en vatios (W) usando la ecuación de Pandolf adaptada a Marte.
+
+    Ecuación: M = F_traje * [1.5*W + G_factor * (2*(W+L)*(L/W)^2 + eta*(W+L)*(1.5*V^2 + 0.35*V*G))]
+    - El término basal (1.5*W) se mantiene a escala terrestre (1 g metabólico basal).
+    - Los términos de carga y marcha dependen del peso efectivo marciano (escalados por G_MARS_FACTOR).
+    - En bajadas (pendiente negativa), Pandolf se aproxima con G = 0 como cota conservadora.
+    """
+    w, l = MASS_ASTRONAUT_KG, MASS_SUIT_PLSS_KG
+    g_slope = max(float(slope_grade), 0.0) * 100.0
+    base = 1.5 * w
+    carga = 2.0 * (w + l) * ((l / w) ** 2)
+    v = max(0.0, float(v_ms))
+    marcha = ETA_TERRAIN * (w + l) * (1.5 * (v ** 2) + 0.35 * v * g_slope)
+    watts = SUIT_PENALTY_FACTOR * (base + G_MARS_FACTOR * (carga + marcha))
+    return float(watts)
+
+
+def heart_rate_bpm(watts: float) -> float:
+    """Aproximación de frecuencia cardíaca (lpm) para visualización según la potencia metabólica."""
+    return float(max(65.0, min(70.0 + (watts - 120.0) * 0.17, 190.0)))
+
+
 def tobler_eva_speed_kmh(slope_grade: float, traversability: float, speed_factor: float = 1.0) -> float:
     """Calcula la velocidad de caminata de un astronauta con traje presurizado en Marte.
 
@@ -72,12 +106,11 @@ def compute_path_resources(
     points: List[List[float]],
     profile: RouteProfile,
     mobility: str = "astronaut",
-    base_o2_l_min: float = 1.2,
     battery_pct_per_h: float = 12.0,
     radiation_msv_per_h: float = 0.025,
     initial_resources: Optional[ResourceState] = None,
 ) -> Tuple[float, float, ResourceState]:
-    """Evalúa el tramo y acumula recursos a partir del estado inicial indicado."""
+    """Evalúa el tramo y acumula recursos a partir del estado inicial indicado usando el modelo de Pandolf."""
     if mobility != "astronaut":
         raise ValueError("El modelo de recursos EVA solo admite astronautas")
     initial = initial_resources if initial_resources is not None else ResourceState()
@@ -90,7 +123,10 @@ def compute_path_resources(
 
     total_km = points[-1][2] - points[0][2] if points else 0.0
     total_hours = 0.0
-    total_o2_liters = 0.0
+    total_o2_g = 0.0
+    total_kcal = 0.0
+    total_water = 0.0
+    total_watts_time = 0.0
 
     for i in range(1, len(points)):
         prev = points[i - 1]
@@ -100,23 +136,32 @@ def compute_path_resources(
         grade = (d_elev_m / (d_km * 1000.0)) if d_km > 0.001 else 0.0
         trav = curr[6] if len(curr) > 6 else 0.5
 
-        speed = tobler_eva_speed_kmh(grade, trav, profile.speed_factor)
-        step_hours = d_km / speed
+        speed_kmh = tobler_eva_speed_kmh(grade, trav, profile.speed_factor)
+        step_hours = d_km / speed_kmh
+        step_seconds = step_hours * 3600.0
         total_hours += step_hours
 
-        rate = base_o2_l_min * (1.3 if grade > 0.14 else 1.0)
-        total_o2_liters += rate * (step_hours * 60.0)
+        v_ms = speed_kmh / 3.6
+        watts = pandolf_metabolic_power(v_ms, grade)
+        step_o2_g = (watts * step_seconds / J_PER_L_O2) * G_PER_L_O2
+        step_kcal = (watts * step_seconds) / 4184.0
+        step_water = (0.10 + max(0.0, watts - 180.0) * 0.0007) * step_hours
 
-    # Capacidad demostrativa del traje EVA: 8 h a 1.2 L/min.
-    o2_capacity = 576.0
-    o2_pct = max(0.0, initial.oxygen_pct - (total_o2_liters / o2_capacity) * 100.0)
+        total_o2_g += step_o2_g
+        total_kcal += step_kcal
+        total_water += step_water
+        total_watts_time += watts * step_seconds
+
+    # Consumo de O2 respecto a tanque de 650 g
+    o2_pct_drop = (total_o2_g / O2_TANK_G) * 100.0
+    o2_pct = max(0.0, initial.oxygen_pct - o2_pct_drop)
 
     battery_pct = max(0.0, initial.battery_pct - total_hours * battery_pct_per_h)
-
     dose_msv = initial.radiation_dose_msv + total_hours * radiation_msv_per_h
 
-    # Reserva al refugio (oxígeno restante al llegar al punto final)
-    reserve_pct = o2_pct
+    total_seconds = total_hours * 3600.0
+    mean_watts = (total_watts_time / total_seconds) if total_seconds > 0 else pandolf_metabolic_power(0.0, 0.0)
+    current_hr = heart_rate_bpm(mean_watts)
 
     res = ResourceState(
         oxygen_pct=o2_pct,
@@ -125,7 +170,12 @@ def compute_path_resources(
         max_eva_time_min=initial.max_eva_time_min,
         radiation_dose_msv=dose_msv,
         max_radiation_dose_msv=initial.max_radiation_dose_msv,
-        reserve_to_next_shelter_pct=reserve_pct,
+        reserve_to_next_shelter_pct=o2_pct,
+        metabolic_power_w=mean_watts,
+        calories_kcal=initial.calories_kcal + total_kcal,
+        heart_rate_bpm=current_hr,
+        water_liters=initial.water_liters + total_water,
+        o2_used_g=initial.o2_used_g + total_o2_g,
     )
     return total_km, total_hours, res
 

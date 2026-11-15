@@ -163,16 +163,22 @@ _planner = {}
 def parse_initial_resources(value):
     if not isinstance(value, dict):
         raise ValueError("initial_resources debe ser un objeto completo")
-    fields = {"oxygen_pct": (0, 100), "battery_pct": (0, 100),
-              "eva_time_min": (0, 1e9), "radiation_dose_msv": (0, 1e9)}
-    if set(value) != set(fields):
+    required = {"oxygen_pct": (0, 100), "battery_pct": (0, 100),
+                "eva_time_min": (0, 1e9), "radiation_dose_msv": (0, 1e9)}
+    optional = {"calories_kcal": (0, 1e9), "metabolic_power_w": (0, 1e9),
+                "heart_rate_bpm": (0, 300), "water_liters": (0, 100), "o2_used_g": (0, 1e9)}
+    if not set(required).issubset(set(value)):
         raise ValueError("initial_resources requiere oxígeno, batería, tiempo y dosis")
+    all_fields = {**required, **optional}
+    if not set(value).issubset(set(all_fields)):
+        raise ValueError("initial_resources contiene campos desconocidos")
     parsed = {}
-    for name, (low, high) in fields.items():
-        v = value[name]
-        if isinstance(v, bool) or not isinstance(v, (int, float)):
-            raise ValueError(f"{name} debe ser un número")
-        parsed[name] = _num(v, low, high)
+    for name, (low, high) in all_fields.items():
+        if name in value:
+            v = value[name]
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                raise ValueError(f"{name} debe ser un número")
+            parsed[name] = _num(v, low, high)
     return ResourceState(**parsed)
 
 
