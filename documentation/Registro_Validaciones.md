@@ -2,6 +2,8 @@
 
 ## Precisión de recursos EVA
 
+Las estimaciones locales de duración y recursos usan por defecto la caminata EVA; antes algunas llamadas sin modo explícito utilizaban velocidad de rover. `tests/test_eva_estimates.cjs` verifica el comportamiento predeterminado. Estas estimaciones locales siguen siendo provisionales y difieren del cálculo del servidor.
+
 El cálculo de recursos admite un estado inicial explícito y acumula consumo, tiempo y dosis sobre él; valida reservas y exposición iniciales. El planificador puede usar ese estado al evaluar una o varias alternativas. La API acepta opcionalmente `initial_resources` con los cuatro campos numéricos obligatorios `oxygen_pct`, `battery_pct`, `eva_time_min` y `radiation_dose_msv`; omitirlo conserva el comportamiento de una EVA nueva. `tests/test_eva_resources.py` compara una ruta completa con dos tramos sucesivos; las pruebas del planificador y la API comprueban reservas insuficientes y entradas inválidas. La simulación todavía no mantiene ni suministra ese estado para replanificar, y la API no verifica su procedencia.
 
 La alerta de tormenta identifica sus valores como escenario hipotético y ya no anuncia una replanificación inexistente ni registra un reporte que la afirme. El usuario puede dejar la simulación en pausa o continuar por la ruta anterior, que no incorpora la tormenta. La replanificación requiere todavía un balance acumulado de recursos y una evaluación ambiental coherente; este flujo no se ha probado visualmente en navegador.

@@ -170,7 +170,7 @@
     const d = (b[2] - a[2]) * 1000;
     return d > 1 ? (b[3] - a[3]) / d : 0;
   };
-  MR.estimateHours = function (pts, mobility = "rover") {
+  MR.estimateHours = function (pts, mobility = "astronaut") {
     let h = 0;
     for (let i = 1; i < pts.length; i++) {
       const dk = pts[i][2] - pts[i - 1][2];
@@ -191,7 +191,7 @@
     { id: "shelter-butler", name: "Octavia Butler Landing (Jezero)", lon: 77.4508, lat: 18.4447, region: "jezero" },
     { id: "shelter-delta", name: "Delta Front Shelter (Jezero)", lon: 77.3820, lat: 18.4550, region: "jezero" },
   ];
-  MR.routeResources = function (pts, mobility = "rover", maxShelterDistKm = 1.0) {
+  MR.routeResources = function (pts, mobility = "astronaut", maxShelterDistKm = 1.0) {
     if (!pts || pts.length < 2) return null;
     const len = pts[pts.length - 1][2];
     const hours = MR.estimateHours(pts, mobility);
