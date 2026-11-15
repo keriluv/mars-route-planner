@@ -27,7 +27,7 @@
     const base = MR.withKm(D.routes[c.main].points);
     return {
       crew: c, mode: "base", choice: "model", baseRoute: base, adjusted: null, shortRoute: null, route: null,
-      profileMode: "segura", mobility: "rover", alertTriggered: false,
+      profileMode: "segura", mobility: "astronaut", approval: null, alertTriggered: false,
       km: 0, simMin: EVA_START * 60, playing: false, speed: 1, stages: [], stageIdx: 0,
       findings: [], missions: [], log: [], ai: [], handled: {}, events: [], proposed: {},
       unread: { misiones: 1, bitacora: 0, hallazgos: 0 }, briefed: false, wx: null, lastWx: -1e9,
@@ -154,6 +154,9 @@
   function switchRegion(regionId) {
     if (regionId === currentRegion) return;
     currentRegion = regionId;
+    T.playing = false;
+    T.mode = "base";
+    T.approval = null;
     MR.setRegion(regionId);
     const regSel = $("regionSelect");
     if (regSel && regSel.value !== regionId) regSel.value = regionId;
@@ -312,27 +315,37 @@
   }
 
   function setMobility(m) {
-    T.mobility = m;
+    if (m !== "astronaut") return;
+    T.mobility = "astronaut";
     document.querySelectorAll("#mobilitySeg button").forEach(b => {
       b.setAttribute("aria-checked", b.dataset.mobility === m);
     });
     renderProfileMetrics();
-    toast(`Modo de movilidad: ${m === "rover" ? "Rover presurizado" : "EVA a pie (traje)"}`);
+    toast("Movilidad: EVA a pie (traje)");
   }
 
   function renderProfileMetrics() {
     const box = $("profileMetrics");
     if (!box) return;
     const r = activeRoute() || T.baseRoute;
-    const res = MR.routeResources(r, T.mobility || "rover");
+    if (MR.routeApproval.matches(T.approval, planRoute(), currentRegion, T.profileMode)) {
+      const resources = T.approval.resources;
+      box.innerHTML = `<p>Estimación EVA del servidor · parámetros demostrativos</p>
+        <p>Duración: ${fmt(resources.eva_time_min, 1)} min</p>
+        <p>Oxígeno restante: ${fmt(resources.oxygen_pct, 1)}%</p>
+        <p>Batería restante: ${fmt(resources.battery_pct, 1)}%</p>
+        <p>Dosis estimada: ${fmt(resources.radiation_dose_msv, 3)} mSv</p>`;
+      return;
+    }
+    const res = MR.routeResources(r, "astronaut");
     if (!res) { box.innerHTML = "<p>Sin ruta activa</p>"; return; }
 
-    const isRover = (T.mobility || "rover") === "rover";
-    const modeLabel = isRover ? "Rover presurizado" : "Traje EVA (a pie)";
+    const modeLabel = "Traje EVA (a pie)";
     const shelterBadgeCls = res.shelterOk ? "ok" : "err";
-    const shelterBadgeText = res.shelterOk ? "REFUGIO VERIFICADO" : "SIN REFUGIO PRESURIZADO";
+    const shelterBadgeText = res.shelterOk ? "REFUGIO SIMULADO" : "SIN REFUGIO EN EL ESCENARIO";
 
     box.innerHTML = `
+      <p>Estimación local provisional · no habilita el inicio de una EVA</p>
       <div class="metric-item">
         <span class="metric-lbl">Tiempo estimado</span>
         <span class="metric-val">${fmt(res.hours, 1)} h Sol</span>
@@ -949,7 +962,10 @@
               (window.MARS_MINERALS && window.MARS_MINERALS.find(x => x.id === id));
     return o ? [o.lon, o.lat] : null;
   }
+  let routeRequestId = 0;
   function recalcRoute() {
+    const requestId = ++routeRequestId;
+    T.approval = null;
     const g = goalObj(); const goal = [g.lon, g.lat];
     const stops = T.stops.map(stopLL).filter(Boolean)
       .sort((a, b) => MR.nearestIdx(T.baseRoute, a).i - MR.nearestIdx(T.baseRoute, b).i);
@@ -972,10 +988,16 @@
     toast(`Ruta ajustada en ${Math.round(performance.now() - t0)} ms · ${fmt(r[r.length - 1][2])} km`);
     // con backend: se refina la misma ruta en la grilla completa de 44 m
     if (MR.API.online) {
-      const trip = T, pts = [[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal];
-      MR.API.route(pts, MR.cfg, T.profileMode || "segura").then(res => {
-        if (!res || !res.route || trip !== T || T.mode !== "plan") return;
-        T.adjusted = MR.densify(res.route); afterRouteChange(false);
+      const trip = T, region = currentRegion, profile = T.profileMode || "segura", pts = [[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal];
+      MR.API.route(pts, MR.cfg, profile, region).then(res => {
+        if (requestId !== routeRequestId || region !== currentRegion || profile !== T.profileMode || trip !== T || T.mode !== "plan") return;
+        if (!res) return toast("No se pudo validar la ruta con el servidor; se muestra la ruta local.");
+        if (!res.is_valid || !Array.isArray(res.route) || res.route.length < 2) return toast(res.rejection_reason || "La ruta no fue validada por el servidor.");
+        const approval = MR.routeApproval.create(res, region, profile);
+        if (!approval) return toast("Respuesta de ruta incompleta; no se puede iniciar la EVA.");
+        T.adjusted = approval.points;
+        T.approval = approval;
+        afterRouteChange(false);
         toast(`Ruta refinada por el backend (${T.profileMode || "segura"}) · ${fmt(T.adjusted[T.adjusted.length - 1][2])} km`);
       });
     }
@@ -1275,6 +1297,9 @@
     T.events.push({ t: T.simMin, c: "var(--brand-red)", txt: "Misión principal aceptada" });
   }
   function acceptRoute() {
+    if (!MR.routeApproval.matches(T.approval, planRoute(), currentRegion, T.profileMode)) {
+      return toast("Esta ruta no está validada para EVA. Recalcula una ruta que cumpla las reservas y termine en un refugio.");
+    }
     T.route = MR.withKm(planRoute().map(p => p.slice()));
     T.mode = "walk"; T.km = 0; T.stages = makeStages(T.route); T.stageIdx = 0; T.playing = false;
     recomputeHazards(); setLeft(false);

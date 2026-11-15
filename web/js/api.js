@@ -36,9 +36,9 @@
     const q = API.queue.splice(0);
     for (const [k, p] of q) await API.send(k, p);
   };
-  API.route = async function (stops, cfg, profile = "all") {
+  API.route = async function (stops, cfg, profile = "all", region = "gale") {
     if (!API.online) return null;
-    try { return await req("route", { method: "POST", body: JSON.stringify({ stops, cfg, profile }) }, 60000); } catch (e) { return null; }
+    try { return await req("route", { method: "POST", body: JSON.stringify({ stops, cfg, profile, region }) }, 60000); } catch (e) { return null; }
   };
   API.getRegions = async function () {
     if (!API.online) return null;
