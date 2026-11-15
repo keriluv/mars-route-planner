@@ -544,29 +544,29 @@
       const k = cfg.exag / M_PER_DEG;
       const yBase = loc.elev * k;
 
-      // Anillo de pulso en la base
-      const ringGeo = new THREE.RingGeometry(0.2, 0.45, 24);
+      // Anillo de pulso en la base (dimensiones refinadas para escala planetaria)
+      const ringGeo = new THREE.RingGeometry(0.04, 0.10, 24);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({ color: loc.color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       group.add(ring);
 
       // Haz cilíndrico luminoso
-      const beamGeo = new THREE.CylinderGeometry(0.04, 0.08, 1.6, 12);
-      beamGeo.translate(0, 0.8, 0);
+      const beamGeo = new THREE.CylinderGeometry(0.008, 0.016, 0.45, 12);
+      beamGeo.translate(0, 0.225, 0);
       const beamMat = new THREE.MeshBasicMaterial({ color: loc.color, transparent: true, opacity: 0.75 });
       const beam = new THREE.Mesh(beamGeo, beamMat);
       group.add(beam);
 
       // Prisma octaédrico flotante
-      const octaGeo = new THREE.OctahedronGeometry(0.35, 0);
-      octaGeo.translate(0, 1.8, 0);
-      const octaMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const octaGeo = new THREE.OctahedronGeometry(0.07, 0);
+      octaGeo.translate(0, 0.52, 0);
+      const octaMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
       const diamond = new THREE.Mesh(octaGeo, octaMat);
       group.add(diamond);
 
       group.position.set(loc.lon, yBase, -loc.lat);
-      group.userData = { loc, diamond, ring, initialY: yBase };
+      group.userData = { loc, diamond, ring, beam, initialY: yBase };
       scene.add(group);
       beacons.push(group);
     });
@@ -768,6 +768,7 @@
   function getInteractiveObjects() {
     const list = [];
     beacons.forEach(b => {
+      if (!b.visible) return;
       b.traverse(c => {
         if (c.isMesh) {
           c._parentGroup = b;
@@ -777,6 +778,7 @@
     });
     if (pinsGroup) {
       pinsGroup.children.forEach(g => {
+        if (!g.visible) return;
         g.traverse(c => {
           if (c.isMesh) {
             c._parentGroup = g;
@@ -1135,12 +1137,48 @@
       scene.fog.near = dist * 1.3;
       scene.fog.far = dist * 2.8 + 6;
 
-      // Animación orbital suave de balizas
+      // Animación orbital y escala adaptativa de balizas planetarias (Gale, Jezero, etc.)
       const tSec = now * 0.0025;
+      const baseBeaconScale = Math.max(0.12, Math.min(2.8, dist * 0.035));
       beacons.forEach((b, idx) => {
-        if (b.userData && b.userData.diamond) {
-          b.userData.diamond.rotation.y = tSec + idx;
-          b.userData.diamond.position.y = 1.8 + Math.sin(tSec * 2 + idx) * 0.12;
+        const u = b.userData;
+        if (!u || !u.loc) return;
+
+        // Distancia euclidiana entre la cámara y la posición de la baliza
+        const bDist = camera.position.distanceTo(b.position);
+
+        // Si la cámara se aproxima a nivel regional/local (< 7.0 grados),
+        // atenuar y reducir progresivamente los marcadores de Gale y Jezero
+        // para que no tapen el cráter, la ruta ni los puntos de la misión
+        if (u.loc.id === "gale" || u.loc.id === "jezero") {
+          if (bDist < 7.0) {
+            const fade = Math.max(0, (bDist - 2.8) / 4.2); // 0 a bDist <= 2.8, 1 a bDist >= 7.0
+            if (fade <= 0.01) {
+              b.visible = false;
+            } else {
+              b.visible = true;
+              const s = baseBeaconScale * Math.max(0.15, fade);
+              b.scale.set(s, s, s);
+              if (u.ring && u.ring.material) u.ring.material.opacity = 0.8 * fade;
+              if (u.beam && u.beam.material) u.beam.material.opacity = 0.75 * fade;
+              if (u.diamond && u.diamond.material) u.diamond.material.opacity = fade;
+            }
+          } else {
+            b.visible = true;
+            b.scale.set(baseBeaconScale, baseBeaconScale, baseBeaconScale);
+            if (u.ring && u.ring.material) u.ring.material.opacity = 0.8;
+            if (u.beam && u.beam.material) u.beam.material.opacity = 0.75;
+            if (u.diamond && u.diamond.material) u.diamond.material.opacity = 1.0;
+          }
+        } else {
+          // Otros hitos planetarios globales (Olympus, Valles Marineris, Hellas)
+          b.visible = true;
+          b.scale.set(baseBeaconScale, baseBeaconScale, baseBeaconScale);
+        }
+
+        if (u.diamond) {
+          u.diamond.rotation.y = tSec + idx;
+          u.diamond.position.y = 0.52 + Math.sin(tSec * 2 + idx) * 0.03;
         }
       });
 
