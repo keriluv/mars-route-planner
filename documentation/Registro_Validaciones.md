@@ -2,6 +2,8 @@
 
 ## Precisión de recursos EVA
 
+El cálculo de recursos admite un estado inicial explícito y acumula consumo, tiempo y dosis sobre él; valida reservas y exposición iniciales. `tests/test_eva_resources.py` compara una ruta completa con dos tramos sucesivos y comprueba entradas inválidas. Es una base interna: la API y la simulación todavía no mantienen ni suministran ese estado para replanificar.
+
 La alerta de tormenta identifica sus valores como escenario hipotético y ya no anuncia una replanificación inexistente ni registra un reporte que la afirme. El usuario puede dejar la simulación en pausa o continuar por la ruta anterior, que no incorpora la tormenta. La replanificación requiere todavía un balance acumulado de recursos y una evaluación ambiental coherente; este flujo no se ha probado visualmente en navegador.
 
 Al aceptar una ruta se copian sus puntos y distancias del servidor sin recalcularlos en el cliente. La aprobación rechaza puntos incompletos, valores no finitos y distancias acumuladas decrecientes. `tests/test_route_validation.cjs` verifica la copia y el rechazo. Los cambios de ruta locales durante la marcha están deshabilitados hasta que exista validación integral del recorrido restante; la simulación se pausa y las misiones secundarias permanecen propuestas. La alerta permite continuar por la ruta anterior bajo decisión del usuario o abortar. Falta verificar estos flujos en navegador.

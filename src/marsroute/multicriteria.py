@@ -75,14 +75,20 @@ def compute_path_resources(
     base_o2_l_min: float = 1.2,
     battery_pct_per_h: float = 12.0,
     radiation_msv_per_h: float = 0.025,
+    initial_resources: Optional[ResourceState] = None,
 ) -> Tuple[float, float, ResourceState]:
-    """Evalúa la distancia total, horas estimadas y recursos de supervivencia a lo largo de la ruta."""
+    """Evalúa el tramo y acumula recursos a partir del estado inicial indicado."""
     if mobility != "astronaut":
         raise ValueError("El modelo de recursos EVA solo admite astronautas")
-    if not points:
-        return 0.0, 0.0, ResourceState()
+    initial = initial_resources if initial_resources is not None else ResourceState()
+    for value, low, high in (
+        (initial.oxygen_pct, 0, 100), (initial.battery_pct, 0, 100),
+        (initial.eva_time_min, 0, math.inf), (initial.radiation_dose_msv, 0, math.inf),
+    ):
+        if not isinstance(value, (int, float)) or not math.isfinite(value) or not low <= value <= high:
+            raise ValueError("Estado inicial de recursos EVA inválido")
 
-    total_km = points[-1][2]
+    total_km = points[-1][2] - points[0][2] if points else 0.0
     total_hours = 0.0
     total_o2_liters = 0.0
 
@@ -103,11 +109,11 @@ def compute_path_resources(
 
     # Capacidad demostrativa del traje EVA: 8 h a 1.2 L/min.
     o2_capacity = 576.0
-    o2_pct = max(0.0, 100.0 - (total_o2_liters / o2_capacity) * 100.0)
+    o2_pct = max(0.0, initial.oxygen_pct - (total_o2_liters / o2_capacity) * 100.0)
 
-    battery_pct = max(0.0, 100.0 - total_hours * battery_pct_per_h)
+    battery_pct = max(0.0, initial.battery_pct - total_hours * battery_pct_per_h)
 
-    dose_msv = total_hours * radiation_msv_per_h
+    dose_msv = initial.radiation_dose_msv + total_hours * radiation_msv_per_h
 
     # Reserva al refugio (oxígeno restante al llegar al punto final)
     reserve_pct = o2_pct
@@ -115,9 +121,10 @@ def compute_path_resources(
     res = ResourceState(
         oxygen_pct=o2_pct,
         battery_pct=battery_pct,
-        eva_time_min=total_hours * 60.0,
-        max_eva_time_min=480.0,
+        eva_time_min=initial.eva_time_min + total_hours * 60.0,
+        max_eva_time_min=initial.max_eva_time_min,
         radiation_dose_msv=dose_msv,
+        max_radiation_dose_msv=initial.max_radiation_dose_msv,
         reserve_to_next_shelter_pct=reserve_pct,
     )
     return total_km, total_hours, res
