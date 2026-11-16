@@ -1,9 +1,9 @@
 /* =========================================================
-   api.js — sincronización opcional con el backend Python
-   Si la página se sirve con backend/server.py, los hallazgos,
-   mensajes y telemetría se guardan en SQLite (relacional) y en el
-   almacén de documentos JSON (no relacional). Sin backend, todo
-   funciona en modo local.
+   api.js — optional synchronization with the Python backend
+   If the page is served by backend/server.py, findings,
+   messages and telemetry are stored in SQLite (relational) and in the
+   JSON document store (non-relational). Without a backend, everything
+   works in local mode.
    ========================================================= */
 (function () {
   "use strict";
@@ -22,11 +22,11 @@
     if (!/^https?:$/.test(location.protocol)) return false;
     try { const h = await req("health"); API.online = h && h.status === "ok"; } catch (e) { API.online = false; }
     const b = document.getElementById("connBadge");
-    if (b) { b.textContent = API.online ? "Backend conectado" : "Modo local"; b.dataset.on = API.online ? "1" : "0"; }
+    if (b) { b.textContent = API.online ? "Backend connected" : "Local mode"; b.dataset.on = API.online ? "1" : "0"; }
     if (API.online) API.flush();
     return API.online;
   };
-  // envía; si falla, guarda en cola ("Sin señal: se enviará al reconectar")
+  // sends; if it fails, queues it ("No signal: will be sent on reconnect")
   API.send = async function (kind, payload) {
     if (!API.online) return { ok: false, local: true };
     try { await req(kind, { method: "POST", body: JSON.stringify(payload) }); return { ok: true }; }
@@ -59,7 +59,7 @@
   API.sendReporte = async function (rep) {
     return await API.send("reportes", rep);
   };
-  // avisos compartidos entre exploradores (ver shared.js)
+  // notices shared between explorers (see shared.js)
   API.sendAviso = n => API.send("avisos", n);
   API.retractAviso = (id, crew) => API.send("avisos/retirar", { id, crew });
   API.ackAviso = (id, crew) => API.send("avisos/recibido", { id, crew });

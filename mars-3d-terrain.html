@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marte 3D · Terreno desde NASA Mars Trek</title>
+<title>Mars 3D · Terrain from NASA Mars Trek</title>
 <style>
   :root { color-scheme: dark; }
   html, body { margin: 0; height: 100%; background: #0b0605; overflow: hidden;
@@ -30,12 +30,12 @@
 </head>
 <body>
 <div id="hud">
-  <h1>Marte 3D · NASA Mars Trek</h1>
+  <h1>Mars 3D · NASA Mars Trek</h1>
 
-  <label>Exageración vertical: <b id="exagVal">6</b>×</label>
+  <label>Vertical exaggeration: <b id="exagVal">6</b>×</label>
   <input id="exag" type="range" min="1" max="30" step="0.5" value="6">
 
-  <label>Lugares</label>
+  <label>Places</label>
   <div>
     <button data-go="-133.8,18.65,14">Olympus Mons</button>
     <button data-go="-59,-14,22">Valles Marineris</button>
@@ -46,33 +46,33 @@
   </div>
 
   <details>
-    <summary>Fuentes de datos (avanzado)</summary>
-    <label>Carpeta local de teselas DEM (generada con tile_dem.py; vacío = usar NASA)</label>
+    <summary>Data sources (advanced)</summary>
+    <label>Local folder of DEM tiles (generated with tile_dem.py; empty = use NASA)</label>
     <input id="localDem" type="text" value="3dView/dem_tiles">
-    <label>Capa de altitud remota (DEM, escala de grises)</label>
+    <label>Remote elevation layer (DEM, grayscale)</label>
     <input id="demLayer" type="text" value="mola128_mola64_merge_90Nto90S_SimpleC_clon0">
-    <label>Extensión del DEM (si falla una, prueba la otra automáticamente)</label>
+    <label>DEM extension (if one fails, the other is tried automatically)</label>
     <select id="demExt"><option value="png">png</option><option value="jpg">jpg</option></select>
-    <label>Elevación mínima / máxima en metros (gris 0 → 255)</label>
+    <label>Minimum / maximum elevation in meters (gray 0 → 255)</label>
     <div style="display:flex;gap:6px">
       <input id="hmin" type="text" value="-8200"><input id="hmax" type="text" value="21200">
     </div>
-  <label>Capa de color / relieve sombreado</label>
+  <label>Color layer / shaded relief</label>
   <div style="display:flex;gap:4px;margin-bottom:6px">
-    <button type="button" id="btnViking" style="flex:1">Color Real (Viking)</button>
-    <button type="button" id="btnMola" style="flex:1">Altimetría MOLA</button>
+    <button type="button" id="btnViking" style="flex:1">True Color (Viking)</button>
+    <button type="button" id="btnMola" style="flex:1">MOLA Altimetry</button>
   </div>
   <input id="colLayer" type="text" value="Mars_MGS_MOLA_ClrShade_merge_global_463m">
-    <label>Zoom máximo de teselas</label>
+    <label>Maximum tile zoom</label>
     <input id="maxZ" type="text" value="6">
-    <label>Proxy CORS (opcional, prefijo de URL)</label>
+    <label>CORS proxy (optional, URL prefix)</label>
     <input id="proxy" type="text" placeholder="https://mi-proxy.example/?url=">
-    <button id="reload" style="margin-top:8px">Recargar terreno</button>
+    <button id="reload" style="margin-top:8px">Reload terrain</button>
   </details>
-  <div id="status">Iniciando…</div>
+  <div id="status">Starting…</div>
 </div>
 <div id="coords"></div>
-<div id="help">Arrastrar: mover · Rueda/pellizco: zoom · Clic derecho / Ctrl+arrastrar: inclinar y rotar</div>
+<div id="help">Drag: move · Wheel/pinch: zoom · Right click / Ctrl+drag: tilt and rotate</div>
 
 <script type="importmap">
 { "imports": {
@@ -85,12 +85,12 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 
-/* ---------- Configuración ---------- */
+/* ---------- Configuration ---------- */
 const BASE = 'https://trek.nasa.gov/tiles/Mars/EQ';
 const TILE_PX = 256;
-const SEGS = 64;                 // resolución de malla por tesela
-const RADIUS = 3;                // teselas alrededor del centro (7x7)
-const M_PER_DEG = 59200;         // ~metros por grado en Marte
+const SEGS = 64;                 // mesh resolution per tile
+const RADIUS = 3;                // tiles around the center (7x7)
+const M_PER_DEG = 59200;         // ~meters per degree on Mars
 const $ = id => document.getElementById(id);
 
 let cfg = {};
@@ -114,7 +114,7 @@ const tileURL = (layer, z, r, c, ext = 'jpg') => {
   return cfg.proxy ? cfg.proxy + encodeURIComponent(u) : u;
 };
 
-/* ---------- Escena ---------- */
+/* ---------- Scene ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -136,7 +136,7 @@ scene.add(sun);
 const controls = new MapControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.screenSpacePanning = false;   // paneo sobre el plano del mapa
+controls.screenSpacePanning = false;   // panning over the map plane
 controls.minDistance = 0.03;
 controls.maxDistance = 260;
 controls.maxPolarAngle = Math.PI * 0.44;
@@ -148,17 +148,17 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-/* ---------- Utilidades ---------- */
+/* ---------- Utilities ---------- */
 function loadImage(url) {
   return new Promise((res, rej) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => res(img);
-    img.onerror = () => rej(new Error('fallo ' + url));
+    img.onerror = () => rej(new Error('failed ' + url));
     img.src = url;
   });
 }
-// ruido de valor simple para el modo de respaldo (si el DEM no se puede leer)
+// simple value noise for the fallback mode (if the DEM cannot be read)
 function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
 function vnoise(x, y) {
   const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
@@ -171,7 +171,7 @@ function fbm(lon, lat) {
   for (let i = 0; i < 6; i++) { s += a * vnoise(lon * f, lat * f); f *= 2; a *= 0.5; }
   return s;
 }
-// mapa de color hipsométrico (0..1)
+// hypsometric color map (0..1)
 function ramp(t) {
   const stops = [[0,[40,20,40]],[0.25,[120,50,30]],[0.5,[190,110,60]],[0.75,[225,170,120]],[1,[250,240,235]]];
   for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
@@ -181,8 +181,8 @@ function ramp(t) {
   return [1,1,1];
 }
 
-/* ---------- Teselas ---------- */
-const tiles = new Map();       // clave -> {mesh, z}
+/* ---------- Tiles ---------- */
+const tiles = new Map();       // key -> {mesh, z}
 const pending = new Set();
 let fallbackUsed = false, errorCount = 0;
 
@@ -210,7 +210,7 @@ async function buildTile(z, r, c) {
   const demImg = demRes && demRes.img;
   const terr = !!(demRes && demRes.terr);
 
-  // Leer píxeles del DEM (requiere CORS)
+  // Read DEM pixels (requires CORS)
   let pix = null;
   if (demImg) {
     try {
@@ -234,15 +234,15 @@ async function buildTile(z, r, c) {
     for (let j = 0; j < n; j++) {
       const u = j / SEGS, v = i / SEGS;
       const lon = lon0 + u * td, lat = lat1 - v * td;
-      let t, meters; // t: 0..1 normalizado
+      let t, meters; // t: 0..1 normalized
       if (pix) {
         const px = Math.min(pix.width - 1, Math.round(u * (pix.width - 1)));
         const py = Math.min(pix.height - 1, Math.round(v * (pix.height - 1)));
         const o = (py * pix.width + px) * 4;
-        if (terr) { // PNG Terrarium generado por tile_dem.py: metros exactos
+        if (terr) { // Terrarium PNG generated by tile_dem.py: exact meters
           meters = pix.data[o] * 256 + pix.data[o + 1] + pix.data[o + 2] / 256 - 32768;
           t = Math.min(1, Math.max(0, (meters - cfg.hmin) / (cfg.hmax - cfg.hmin)));
-        } else { // DEM de la NASA en escala de grises
+        } else { // NASA DEM in grayscale
           t = pix.data[o] / 255;
           meters = cfg.hmin + t * (cfg.hmax - cfg.hmin);
         }
@@ -251,7 +251,7 @@ async function buildTile(z, r, c) {
         meters = cfg.hmin + t * (cfg.hmax - cfg.hmin);
       }
       const p = (i * n + j) * 3;
-      // Las teselas gruesas se bajan para que nunca tapen a las de más detalle
+      // Coarse tiles are lowered so that they never cover the more detailed ones
       pos[p] = lon; pos[p + 1] = meters * k - (cfg.maxZ - z) * 0.1 * cfg.exag; pos[p + 2] = -lat;
       uvs[(i * n + j) * 2] = u; uvs[(i * n + j) * 2 + 1] = 1 - v;
       const col = ramp(t);
@@ -275,7 +275,7 @@ async function buildTile(z, r, c) {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
-    mat = new THREE.MeshBasicMaterial({ map: tex, ...po });   // el relieve ya viene sombreado por la NASA
+    mat = new THREE.MeshBasicMaterial({ map: tex, ...po });   // the relief already comes shaded by NASA
   } else {
     geo.computeVertexNormals();
     mat = new THREE.MeshLambertMaterial({ vertexColors: true, ...po });
@@ -312,7 +312,7 @@ let alive = true;
 
 function chooseZoom() {
   const h = Math.max(0.01, camera.position.distanceTo(controls.target));
-  const span = 0.93 * h * (innerWidth / innerHeight > 1 ? 1 : innerHeight / innerWidth); // grados visibles aprox.
+  const span = 0.93 * h * (innerWidth / innerHeight > 1 ? 1 : innerHeight / innerWidth); // approx. visible degrees
   const z = Math.round(Math.log2((180 * 3) / span));
   return Math.max(0, Math.min(cfg.maxZ, z));
 }
@@ -324,7 +324,7 @@ function updateTiles() {
   const lon = controls.target.x, lat = -controls.target.z;
   const cc = Math.floor((lon + 180) / td), cr = Math.floor((90 - lat) / td);
   currentNeeded = new Set();
-  // base global (siempre presente, contexto)
+  // global base (always present, context)
   for (let c = 0; c < tilesX(0); c++) { currentNeeded.add(`0/0/${c}`); ensure(0, 0, c); }
   for (let dr = -RADIUS; dr <= RADIUS; dr++) for (let dc = -RADIUS; dc <= RADIUS; dc++) {
     const r = cr + dr, c = cc + dc;
@@ -336,16 +336,16 @@ function updateTiles() {
   setStatus();
 }
 
-// Elimina teselas obsoletas solo cuando las nuevas ya están listas (evita huecos)
+// Removes obsolete tiles only when the new ones are ready (avoids gaps)
 function cleanup() {
   for (const key of currentNeeded) if (!tiles.has(key)) return;
   for (const [key, t] of tiles) if (!currentNeeded.has(key)) { disposeTile(t); tiles.delete(key); }
 }
 
 function setStatus() {
-  let s = `Zoom ${currentZ}/${cfg.maxZ} · ${tiles.size} teselas`;
-  if (pending.size) s += ` · cargando ${pending.size}…`;
-  if (fallbackUsed) s += '<br>⚠ No se pudo leer el DEM de la NASA (posible bloqueo CORS o nombre de capa). Se usa relieve procedural en esas teselas; prueba un proxy CORS en “Fuentes de datos”.';
+  let s = `Zoom ${currentZ}/${cfg.maxZ} · ${tiles.size} tiles`;
+  if (pending.size) s += ` · loading ${pending.size}…`;
+  if (fallbackUsed) s += '<br>⚠ The NASA DEM could not be read (possible CORS block or layer name). Procedural relief is used on those tiles; try a CORS proxy in “Data sources”.';
   $('status').innerHTML = s;
 }
 
@@ -374,7 +374,7 @@ function flyTo(lon, lat, h) {
   fly = { t0: controls.target.clone(), p0: camera.position.clone(), t1, p1, s: performance.now(), d: 1600 };
 }
 
-/* ---------- Bucle ---------- */
+/* ---------- Loop ---------- */
 let lastKey = '';
 function frame(now) {
   if (fly) {
@@ -385,7 +385,7 @@ function frame(now) {
   }
   controls.update();
 
-  // limitar el objetivo a los límites del mapa
+  // limit the target to the map bounds
   controls.target.x = Math.max(-180, Math.min(180, controls.target.x));
   controls.target.z = Math.max(-90, Math.min(90, controls.target.z));
 
@@ -399,7 +399,7 @@ function frame(now) {
   if (key !== lastKey) { lastKey = key; updateTiles(); }
 
   $('coords').textContent =
-    `Lon ${controls.target.x.toFixed(2)}°  Lat ${(-controls.target.z).toFixed(2)}°  ·  Altura de cámara ${(dist * M_PER_DEG / 1000).toFixed(0)} km`;
+    `Lon ${controls.target.x.toFixed(2)}°  Lat ${(-controls.target.z).toFixed(2)}°  ·  Camera height ${(dist * M_PER_DEG / 1000).toFixed(0)} km`;
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }

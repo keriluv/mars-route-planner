@@ -1,6 +1,6 @@
 {
   "scenario_id": "demo_gale_dust_anomaly_sol100",
-  "title": "Escenario Demostrativo: Anomalía de Polvo y Viento en Cráter Gale",
+  "title": "Demo Scenario: Dust and Wind Anomaly in Gale Crater",
   "region": "gale",
   "sol": 100,
   "start_time_ltst": "08:00",
@@ -9,7 +9,7 @@
   "stations": [
     {
       "id": "MDA-GALE-01",
-      "name": "Estación Cuadrante Noroeste",
+      "name": "Northwest Quadrant Station",
       "lon": 137.30,
       "lat": -4.70,
       "nominal": {
@@ -23,7 +23,7 @@
     },
     {
       "id": "MDA-GALE-07",
-      "name": "Estación Corredor Bradbury",
+      "name": "Bradbury Corridor Station",
       "lon": 137.45,
       "lat": -4.80,
       "nominal": {
@@ -37,7 +37,7 @@
     },
     {
       "id": "MDA-GALE-14",
-      "name": "Estación Dunas de Bagnold",
+      "name": "Bagnold Dunes Station",
       "lon": 137.62,
       "lat": -4.95,
       "nominal": {
@@ -51,7 +51,7 @@
     },
     {
       "id": "MDA-GALE-22",
-      "name": "Estación Base Mount Sharp",
+      "name": "Mount Sharp Base Station",
       "lon": 137.82,
       "lat": -5.25,
       "nominal": {
@@ -69,7 +69,7 @@
       "sol_min": 60,
       "ltst": "09:00",
       "type": "TELEMETRY_UPDATE",
-      "description": "Condiciones nominales registradas por la red de estaciones MDA.",
+      "description": "Nominal conditions recorded by the MDA station network.",
       "station_id": "MDA-GALE-07",
       "data": { "wind_speed_ms": 7.5, "dust_opacity_tau": 0.70 }
     },
@@ -77,9 +77,9 @@
       "sol_min": 210,
       "ltst": "11:30",
       "type": "CRITICAL_WEATHER_EVENT",
-      "description": "Frente súbito de vientos catabáticos y tolvanera (dust devil / regional dust front) detectado por MDA-GALE-14.",
+      "description": "Sudden front of katabatic winds and dust storm (dust devil / regional dust front) detected by MDA-GALE-14.",
       "station_id": "MDA-GALE-14",
-      "severity": "CRÍTICA",
+      "severity": "CRITICAL",
       "anomaly": {
         "wind_speed_ms": 28.4,
         "wind_threshold_ms": 25.0,
@@ -89,22 +89,22 @@
       },
       "alert": {
         "id": "ALT-2026-100-14",
-        "level": "CRÍTICA",
-        "variable": "viento_y_polvo",
+        "level": "CRITICAL",
+        "variable": "wind_and_dust",
         "threshold": 25.0,
         "observed_value": 28.4,
-        "message": "Condición climática peligrosa: Viento de 28,4 m/s y opacidad de polvo τ = 2,15 en Dunas de Bagnold.",
+        "message": "Dangerous weather condition: wind of 28.4 m/s and dust opacity τ = 2.15 at Bagnold Dunes.",
         "affected_km_start": 14.2,
         "affected_km_end": 18.5,
         "affected_lonlat": [137.62, -4.95],
-        "action_suggested": "Detener avance en el sector Bagnold. Replanificar ruta hacia el flanco este para evitar la zona de baja visibilidad."
+        "action_suggested": "Stop advancing in the Bagnold sector. Replan the route toward the east flank to avoid the low-visibility zone."
       }
     },
     {
       "sol_min": 220,
       "ltst": "11:40",
       "type": "REPLAN_TRIGGER",
-      "description": "El planificador recalcula la trayectoria rodeando el sector bloqueado de MDA-GALE-14 hacia el refugio final.",
+      "description": "The planner recomputes the trajectory around the blocked sector of MDA-GALE-14 toward the final shelter.",
       "blocked_center": [137.62, -4.95],
       "blocked_radius_km": 3.0
     }

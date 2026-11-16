@@ -1,15 +1,15 @@
-"""Blender (bpy) — modelo 3D del cráter Gale con la ruta segura.
+"""Blender (bpy) — 3D model of Gale Crater with the safe route.
 
-Crea en Blender:
-  * una malla de terreno a partir del DEM exportado (web/data/layers.json, 300 × 300)
-  * el mapa base de relieve como textura
-  * la ruta del modelo como un tubo azul y la ruta corta como un tubo gris
-  * banderas en la base (Bradbury Landing) y en la meta (cima de Mount Sharp)
-y exporta todo a blender/gale_terrain.glb para usarlo en Three.js o en presentaciones.
+Creates in Blender:
+  * a terrain mesh from the exported DEM (web/data/layers.json, 300 × 300)
+  * the relief base map as a texture
+  * the model route as a blue tube and the short route as a gray tube
+  * flags at the base (Bradbury Landing) and at the goal (Mount Sharp summit)
+and exports everything to blender/gale_terrain.glb for use in Three.js or in presentations.
 
-Uso (Blender 3.6 o 4.x):
+Usage (Blender 3.6 or 4.x):
   blender --background --python blender/build_terrain.py -- --exag 2.5
-o abrir Blender → pestaña Scripting → abrir este archivo → Run Script.
+or open Blender → Scripting tab → open this file → Run Script.
 """
 import base64
 import json
@@ -22,7 +22,7 @@ import bpy  # type: ignore
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"
-SIZE = 100.0                     # el terreno mide 100 × 100 unidades de Blender (≈ 53 km)
+SIZE = 100.0                     # the terrain measures 100 × 100 Blender units (≈ 53 km)
 KM_PER_UNIT = 53.2 / SIZE
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -42,7 +42,7 @@ def decode(layer):
 
 layers = json.loads((WEB / "data" / "layers.json").read_text(encoding="utf-8"))
 routes = json.loads((WEB / "data" / "routes.json").read_text(encoding="utf-8"))
-objetivos = json.loads((WEB / "data" / "objetivos.json").read_text(encoding="utf-8"))
+targets = json.loads((WEB / "data" / "targets.json").read_text(encoding="utf-8"))
 G = layers["grid"]
 dem = decode(layers["dem"])
 zmin = layers["dem"]["min"]
@@ -58,11 +58,11 @@ def to_xyz(lon, lat, lift=0.3):
     return ((u - 0.5) * SIZE, -(v - 0.5) * SIZE, z + lift)
 
 
-# ---------- escena limpia ----------
+# ---------- clean scene ----------
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 
-# ---------- terreno ----------
+# ---------- terrain ----------
 verts, faces, uvs = [], [], []
 for r in range(G):
     for c in range(G):
@@ -84,10 +84,10 @@ for vi in loop_vi:
     flat += (c / (G - 1), 1 - r / (G - 1))
 uv.data.foreach_set("uv", flat)
 mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
-terrain = bpy.data.objects.new("Terreno_Gale", mesh)
+terrain = bpy.data.objects.new("Terrain_Gale", mesh)
 scene.collection.objects.link(terrain)
 
-mat = bpy.data.materials.new("Relieve_Marte")
+mat = bpy.data.materials.new("Mars_Relief")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes["Principled BSDF"]
 tex = mat.node_tree.nodes.new("ShaderNodeTexImage")
@@ -97,7 +97,7 @@ bsdf.inputs["Roughness"].default_value = 0.95
 terrain.data.materials.append(mat); print("material ok", flush=True)
 
 
-# ---------- rutas como tubos ----------
+# ---------- routes as tubes ----------
 def route_tube(name, pts, color, radius):
     curve = bpy.data.curves.new(name, "CURVE")
     curve.dimensions = "3D"
@@ -119,22 +119,22 @@ def route_tube(name, pts, color, radius):
     return obj
 
 
-route_tube("Ruta_modelo", routes["summit"]["points"], (0.12, 0.39, 0.86, 1), 0.25)
+route_tube("Route_model", routes["summit"]["points"], (0.12, 0.39, 0.86, 1), 0.25)
 print("tube1 ok", flush=True)
-route_tube("Ruta_corta", routes["summit_short"]["points"], (0.75, 0.75, 0.75, 1), 0.15)
+route_tube("Route_short", routes["summit_short"]["points"], (0.75, 0.75, 0.75, 1), 0.15)
 
-# ---------- banderas ----------
-for o in objetivos:
-    if o["type"] not in ("base", "meta"):
+# ---------- flags ----------
+for o in targets:
+    if o["type"] not in ("base", "goal"):
         continue
     x, y, z = to_xyz(o["lon"], o["lat"], 0)
     bpy.ops.mesh.primitive_cylinder_add(radius=0.08, depth=4, location=(x, y, z + 2))
     pole = bpy.context.active_object
-    pole.name = "Mastil_" + o["id"]
+    pole.name = "Pole_" + o["id"]
     bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.8, depth=1.4, location=(x, y, z + 4.4))
-    bpy.context.active_object.name = "Bandera_" + o["id"]
+    bpy.context.active_object.name = "Flag_" + o["id"]
 
-# ---------- luz y cámara ----------
+# ---------- light and camera ----------
 bpy.ops.object.light_add(type="SUN", location=(-40, 40, 80))
 bpy.context.active_object.data.energy = 3.5
 bpy.context.active_object.rotation_euler = (math.radians(40), 0, math.radians(-135))
@@ -149,7 +149,7 @@ track.track_axis = "TRACK_NEGATIVE_Z"
 track.up_axis = "UP_Y"
 scene.camera = cam
 
-# ---------- exportar ----------
+# ---------- export ----------
 print("scene ok", flush=True)
 out = ROOT / "blender" / "gale_terrain.glb"
 bpy.ops.export_scene.gltf(filepath=str(out), export_format="GLB")

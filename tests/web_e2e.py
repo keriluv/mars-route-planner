@@ -1,13 +1,13 @@
-"""Prueba de extremo a extremo (Fase 5). Un recorrido completo, como lo haría una persona, abriendo web/index.html por file://:
+"""End-to-end test (Phase 5). A complete traverse, as a person would do it, opening web/index.html over file://:
 
-  1. abrir sin servidor, sin errores en consola;
-  2. alternar Mapa 2D ↔ Relieve 3D (antes y durante el recorrido);
-  3. aceptar la misión y la ruta de EV1 y caminar hasta la cima;
-  4. atender una alerta crítica de pendiente (desvío si hay uno corto, si no seguir con precaución);
-  5. registrar un hallazgo y comprobar que EV2 y EV3 lo reciben sin perder su viaje separado;
-  6. llegar a la cima: el resumen muestra dosis EVA, hallazgo y alertas.
+  1. open without a server, with no console errors;
+  2. switch 2D Map ↔ 3D Relief (before and during the traverse);
+  3. accept EV1's mission and route and walk to the summit;
+  4. handle a critical slope alert (detour if there is a short one, otherwise proceed with caution);
+  5. log a finding and check that EV2 and EV3 receive it without losing their separate trip;
+  6. reach the summit: the summary shows EVA dose, finding and alerts.
 
-Requisitos: pip install playwright (usa el Edge/Chrome instalado).  Uso: python tests/web_e2e.py [carpeta_capturas]
+Requirements: pip install playwright (uses the installed Edge/Chrome).  Usage: python tests/web_e2e.py [screenshots_folder]
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ IGNORE = ("GPU stall", "GL Driver")
 
 def check(name: str, ok: bool, detail: str = "") -> None:
     CHECKS.append((name, bool(ok), detail))
-    print(("OK   " if ok else "FALLA"), name, detail)
+    print(("OK   " if ok else "FAIL "), name, detail)
 
 
 def modal_text(pg) -> str:
@@ -37,7 +37,7 @@ def set_view(pg, view: str) -> None:
 
 
 def terrain_brightness(pg) -> float:
-    """Luminancia media (0-255) de la zona central de la pantalla: un relieve 3D con textura negra da valores muy bajos."""
+    """Mean luminance (0-255) of the central area of the screen: a 3D relief with a black texture gives very low values."""
     import base64
     png = base64.b64encode(pg.screenshot(clip={"x": 560, "y": 260, "width": 700, "height": 560})).decode()
     return pg.evaluate("""b64 => new Promise(res => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
@@ -59,50 +59,50 @@ def main() -> int:
         pg.on("pageerror", lambda e: ERRORS.append("PAGEERROR " + str(e)))
         pg.on("response", lambda r: ERRORS.append(f"HTTP {r.status} {r.url}") if r.status >= 400 else None)
 
-        # --- 1. abrir por file://
+        # --- 1. open over file://
         pg.goto(INDEX)
         pg.wait_for_selector("#modal:not([hidden]) [data-a]", timeout=8000)
-        check("abre por file:// (sin servidor)", pg.url.startswith("file:"), pg.url[:40])
-        check("modo local: sin backend", pg.evaluate("() => MR.API.online") is False)
-        check("briefing con soles estimados", "soles" in modal_text(pg))
-        check("tres astronautas disponibles", pg.evaluate("() => document.querySelectorAll('.crew button').length") == 3)
+        check("opens over file:// (no server)", pg.url.startswith("file:"), pg.url[:40])
+        check("local mode: no backend", pg.evaluate("() => MR.API.online") is False)
+        check("briefing with estimated sols", "sols" in modal_text(pg))
+        check("three astronauts available", pg.evaluate("() => document.querySelectorAll('.crew button').length") == 3)
         if shots:
             pg.screenshot(path=str(shots / "e2e_1_briefing.png"))
 
-        # --- 2. 2D ↔ 3D (con el briefing abierto: los botones de vista se accionan por script)
-        check("arranca en Mapa 2D", pg.evaluate("() => document.querySelector('[role=radio][data-view=\"2d\"]').getAttribute('aria-checked')") == "true")
+        # --- 2. 2D ↔ 3D (with the briefing open: the view buttons are triggered by script)
+        check("starts on the 2D Map", pg.evaluate("() => document.querySelector('[role=radio][data-view=\"2d\"]').getAttribute('aria-checked')") == "true")
         set_view(pg, "3d")
         ok3d = pg.evaluate("() => !!(MR.Scene3D && MR.Scene3D.ready) && !!document.querySelector('canvas')")
-        check("Relieve 3D se inicia (WebGL)", ok3d)
+        check("3D Relief starts (WebGL)", ok3d)
         pg.evaluate("() => document.querySelector('#modal [data-n]') && 0")
         pg.wait_for_timeout(1500)
         lum = terrain_brightness(pg)
-        check("el terreno 3D tiene textura (no sale negro por file://)", lum > 45, f"luminancia media {lum:.0f}/255")
+        check("the 3D terrain has texture (it does not come out black over file://)", lum > 45, f"mean luminance {lum:.0f}/255")
         if shots and ok3d:
             pg.screenshot(path=str(shots / "e2e_2_3d.png"))
         set_view(pg, "2d")
-        check("vuelve a Mapa 2D", pg.evaluate("() => document.querySelector('[role=radio][data-view=\"2d\"]').getAttribute('aria-checked')") == "true")
+        check("returns to the 2D Map", pg.evaluate("() => document.querySelector('[role=radio][data-view=\"2d\"]').getAttribute('aria-checked')") == "true")
 
-        # --- 3. misión y ruta de EV1
+        # --- 3. EV1's mission and route
         pg.click("#modal [data-a]")
         pg.wait_for_selector("#dockPlan [data-acc]", timeout=5000)
         est = pg.evaluate("() => MR.eva.plan(MR.state().baseRoute)")
         pg.click("#dockPlan [data-acc]")
-        check("recorrido de EV1 iniciado", pg.evaluate("() => MR.state().mode") == "walk")
+        check("EV1's traverse started", pg.evaluate("() => MR.state().mode") == "walk")
         pg.evaluate("() => document.querySelector('.speed [data-speed=\"50\"]').click()")
-        pg.evaluate("() => { MR.cfg.radThr = 1e6; }")  # la radiación se prueba aparte; aquí manda la alerta de pendiente
+        pg.evaluate("() => { MR.cfg.radThr = 1e6; }")  # radiation is tested separately; here the slope alert takes precedence
 
-        # --- 4. caminar; atender la alerta crítica; hallazgo compartido a mitad de camino; 3D durante el recorrido
+        # --- 4. walk; handle the critical alert; shared finding halfway; 3D during the traverse
         state = {"alert": None, "finding": False, "view3d": False}
         waited = 0
         pg.evaluate("() => document.getElementById('btnPlay').click()")
         while waited < 170000 and pg.evaluate("() => MR.state().mode") == "walk":
             mt = modal_text(pg)
-            if "Pendiente fuerte" in mt:
-                state["alert"] = "desvío" if pg.query_selector("#modal [data-d]:not([disabled])") else "seguir"
-                if shots and not (shots / "e2e_3_alerta.png").exists():
-                    pg.screenshot(path=str(shots / "e2e_3_alerta.png"))
-                pg.click("#modal [data-d]" if state["alert"] == "desvío" else "#modal [data-s]")
+            if "Steep slope" in mt:
+                state["alert"] = "detour" if pg.query_selector("#modal [data-d]:not([disabled])") else "follow"
+                if shots and not (shots / "e2e_3_alert.png").exists():
+                    pg.screenshot(path=str(shots / "e2e_3_alert.png"))
+                pg.click("#modal [data-d]" if state["alert"] == "detour" else "#modal [data-s]")
                 pg.wait_for_timeout(300)
             elif mt:
                 for sel in ("[data-ignore]", "[data-s]", "[data-p]"):
@@ -114,27 +114,27 @@ def main() -> int:
             elif not pg.evaluate("() => MR.state().playing"):
                 pg.evaluate("() => document.getElementById('btnPlay').click()")
             km = pg.evaluate("() => MR.state().km")
-            if not state["view3d"] and km > 8:  # alternar 3D durante el recorrido
+            if not state["view3d"] and km > 8:  # switch to 3D during the traverse
                 state["view3d"] = True
                 set_view(pg, "3d")
                 state["view3d_ok"] = pg.evaluate("() => !!(MR.Scene3D && MR.Scene3D.ready)")
                 set_view(pg, "2d")
             if not state["finding"] and km > 20 and pg.evaluate("() => MR.state().playing"):
                 state["finding"] = True
-                pg.evaluate("() => document.getElementById('btnPlay').click()")  # pausa
+                pg.evaluate("() => document.getElementById('btnPlay').click()")  # pause
                 pg.evaluate("() => document.getElementById('btnReport').click()")
                 pg.wait_for_selector("#miniCard:not([hidden]) .typepick button", timeout=5000)
                 pg.click("#miniCard .typepick button[data-k=mineral]")
-                pg.fill("#miniCard textarea", "sulfato en afloramiento")
+                pg.fill("#miniCard textarea", "sulfate in outcrop")
                 pg.click("#miniCard [data-s]")
                 pg.wait_for_timeout(400)
-                # EV2 y EV3 lo reciben y conservan su viaje separado
+                # EV2 and EV3 receive it and keep their trip separate
                 got = {}
                 for c in ("ev2", "ev3"):
                     pg.evaluate("c => document.querySelector('.crew button[data-id=' + c + ']').click()", c)
                     pg.wait_for_timeout(500)
                     pg.evaluate("() => { const b = document.querySelector('#modal:not([hidden]) [data-n]'); b && b.click(); }")
-                    got[c] = pg.evaluate("() => ({ peers: MR.state().log.filter(m => m.from === 'peer' && m.text.includes('sulfato')).length, mode: MR.state().mode, km: MR.state().km, findings: MR.state().findings.length, zones: document.querySelectorAll('#vector .r-zone').length })")
+                    got[c] = pg.evaluate("() => ({ peers: MR.state().log.filter(m => m.from === 'peer' && m.text.includes('sulfate')).length, mode: MR.state().mode, km: MR.state().km, findings: MR.state().findings.length, zones: document.querySelectorAll('#vector .r-zone').length })")
                 state["peers"] = got
                 pg.evaluate("() => document.querySelector('.crew button[data-id=ev1]').click()")
                 pg.wait_for_timeout(500)
@@ -143,32 +143,32 @@ def main() -> int:
             waited += 120
 
         done = pg.evaluate("() => ({ mode: MR.state().mode, km: MR.state().km, sols: Math.floor(MR.state().simMin / 1440) + 1, alerts: MR.state().alerts, detours: MR.state().detours, dose: MR.state().rad.total, findings: MR.state().findings.length })")
-        check("recorrido completo hasta la cima", done["mode"] == "done", f"{done['km']:.1f} km en {done['sols']} soles")
-        check("atendió una alerta crítica de pendiente", state["alert"] is not None and done["alerts"] >= 1, f"{state['alert']} · {done['alerts']} alertas · {done['detours']} desvíos")
-        check("alternó a 3D durante el recorrido", state.get("view3d_ok") is True)
-        check("el hallazgo se registró en el viaje de EV1", state["finding"] and done["findings"] == 1)
+        check("full traverse to the summit", done["mode"] == "done", f"{done['km']:.1f} km in {done['sols']} sols")
+        check("handled a critical slope alert", state["alert"] is not None and done["alerts"] >= 1, f"{state['alert']} · {done['alerts']} alerts · {done['detours']} detours")
+        check("switched to 3D during the traverse", state.get("view3d_ok") is True)
+        check("the finding was logged in EV1's trip", state["finding"] and done["findings"] == 1)
         peers = state.get("peers", {})
-        check("EV2 y EV3 recibieron el hallazgo", all(v["peers"] == 1 for v in peers.values()) and len(peers) == 2, str(peers))
-        check("sus viajes siguen separados (sin hallazgos propios, km 0, sin ruta)", all(v["findings"] == 0 and v["km"] == 0 and v["mode"] == "base" for v in peers.values()))
-        check("EV2 y EV3 veían la zona en el mapa", all(v["zones"] == 1 for v in peers.values()))
-        check("los soles simulados coinciden con la estimación", abs(done["sols"] - est["solsCeil"]) <= 1, f"simulados {done['sols']} · estimados {est['solsCeil']}")
-        check("la dosis EVA acumulada es positiva", done["dose"] > 0, f"{done['dose']:.2f} mSv")
+        check("EV2 and EV3 received the finding", all(v["peers"] == 1 for v in peers.values()) and len(peers) == 2, str(peers))
+        check("their trips stay separate (no findings of their own, km 0, no route)", all(v["findings"] == 0 and v["km"] == 0 and v["mode"] == "base" for v in peers.values()))
+        check("EV2 and EV3 saw the zone on the map", all(v["zones"] == 1 for v in peers.values()))
+        check("the simulated sols match the estimate", abs(done["sols"] - est["solsCeil"]) <= 1, f"simulated {done['sols']} · estimated {est['solsCeil']}")
+        check("the accumulated EVA dose is positive", done["dose"] > 0, f"{done['dose']:.2f} mSv")
 
-        # --- 5. resumen
+        # --- 5. summary
         pg.wait_for_selector("#summary:not([hidden])", timeout=8000)
         summ = " ".join(pg.inner_text("#summary").split())
-        check("el resumen dice «Misión completada»", "Misión completada" in summ)
-        check("el resumen muestra la dosis EVA (modelo simplificado)", "dosis EVA" in summ and "simplificado" in summ.lower())
-        check("el resumen cuenta el hallazgo y las alertas", "hallazgos" in summ and "alertas atendidas" in summ)
+        check("the summary says «Mission completed»", "Mission completed" in summ)
+        check("the summary shows the EVA dose (simplified model)", "EVA dose" in summ and "simplified" in summ.lower())
+        check("the summary counts the finding and the alerts", "findings" in summ and "alerts handled" in summ)
         if shots:
-            pg.screenshot(path=str(shots / "e2e_4_resumen.png"))
+            pg.screenshot(path=str(shots / "e2e_4_summary.png"))
 
         errs = [e for e in ERRORS if not any(i in e for i in IGNORE)]
-        check("sin errores en consola durante todo el recorrido", not errs, "; ".join(errs)[:500])
+        check("no console errors during the whole traverse", not errs, "; ".join(errs)[:500])
         browser.close()
 
     failed = [c for c in CHECKS if not c[1]]
-    print(f"\n{len(CHECKS) - len(failed)}/{len(CHECKS)} comprobaciones correctas")
+    print(f"\n{len(CHECKS) - len(failed)}/{len(CHECKS)} checks passed")
     return 1 if failed else 0
 
 

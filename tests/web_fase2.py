@@ -1,6 +1,6 @@
-"""Prueba de navegador de la Fase 2 (confianza del modelo y limitaciones). Abre web/index.html por file://.
+"""Phase 2 browser test (model confidence and limitations). Opens web/index.html over file://.
 
-Requisitos: pip install playwright (usa el Edge/Chrome instalado).  Uso: python tests/web_fase2.py [captura.png]
+Requirements: pip install playwright (uses the installed Edge/Chrome).  Usage: python tests/web_fase2.py [screenshot.png]
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ CHECKS: list[tuple[str, bool, str]] = []
 
 def check(name: str, ok: bool, detail: str = "") -> None:
     CHECKS.append((name, bool(ok), detail))
-    print(("OK   " if ok else "FALLA"), name, detail)
+    print(("OK   " if ok else "FAIL "), name, detail)
 
 
 def main() -> int:
@@ -33,49 +33,49 @@ def main() -> int:
         pg.wait_for_timeout(1200)
 
         info = pg.evaluate("() => { const f = MR.F.confidence; if (!f) return null; let lo = 9, hi = -9; for (const v of f) { if (v < lo) lo = v; if (v > hi) hi = v; } return { n: f.length, lo, hi }; }")
-        check("capa de confianza cargada como script (file://)", info and info["n"] == 300 * 300, str(info))
-        check("valores de confianza entre 0 y 1", info and -0.01 <= info["lo"] and info["hi"] <= 1.01)
+        check("confidence layer loaded as a script (file://)", info and info["n"] == 300 * 300, str(info))
+        check("confidence values between 0 and 1", info and -0.01 <= info["lo"] and info["hi"] <= 1.01)
 
         pg.evaluate("() => document.querySelector('.layer-opt[data-key=confidence]').click()")
-        check("capa Confianza seleccionable", pg.evaluate("() => document.querySelector('.layer-opt[data-key=confidence]').getAttribute('aria-checked') === 'true'"))
-        check("leyenda Baja/Alta", "Baja" in pg.inner_text("#legend") and "Alta" in pg.inner_text("#legend"))
+        check("Confidence layer selectable", pg.evaluate("() => document.querySelector('.layer-opt[data-key=confidence]').getAttribute('aria-checked') === 'true'"))
+        check("Low/High legend", "Low" in pg.inner_text("#legend") and "High" in pg.inner_text("#legend"))
 
-        # panel del modelo: confianza + limitaciones
+        # model panel: confidence + limitations
         pg.evaluate("() => { document.getElementById('btnConditions').click(); }")
         pg.click(".dash-tab-btn[data-tab=mod]")
         pg.wait_for_timeout(300)
         txt = pg.inner_text("#dashBody")
-        check("sección «Limitaciones y supuestos»", "Limitaciones y supuestos" in txt)
-        check("cada limitación indica su origen (fuente/dato/supuesto)", all(w in txt for w in ("SUPUESTO", "FUENTE · Bennett 2023", "DATO DEL REPO")))
-        check("menciona el rover frente al astronauta", "El rover no camina como un astronauta" in txt)
-        check("tarjeta de confianza con advertencia", "Confianza del modelo" in txt and "no significa que acierten" in txt)
+        check("«Limitations and assumptions» section", "Limitations and assumptions" in txt)
+        check("each limitation states its origin (source/data/assumption)", all(w in txt for w in ("ASSUMPTION", "SOURCE · Bennett 2023", "REPO DATA")))
+        check("mentions the rover versus the astronaut", "The rover does not walk like an astronaut" in txt)
+        check("confidence card with a warning", "Model confidence" in txt and "does not mean they are right" in txt)
         if shot:
             pg.screenshot(path=shot)
 
-        # tabla de rutas con la confianza media
+        # route table with the mean confidence
         pg.click(".dash-tab-btn[data-tab=ter]")
         pg.wait_for_timeout(200)
-        check("comparación de rutas incluye confianza media", "Confianza del modelo (media)" in pg.inner_text("#dashBody"))
+        check("route comparison includes mean confidence", "Model confidence (mean)" in pg.inner_text("#dashBody"))
 
-        # botón "Ver en el mapa" activa la capa
+        # "View on the map" button activates the layer
         pg.click(".dash-tab-btn[data-tab=mod]")
         pg.evaluate("() => { document.querySelector('.layer-opt[data-key=none]').click(); }")
         pg.click("#btnConfLayer")
         pg.wait_for_timeout(300)
-        check("«Ver en el mapa» activa la capa", pg.evaluate("() => document.querySelector('.layer-opt[data-key=confidence]').getAttribute('aria-checked') === 'true'"))
+        check("«View on the map» activates the layer", pg.evaluate("() => document.querySelector('.layer-opt[data-key=confidence]').getAttribute('aria-checked') === 'true'"))
 
-        # Jezero: la capa no existe allí → marcada «solo Gale»
+        # Jezero: the layer does not exist there → marked «Gale only»
         pg.evaluate("() => { const s = document.getElementById('regionSelect'); s.value = 'jezero'; s.dispatchEvent(new Event('change', { bubbles: true })); }")
         pg.wait_for_timeout(500)
         na = pg.evaluate("() => document.querySelector('.layer-opt[data-key=confidence]').classList.contains('layer-na')")
-        check("en Jezero la capa figura como solo Gale", na)
+        check("in Jezero the layer is listed as Gale only", na)
 
         errs = [e for e in ERRORS if not any(i in e for i in ("GPU stall", "GL Driver"))]
-        check("sin errores en consola", not errs, "; ".join(errs)[:400])
+        check("no console errors", not errs, "; ".join(errs)[:400])
         browser.close()
 
     failed = [c for c in CHECKS if not c[1]]
-    print(f"\n{len(CHECKS) - len(failed)}/{len(CHECKS)} comprobaciones correctas")
+    print(f"\n{len(CHECKS) - len(failed)}/{len(CHECKS)} checks passed")
     return 1 if failed else 0
 
 

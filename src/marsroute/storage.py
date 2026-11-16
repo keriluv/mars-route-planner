@@ -1,7 +1,7 @@
-"""storage.py — Gestión de persistencia local SQLite para GaleX.
+"""storage.py — Local SQLite persistence management for GaleX.
 
-Provee almacenamiento relacional estructurado para reportes, bitácora, hallazgos,
-misiones y telemetría de exploradores, garantizando funcionamiento 100% offline.
+Provides structured relational storage for reports, logbook, findings,
+missions and explorer telemetry, guaranteeing 100% offline operation.
 """
 from __future__ import annotations
 
@@ -80,15 +80,15 @@ CREATE INDEX IF NOT EXISTS ix_mision_exp ON mision(explorador);
 CREATE INDEX IF NOT EXISTS ix_reporte_autor ON reporte(autor);
 
 INSERT OR IGNORE INTO explorador (id, rol, color) VALUES
-    ('ev1', 'Comandante', '#1E64DC'),
-    ('ev2', 'Geóloga',    '#B5651D'),
-    ('ev3', 'Ingeniero',  '#127846');
+    ('ev1', 'Commander', '#1E64DC'),
+    ('ev2', 'Geologist', '#B5651D'),
+    ('ev3', 'Engineer',  '#127846');
 """
 
 
 class _ClosingConnection(sqlite3.Connection):
-    """`with sqlite3.connect(...)` confirma o revierte pero NO cierra la conexión: cada llamada dejaba una abierta
-    (en Windows eso impide borrar el archivo). Esta variante también la cierra al salir del bloque `with`."""
+    """`with sqlite3.connect(...)` commits or rolls back but does NOT close the connection: every call left one open
+    (on Windows that prevents deleting the file). This variant also closes it on leaving the `with` block."""
 
     def __exit__(self, exc_type, exc, tb):
         try:
@@ -98,7 +98,7 @@ class _ClosingConnection(sqlite3.Connection):
 
 
 class Storage:
-    """Administrador de persistencia SQLite hilo-seguro para el prototipo."""
+    """Thread-safe SQLite persistence manager for the prototype."""
 
     def __init__(self, db_path: Optional[Path | str] = None):
         self.db_path = Path(db_path) if db_path else DEFAULT_DB_PATH
@@ -117,9 +117,9 @@ class Storage:
                 conn.executescript(SCHEMA)
                 conn.commit()
 
-    # ------------------------------------------------------------- Reportes
+    # ------------------------------------------------------------- Reports
     def save_report(self, report: Report) -> None:
-        """Guarda o actualiza un reporte en SQLite."""
+        """Saves or updates a report in SQLite."""
         sql = """
         INSERT OR REPLACE INTO reporte (
             id, autor, tipo, lon, lat, elev_m, sol_min, km, texto, adjuntos_json, sync_status, creado
@@ -145,7 +145,7 @@ class Storage:
                 conn.commit()
 
     def get_report(self, report_id: str) -> Optional[Report]:
-        """Obtiene un reporte por su ID."""
+        """Gets a report by its ID."""
         sql = "SELECT * FROM reporte WHERE id = ?"
         with self._lock:
             with self._get_connection() as conn:
@@ -168,7 +168,7 @@ class Storage:
                 )
 
     def list_reports(self, author: Optional[str] = None, limit: int = 100) -> List[Report]:
-        """Lista los reportes ordenados cronológicamente."""
+        """Lists reports in chronological order."""
         sql = "SELECT * FROM reporte"
         params: list[Any] = []
         if author:
@@ -198,9 +198,9 @@ class Storage:
                     for r in rows
                 ]
 
-    # ------------------------------------------------------------- Hallazgos
+    # ------------------------------------------------------------- Findings
     def save_finding(self, finding: Dict[str, Any]) -> None:
-        """Registra un hallazgo geológico."""
+        """Records a geological finding."""
         sql = """
         INSERT OR REPLACE INTO hallazgo (
             id, explorador, tipo, nota, lon, lat, altura_m, sol_min, km, tiene_foto
@@ -234,7 +234,7 @@ class Storage:
             with self._get_connection() as conn:
                 return [dict(r) for r in conn.execute(sql, params).fetchall()]
 
-    # ------------------------------------------------------------- Mensajes
+    # ------------------------------------------------------------- Messages
     def save_message(self, msg: Dict[str, Any]) -> int:
         sql = """
         INSERT INTO mensaje (explorador, remitente, texto, tipo, lon, lat, sol_min)

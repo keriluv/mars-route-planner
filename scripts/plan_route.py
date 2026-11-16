@@ -41,9 +41,9 @@ def main() -> None:
     size = int(config["grid_size"])
     start = lonlat_to_cell(*config["start"], config["bbox"], size)
     goal = lonlat_to_cell(*config["goal"], config["bbox"], size)
-    for name, cell in (("inicio", start), ("objetivo", goal)):
+    for name, cell in (("start", start), ("goal", goal)):
         if blocked[cell]:
-            raise SystemExit(f"El punto de {name} cae en zona bloqueada: {cell}")
+            raise SystemExit(f"The {name} point falls in a blocked area: {cell}")
 
     route = astar(cost, blocked, start, goal)
     cells = simplify(route.cells)

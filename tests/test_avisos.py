@@ -1,6 +1,6 @@
-"""Pruebas del backend de avisos compartidos (Fase 4): SQLite para los registros, JSONL para los eventos.
+"""Tests of the shared-notices backend (Phase 4): SQLite for the records, JSONL for the events.
 
-Usa una carpeta de datos temporal (MARS_DATA_DIR); no toca backend/data.
+Uses a temporary data folder (MARS_DATA_DIR); it does not touch backend/data.
 """
 from __future__ import annotations
 
@@ -26,12 +26,12 @@ def server(tmp_path, monkeypatch):
 
 
 def aviso(**kw):
-    base = {"id": "av_1", "author": "ev1", "kind": "hallazgo", "text": "olivino", "lon": 137.5, "lat": -4.8, "simMin": 600}
+    base = {"id": "av_1", "author": "ev1", "kind": "hallazgo", "text": "olivine", "lon": 137.5, "lat": -4.8, "simMin": 600}
     base.update(kw)
     return base
 
 
-def test_publicar_guarda_registro_y_evento(server):
+def test_publish_saves_record_and_event(server):
     server.save_aviso(aviso())
     rows = server.list_avisos()
     assert [(r["id"], r["author"], r["kind"], r["estado"]) for r in rows] == [("av_1", "ev1", "hallazgo", "activo")]
@@ -39,14 +39,14 @@ def test_publicar_guarda_registro_y_evento(server):
     assert len(eventos) == 1 and eventos[0]["aviso_id"] == "av_1"
 
 
-def test_reenviar_es_idempotente(server):
+def test_resend_is_idempotent(server):
     server.save_aviso(aviso())
     server.save_aviso(aviso())
     assert len(server.list_avisos()) == 1
     assert len(server.docs.find("eventos", {"tipo": "aviso_publicado"})) == 1
 
 
-def test_solo_el_autor_retira(server):
+def test_only_the_author_withdraws(server):
     server.save_aviso(aviso())
     server.retire_aviso({"id": "av_1", "crew": "ev2"})
     assert server.list_avisos()[0]["estado"] == "activo"
@@ -56,13 +56,13 @@ def test_solo_el_autor_retira(server):
 
 
 @pytest.mark.parametrize("cambio", [{"kind": "otro"}, {"author": "ev9"}, {"text": ""}, {"lat": 200}, {"id": ""}])
-def test_rechaza_datos_invalidos(server, cambio):
+def test_rejects_invalid_data(server, cambio):
     with pytest.raises(ValueError):
         server.save_aviso(aviso(**cambio))
     assert server.list_avisos() == []
 
 
-def test_recibido_solo_deja_evento(server):
+def test_receipt_only_leaves_event(server):
     server.save_aviso(aviso())
     server.ack_aviso({"id": "av_1", "crew": "ev2"})
     ev = server.docs.find("eventos", {"tipo": "aviso_recibido"})
@@ -71,7 +71,7 @@ def test_recibido_solo_deja_evento(server):
         server.ack_aviso({"id": "av_1", "crew": "ev9"})
 
 
-def test_filtra_por_region(server):
+def test_filters_by_region(server):
     server.save_aviso(aviso())
     server.save_aviso(aviso(id="av_2", region="jezero", lon=77.4, lat=18.4))
     assert [r["id"] for r in server.list_avisos("jezero")] == ["av_2"]

@@ -1,17 +1,17 @@
-"""Incertidumbre del bosque aleatorio de traversabilidad: desacuerdo entre árboles.
+"""Uncertainty of the traversability random forest: disagreement between trees.
 
-Para cada celda se pregunta a cada uno de los 300 árboles por la probabilidad de "terreno transitable"
-y se mide cuánto se contradicen (desviación estándar). Si todos coinciden, la confianza es alta; si
-unos dicen "fácil" y otros "difícil", es baja.
+For each cell, each of the 300 trees is asked for the probability of "traversable terrain"
+and the amount of disagreement is measured (standard deviation). If they all agree, confidence is high; if
+some say "easy" and others "hard", it is low.
 
-IMPORTANTE: el desacuerdo entre árboles NO mide toda la incertidumbre. Fuera del corredor de
-entrenamiento los árboles pueden coincidir y estar equivocados juntos. Por eso el script también
-calcula qué parte del terreno cae fuera del rango de variables que el modelo vio al entrenarse.
+IMPORTANT: disagreement between trees does NOT measure all of the uncertainty. Outside the training
+corridor the trees can agree and be wrong together. That is why the script also
+computes what share of the terrain falls outside the range of variables the model saw during training.
 
-Requiere data/processed/layers.npz (python scripts/build_layers.py) y models/terrain_model.joblib.
-Genera:
-  web/data/uncertainty_data.js  -> window.MARS_EXTRA (capa "confidence" a 300 × 300, se carga como script)
-  models/uncertainty_summary.json -> cifras para docs/ y para el dashboard
+Requires data/processed/layers.npz (python scripts/build_layers.py) and models/terrain_model.joblib.
+Generates:
+  web/data/uncertainty_data.js  -> window.MARS_EXTRA ("confidence" layer at 300 × 300, loaded as a script)
+  models/uncertainty_summary.json -> figures for docs/ and for the dashboard
 """
 from __future__ import annotations
 
@@ -30,11 +30,11 @@ from export_web import GRID, b64, block_mean, q8  # noqa: E402
 from marsroute.layers import load_layers  # noqa: E402
 from marsroute.model import FEATURES, build_dataset, feature_matrix, load_model  # noqa: E402
 
-STD_CAP = 0.5  # una desviación de 0,5 es el máximo posible entre probabilidades de 0 a 1
+STD_CAP = 0.5  # a deviation of 0.5 is the maximum possible between probabilities from 0 to 1
 
 
 def tree_spread(model, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Media y desviación estándar de las probabilidades por árbol, sin guardar los 300 mapas."""
+    """Mean and standard deviation of the per-tree probabilities, without storing the 300 maps."""
     n = len(model.estimators_)
     s = np.zeros(X.shape[0], dtype="float64")
     s2 = np.zeros(X.shape[0], dtype="float64")
@@ -55,11 +55,11 @@ def main() -> None:
 
     mean, std = tree_spread(model, X)
     ref = model.predict_proba(X)[:, 1]
-    assert np.allclose(mean, ref, atol=1e-4), "la media por árbol no coincide con predict_proba"
+    assert np.allclose(mean, ref, atol=1e-4), "the per-tree mean does not match predict_proba"
     mean, std = mean.reshape(shape), std.reshape(shape)
     confidence = 1.0 - np.clip(std / STD_CAP, 0.0, 1.0)
 
-    # ¿qué parte del terreno queda fuera de lo que vio el modelo? (rango de cada variable en el entrenamiento)
+    # what share of the terrain falls outside what the model saw? (range of each feature in training)
     rows, cols, _labels, progress = build_dataset(
         layers, config["model"]["positive_buffer_m"], config["model"]["negative_buffer_m"],
         config["model"].get("hazard_fraction", 0.7), config["model"].get("seed", 7))
@@ -74,13 +74,13 @@ def main() -> None:
         outside_any |= out
 
     dist_km = layers["traverse_distance"]
-    bands = {"a menos de 1 km del recorrido": dist_km <= 1.0, "de 1 a 10 km": (dist_km > 1.0) & (dist_km <= 10.0),
-             "a más de 10 km": dist_km > 10.0}
-    by_band = {k: {"celdas_pct": float(100 * m.mean()), "desv_arboles_media": float(std[m].mean()),
-                   "confianza_media": float(confidence[m].mean()), "fuera_de_rango_pct": float(100 * outside_any[m].mean()),
-                   "transitabilidad_media": float(mean[m].mean())} for k, m in bands.items() if m.any()}
+    bands = {"within 1 km of the traverse": dist_km <= 1.0, "1 to 10 km": (dist_km > 1.0) & (dist_km <= 10.0),
+             "beyond 10 km": dist_km > 10.0}
+    by_band = {k: {"cells_pct": float(100 * m.mean()), "mean_tree_std": float(std[m].mean()),
+                   "mean_confidence": float(confidence[m].mean()), "out_of_range_pct": float(100 * outside_any[m].mean()),
+                   "mean_traversability": float(mean[m].mean())} for k, m in bands.items() if m.any()}
 
-    # sobre las rutas exportadas a la web (puntos lon/lat → celda de 44 m)
+    # over the routes exported to the web (lon/lat points → 44 m cell)
     bbox = config["bbox"]
     routes_file = ROOT / "web" / "data" / "routes.json"
     route_stats = {}
@@ -92,32 +92,32 @@ def main() -> None:
                 continue
             ci = np.clip(((np.array([p[0] for p in pts]) - bbox[0]) / (bbox[2] - bbox[0]) * shape[1]).astype(int), 0, shape[1] - 1)
             ri = np.clip(((bbox[3] - np.array([p[1] for p in pts])) / (bbox[3] - bbox[1]) * shape[0]).astype(int), 0, shape[0] - 1)
-            route_stats[name] = {"confianza_media": float(confidence[ri, ci].mean()), "fuera_de_rango_pct": float(100 * outside_any[ri, ci].mean()),
-                                 "puntos": len(pts)}
+            route_stats[name] = {"mean_confidence": float(confidence[ri, ci].mean()), "out_of_range_pct": float(100 * outside_any[ri, ci].mean()),
+                                 "points": len(pts)}
 
     summary = {
-        "arboles": len(model.estimators_),
-        "desv_arboles": {"media": float(std.mean()), "p50": float(np.percentile(std, 50)), "p90": float(np.percentile(std, 90)),
+        "trees": len(model.estimators_),
+        "tree_std": {"media": float(std.mean()), "p50": float(np.percentile(std, 50)), "p90": float(np.percentile(std, 90)),
                          "max": float(std.max())},
-        "celdas_confianza_baja_pct": float(100 * (confidence < 0.5).mean()),
-        "fuera_de_rango_entrenamiento_pct": float(100 * outside_any.mean()),
-        "fuera_de_rango_por_variable_pct": {k: 100 * v for k, v in outside_by_feature.items()},
-        "rango_entrenamiento": {n: [float(lo[i]), float(hi[i])] for i, n in enumerate(FEATURES)},
-        "por_distancia_al_recorrido": by_band, "rutas": route_stats,
-        "nota": "El desacuerdo entre árboles no cubre el error por extrapolación fuera del corredor de entrenamiento.",
+        "low_confidence_cells_pct": float(100 * (confidence < 0.5).mean()),
+        "out_of_training_range_pct": float(100 * outside_any.mean()),
+        "out_of_range_by_feature_pct": {k: 100 * v for k, v in outside_by_feature.items()},
+        "training_range": {n: [float(lo[i]), float(hi[i])] for i, n in enumerate(FEATURES)},
+        "by_distance_to_traverse": by_band, "routes": route_stats,
+        "note": "Disagreement between trees does not cover the extrapolation error outside the training corridor.",
     }
     (ROOT / "models" / "uncertainty_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
 
     conf_s = block_mean(confidence.astype("float32"), GRID)
     extra = {
-        "confidence": {"b64": b64(q8(conf_s, 0, 1)), "dtype": "u8", "min": 0, "max": 1, "unit": "índice"},
-        "summary": {k: summary[k] for k in ("arboles", "desv_arboles", "celdas_confianza_baja_pct", "fuera_de_rango_entrenamiento_pct",
-                                              "por_distancia_al_recorrido", "rutas")},
+        "confidence": {"b64": b64(q8(conf_s, 0, 1)), "dtype": "u8", "min": 0, "max": 1, "unit": "index"},
+        "summary": {k: summary[k] for k in ("trees", "tree_std", "low_confidence_cells_pct", "out_of_training_range_pct",
+                                              "by_distance_to_traverse", "routes")},
     }
     out = ROOT / "web" / "data" / "uncertainty_data.js"
     out.write_text("window.MARS_EXTRA=" + json.dumps(extra, ensure_ascii=False) + ";\n", encoding="utf-8")
     print(json.dumps(summary, indent=2, ensure_ascii=False))
-    print(f"\nEscrito {out.relative_to(ROOT)} ({out.stat().st_size // 1024} KB)")
+    print(f"\nWritten {out.relative_to(ROOT)} ({out.stat().st_size // 1024} KB)")
 
 
 if __name__ == "__main__":

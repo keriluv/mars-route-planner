@@ -1,5 +1,5 @@
 /* =========================================================
-   charts.js — gráficas SVG ligeras (sin librerías)
+   charts.js — lightweight SVG charts (no libraries)
    ========================================================= */
 (function () {
   "use strict";
@@ -28,14 +28,14 @@
     return out;
   }
 
-  /* ---------- Perfil de altura de la ruta (con posición del explorador) ---------- */
+  /* ---------- Route elevation profile (with the explorer's position) ---------- */
   MR.profileChart = function (host, pts, o = {}) {
     host.innerHTML = "";
     if (!pts || pts.length < 2) return;
     const Wd = host.clientWidth - 20, Ht = host.clientHeight - 12;
     if (Wd < 50) return;
     const m = { l: 58, r: 8, t: 8, b: 18 };
-    const svg = el("svg", { viewBox: `0 0 ${Wd} ${Ht}`, role: "img", "aria-label": "Perfil de altura", class: "ch" }, host);
+    const svg = el("svg", { viewBox: `0 0 ${Wd} ${Ht}`, role: "img", "aria-label": "Elevation profile", class: "ch" }, host);
     const L = pts[pts.length - 1][2];
     const zs = pts.map(p => p[3]); const zmin = Math.min(...zs), zmax = Math.max(...zs);
     const X = km => m.l + (km / L) * (Wd - m.l - m.r);
@@ -50,7 +50,7 @@
       const t = el("text", { x: X(v), y: Ht - 3, "text-anchor": "middle", fill: css("--text-2"), "font-size": 11, "font-family": "Barlow Semi Condensed" }, svg);
       t.textContent = v + " km";
     });
-    // área por tramos coloreados por pendiente (verde / ámbar / rojo)
+    // area by segments colored by slope (green / amber / red)
     const col = s => (s > MR.cfg.critSlope ? css("--danger") : s > MR.cfg.caution ? css("--caution") : css("--nominal"));
     const step = Math.max(1, Math.floor(pts.length / 400));
     for (let i = step; i < pts.length; i += step) {
@@ -60,25 +60,25 @@
     }
     let d = ""; pts.forEach((p, i) => { if (i % step === 0 || i === pts.length - 1) d += (d ? "L" : "M") + X(p[2]).toFixed(1) + "," + Y(p[3]).toFixed(1); });
     el("path", { d, stroke: css("--text"), "stroke-width": 2, fill: "none" }, svg);
-    // límites de etapas
+    // stage boundaries
     (o.stages || []).forEach((km, i) => {
       if (km <= 0 || km >= L) return;
       el("line", { x1: X(km), x2: X(km), y1: m.t, y2: Ht - m.b, stroke: css("--text-2"), "stroke-dasharray": "3 3" }, svg);
       const t = el("text", { x: X(km) + 3, y: m.t + 10, fill: css("--text-2"), "font-size": 10, "font-family": "Barlow Semi Condensed" }, svg);
       t.textContent = "E" + (i + 1);
     });
-    // zonas de peligro
+    // danger zones
     (o.hazards || []).forEach(z => {
       el("rect", { x: X(z.startKm) - 2, width: Math.max(4, X(z.endKm) - X(z.startKm) + 4), y: m.t, height: 5, rx: 2, fill: css("--danger") }, svg);
     });
-    // posición
+    // position
     if (o.posKm != null) {
       const pi = MR.nearestKm(pts, o.posKm);
       el("rect", { x: m.l, y: m.t, width: Math.max(0, X(o.posKm) - m.l), height: Ht - m.t - m.b, fill: css("--accent"), "fill-opacity": .06 }, svg);
       el("line", { x1: X(o.posKm), x2: X(o.posKm), y1: m.t, y2: Ht - m.b, stroke: css("--accent"), "stroke-width": 2 }, svg);
       el("circle", { cx: X(o.posKm), cy: Y(pts[pi][3]), r: 6, fill: css("--accent"), stroke: css("--panel"), "stroke-width": 2 }, svg);
     }
-    // capa de interacción (cursor + tooltip + clic)
+    // interaction layer (cursor + tooltip + click)
     const hl = el("line", { y1: m.t, y2: Ht - m.b, stroke: css("--text-2"), "stroke-width": 1, visibility: "hidden" }, svg);
     const hit = el("rect", { x: m.l, y: 0, width: Wd - m.l - m.r, height: Ht, fill: "transparent", style: "cursor:pointer" }, svg);
     const at = ev => {
@@ -88,7 +88,7 @@
     };
     hit.addEventListener("mousemove", ev => {
       const p = at(ev); hl.setAttribute("x1", X(p[2])); hl.setAttribute("x2", X(p[2])); hl.setAttribute("visibility", "visible");
-      showTip(`<b>${MR.fmt(p[2])} km</b><br>Altura ${MR.fmt(p[3], 0)} m · Pendiente ${MR.fmt(p[4])}°<br>Facilidad de paso ${MR.fmt(p[6], 2)}`, ev.clientX, ev.clientY);
+      showTip(`<b>${MR.fmt(p[2])} km</b><br>Elevation ${MR.fmt(p[3], 0)} m · Slope ${MR.fmt(p[4])}°<br>Traversability ${MR.fmt(p[6], 2)}`, ev.clientX, ev.clientY);
     });
     hit.addEventListener("mouseleave", () => { hl.setAttribute("visibility", "hidden"); hideTip(); });
     hit.addEventListener("click", ev => o.onPick && o.onPick(at(ev)));
@@ -99,7 +99,7 @@
     return lo;
   };
 
-  /* ---------- Línea por hora del sol (REMS) ---------- */
+  /* ---------- Line by hour of the sol (REMS) ---------- */
   MR.lineChart = function (host, cfg) {
     host.innerHTML = "";
     const Wd = Math.max(320, host.clientWidth), Ht = cfg.height || 300;
@@ -118,7 +118,7 @@
     });
     if (lo < 0 && hi > 0 && cfg.showZero) el("line", { x1: m.l, x2: Wd - m.r, y1: Y(0), y2: Y(0), class: "zero" }, svg);
     for (let h = 0; h <= 24; h += 3) el("text", { x: X(h), y: Ht - 10, "text-anchor": "middle" }, svg).textContent = String(h).padStart(2, "0") + ":00";
-    // ventana EVA
+    // EVA window
     if (cfg.eva) el("rect", { x: X(MR.eva ? MR.eva.cfg.startHour : 8), width: X(MR.eva ? MR.eva.endHour() : 17) - X(MR.eva ? MR.eva.cfg.startHour : 8), y: m.t, height: Ht - m.t - m.b, fill: css("--accent"), "fill-opacity": .06 }, svg);
     cfg.series.forEach(s => {
       const hrs = s.hours; let d = "";
@@ -127,7 +127,7 @@
     });
     if (cfg.marker != null) {
       el("line", { x1: X(cfg.marker), x2: X(cfg.marker), y1: m.t, y2: Ht - m.b, stroke: css("--text"), "stroke-width": 1.5, "stroke-dasharray": "4 3" }, svg);
-      el("text", { x: X(cfg.marker) + 4, y: m.t + 10, fill: css("--text") }, svg).textContent = "Ahora";
+      el("text", { x: X(cfg.marker) + 4, y: m.t + 10, fill: css("--text") }, svg).textContent = "Now";
     }
     // crosshair + tooltip
     const hl = el("line", { y1: m.t, y2: Ht - m.b, stroke: css("--text-2"), visibility: "hidden" }, svg);
@@ -148,7 +148,7 @@
     hit.addEventListener("mouseleave", () => { hl.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); hideTip(); });
   };
 
-  /* ---------- Barras horizontales ---------- */
+  /* ---------- Horizontal bars ---------- */
   MR.barH = function (host, items, o = {}) {
     host.innerHTML = "";
     const Wd = Math.max(280, host.clientWidth), bh = 26, gap = 10, m = { l: o.labelW || 150, r: 56, t: 4 };
@@ -165,7 +165,7 @@
     });
   };
 
-  /* ---------- Histograma de pendientes de una ruta (por clase) ---------- */
+  /* ---------- Slope histogram of a route (by class) ---------- */
   MR.slopeClasses = function (pts) {
     const c = [0, 0, 0, 0];
     for (let i = 1; i < pts.length; i++) {

@@ -1,6 +1,6 @@
 /* =========================================================
-   core.js — datos, geometría, A*, clima y modelo de caminata
-   Todo lo que no es interfaz vive aquí.
+   core.js — data, geometry, A*, weather and walking model
+   Everything that is not interface lives here.
    ========================================================= */
 (function () {
   "use strict";
@@ -14,7 +14,7 @@
   MR.REGIONS = {
     gale: {
       id: "gale",
-      name: "Cráter Gale (Curiosity)",
+      name: "Gale Crater (Curiosity)",
       rover: "Curiosity (MSL)",
       bbox: [137.18, -5.45, 138.08, -4.55],
       center: [137.44, -4.68],
@@ -25,7 +25,7 @@
     },
     jezero: {
       id: "jezero",
-      name: "Cráter Jezero (Perseverance)",
+      name: "Jezero Crater (Perseverance)",
       rover: "Perseverance (Mars 2020)",
       bbox: (window.JEZERO_DATA && window.JEZERO_DATA.bbox) || [77.05, 18.05, 77.68, 18.63],
       center: (window.JEZERO_DATA && window.JEZERO_DATA.center) || [77.365, 18.34],
@@ -44,7 +44,7 @@
   };
   MR.setRegion("gale");
 
-  /* ---------- decodificación de capas (base64 → arreglos) ---------- */
+  /* ---------- layer decoding (base64 → arrays) ---------- */
   function decode(layer) {
     const bin = atob(layer.b64);
     const u8 = new Uint8Array(bin.length);
@@ -57,7 +57,7 @@
   }
   MR.F = {};
   for (const k of Object.keys(D.layers)) if (k !== "grid") MR.F[k] = decode(D.layers[k]);
-  // capa opcional de confianza (desacuerdo entre los 300 árboles del bosque), de scripts/export_uncertainty.py
+  // optional confidence layer (disagreement among the 300 trees of the forest), from scripts/export_uncertainty.py
   MR.EXTRA = window.MARS_EXTRA || null;
   if (MR.EXTRA && MR.EXTRA.confidence) MR.F.confidence = decode(MR.EXTRA.confidence);
   MR.J = {};
@@ -70,7 +70,7 @@
     MR.F.jezero_dem = decode(window.JEZERO_DATA.dem);
   }
 
-  /* ---------- geometría ---------- */
+  /* ---------- geometry ---------- */
   MR.toWorld = (lon, lat) => {
     const [w, s, e, n] = MR.bbox || D.bbox;
     return [((lon - w) / (e - w)) * 1200, ((n - lat) / (n - s)) * 1200];
@@ -110,7 +110,7 @@
   MR.fmt = (v, d = 1) => (v == null || isNaN(v) ? "—" : Number(v).toLocaleString("es-CO", { minimumFractionDigits: d, maximumFractionDigits: d }).replace(/^-/, "−"));
   MR.fmtLL = (lon, lat) => `${MR.fmt(lat, 3)}° · ${MR.fmt(lon, 3)}°`;
 
-  /* ---------- rutas: formato [lon, lat, km, elev, slope, rough, trav] ---------- */
+  /* ---------- routes: format [lon, lat, km, elev, slope, rough, trav] ---------- */
   MR.withKm = function (pts) {
     let km = 0;
     return pts.map((p, i) => {
@@ -133,18 +133,18 @@
       hazards: MR.hazardZones(pts).length, meanConf: MR.routeConfidence(pts), minElev: Math.min(...pts.map(p => p[3])), maxElev: Math.max(...pts.map(p => p[3])) };
   };
 
-  // confianza media del modelo a lo largo de una ruta (0–1); null si no hay capa o la región no es Gale
+  // mean model confidence along a route (0–1); null if there is no layer or the region is not Gale
   MR.routeConfidence = function (pts) {
     if (!MR.F.confidence || MR.currentRegion !== "gale" || !pts.length) return null;
     let s = 0; for (const p of pts) s += MR.sample("confidence", p[0], p[1]);
     return s / pts.length;
   };
 
-  /* ---------- configuración global (umbrales y pesos) ---------- */
-  // radThr: umbral de dosis EVA por jornada (mSv). SUPUESTO operativo de la app, no un límite de la NASA.
+  /* ---------- global configuration (thresholds and weights) ---------- */
+  // radThr: EVA dose threshold per workday (mSv). Operational ASSUMPTION of the app, not a NASA limit.
   MR.cfg = { riskW: 4, slopeW: 3, maxSlope: 20, caution: 8, critSlope: 15, travThr: 0.25, radThr: 5 };
 
-  /* ---------- zonas de peligro sobre una ruta ---------- */
+  /* ---------- danger zones along a route ---------- */
   MR.hazardZones = function (pts, crit = MR.cfg.critSlope) {
     const zones = []; let cur = null;
     for (let i = 0; i < pts.length; i++) {
@@ -169,9 +169,9 @@
     return zones.filter(z => z.endKm - z.startKm > 0.15).map((z, i) => Object.assign(z, { id: "lt" + i + "_" + z.startKm.toFixed(2) }));
   };
 
-  /* ---------- modelo de caminata (Tobler adaptado a traje EVA) ----------
-     v = 6·e^(−3.5·|pendiente_firmada + 0.05|) km/h  (función de Tobler)
-     × 0.55 por traje presurizado y × (1 − 0.35·(1 − facilidad de paso))   */
+  /* ---------- walking model (Tobler adapted to the EVA suit) ----------
+     v = 6·e^(−3.5·|signed_slope + 0.05|) km/h  (Tobler function)
+     × 0.55 for the pressurized suit and × (1 − 0.35·(1 − traversability))   */
   MR.walkSpeed = function (grade, trav) {
     const tob = 6 * Math.exp(-3.5 * Math.abs(grade + 0.05));
     return Math.max(0.4, tob * 0.55 * (1 - 0.35 * (1 - trav)));
@@ -181,8 +181,8 @@
     const d = (b[2] - a[2]) * 1000;
     return d > 1 ? (b[3] - a[3]) / d : 0;
   };
-  // Velocidad (km/h) en el punto i: la misma que usa la simulación, para que las estimaciones y el recorrido coincidan.
-  // Incluye el ritmo más lento en tramos empinados (× 0,6, supuesto del prototipo) y las pausas configurables (solo a pie).
+  // Speed (km/h) at point i: the same one used by the simulation, so that the estimates and the traverse match.
+  // Includes the slower pace on steep sections (× 0.6, prototype assumption) and the configurable breaks (on foot only).
   MR.speedAt = function (pts, i, mobility, zones) {
     const rover = mobility === "rover";
     let v = rover ? MR.roverSpeed(pts[i][4], pts[i][6]) : MR.walkSpeed(MR.gradeAt(pts, i), pts[i][6]);
@@ -196,10 +196,10 @@
     return h;
   };
 
-  /* ---------- jornada EVA: supuestos CONFIGURABLES ----------
-     Ninguna de estas cifras viene de una fuente oficial. Nelson (NASA, 2021) lista la duración y el ritmo de
-     las EVA en Marte como brechas de conocimiento abiertas, así que se exponen como supuestos que se pueden mover.
-     Los valores por defecto reproducen el comportamiento original del prototipo (08:00–17:00, sin pausas ni reserva). */
+  /* ---------- EVA workday: CONFIGURABLE assumptions ----------
+     None of these figures comes from an official source. Nelson (NASA, 2021) lists the duration and pace of
+     EVAs on Mars as open knowledge gaps, so they are exposed as assumptions that can be changed.
+     The default values reproduce the original behavior of the prototype (08:00–17:00, no breaks or reserve). */
   const EVA = (MR.eva = { mobility: "astronaut" });
   EVA.DEFAULTS = { startHour: 8, durationH: 9, pauseMinPerH: 0, reserveMin: 0 };
   EVA.cfg = Object.assign({}, EVA.DEFAULTS);
@@ -210,11 +210,11 @@
       EVA.cfg[k] = isFinite(v) && o[k] != null ? Math.min(hi, Math.max(lo, v)) : EVA.DEFAULTS[k];
     });
   };
-  EVA.endHour = () => EVA.cfg.startHour + EVA.cfg.durationH;                 // fin de la jornada
-  EVA.walkEndHour = () => EVA.endHour() - EVA.cfg.reserveMin / 60;           // se deja de caminar antes: queda tiempo para volver
-  EVA.windowH = () => Math.max(0.25, EVA.cfg.durationH - EVA.cfg.reserveMin / 60); // horas de marcha por sol
-  EVA.paceFactor = () => (60 - EVA.cfg.pauseMinPerH) / 60;                   // las pausas se promedian en el ritmo
-  // cuántos soles toma una ruta con la jornada actual
+  EVA.endHour = () => EVA.cfg.startHour + EVA.cfg.durationH;                 // end of the workday
+  EVA.walkEndHour = () => EVA.endHour() - EVA.cfg.reserveMin / 60;           // walking stops earlier: time is left to return
+  EVA.windowH = () => Math.max(0.25, EVA.cfg.durationH - EVA.cfg.reserveMin / 60); // walking hours per sol
+  EVA.paceFactor = () => (60 - EVA.cfg.pauseMinPerH) / 60;                   // breaks are averaged into the pace
+  // how many sols a route takes with the current workday
   EVA.plan = function (pts, mobility = EVA.mobility) {
     const hours = MR.estimateHours(pts, mobility), len = pts[pts.length - 1][2], win = EVA.windowH();
     return { hours, len, windowH: win, sols: hours / win, solsCeil: Math.max(1, Math.ceil(hours / win - 1e-9)), avgKmh: len / hours,
@@ -236,9 +236,9 @@
     const len = pts[pts.length - 1][2];
     const hours = MR.estimateHours(pts, mobility);
     const isRover = mobility === "rover";
-    // A pie, el traje se recarga cada noche (SUPUESTO): el consumo se mide por jornada EVA, no sobre todo el recorrido.
+    // On foot, the suit is recharged every night (ASSUMPTION): consumption is measured per EVA workday, not over the whole traverse.
     const useH = isRover ? hours : (hours <= MR.eva.windowH() ? hours : MR.eva.cfg.durationH);
-    const o2Capacity = isRover ? 5184 : 576; // 72h vs 8h autonomía a 72 L/h (supuestos del prototipo)
+    const o2Capacity = isRover ? 5184 : 576; // 72h vs 8h endurance at 72 L/h (prototype assumptions)
     const o2Consumed = useH * 72;
     const o2Pct = Math.min(100, (o2Consumed / o2Capacity) * 100);
 
@@ -247,7 +247,7 @@
     const battConsumed = useH * battRate;
     const battPct = Math.min(100, (battConsumed / battCapacity) * 100);
 
-    const radDose = MR.radiation.routeDose(pts, mobility); // mSv, modelo simplificado (ver MR.radiation)
+    const radDose = MR.radiation.routeDose(pts, mobility); // mSv, simplified model (see MR.radiation)
 
     const goal = pts[pts.length - 1];
     let nearestShelter = null, minShelterDist = Infinity;
@@ -259,14 +259,14 @@
     let valid = true, rejectionReason = "";
     if (!shelterOk) {
       valid = false;
-      rejectionReason = `Destino sin refugio presurizado verificado (distancia mínima: ${minShelterDist.toFixed(1)} km > 1.0 km).`;
+      rejectionReason = `Destination without a verified pressurized shelter (minimum distance: ${minShelterDist.toFixed(1)} km > 1.0 km).`;
     } else if (o2Pct > 80.0) {
       valid = false;
-      rejectionReason = isRover ? `Consumo de O₂ proyectado (${o2Pct.toFixed(1)}%) supera umbral de seguridad (reserva < 20%).`
-        : `Una jornada de ${useH.toFixed(1)} h usa el ${o2Pct.toFixed(0)} % del O₂ del traje (autonomía 8 h, supuesto; reserva < 20 %). Acorta la jornada en Ruta → Jornada EVA.`;
+      rejectionReason = isRover ? `Projected O₂ consumption (${o2Pct.toFixed(1)}%) exceeds the safety threshold (reserve < 20%).`
+        : `A workday of ${useH.toFixed(1)} h uses ${o2Pct.toFixed(0)} % of the suit's O₂ (8 h endurance, assumption; reserve < 20 %). Shorten the workday in Route → EVA workday.`;
     } else if (battPct > 85.0) {
       valid = false;
-      rejectionReason = `Consumo de batería proyectado (${battPct.toFixed(1)}%) supera umbral de seguridad.`;
+      rejectionReason = `Projected battery consumption (${battPct.toFixed(1)}%) exceeds the safety threshold.`;
     }
 
     return {
@@ -279,42 +279,42 @@
       battRemainingPct: Math.max(0, 100 - battPct),
       radDose,
       shelterOk,
-      shelterName: nearestShelter ? nearestShelter.name : "Desconocido",
+      shelterName: nearestShelter ? nearestShelter.name : "Unknown",
       shelterDistKm: minShelterDist,
       valid,
       rejectionReason,
     };
   };
 
-  /* ---------- radiación: modelo SIMPLIFICADO (no es una medición) ----------
-     Índice relativo de exposición: 1,00 = suelo del cráter a cielo abierto.
-       índice = factor_altura × factor_relieve
-       factor_altura  = 1 + s·(1 − columna/columna_ref)   (menos atmósfera encima → más dosis)
-       factor_relieve = a + (1 − a)·SVF                    (SVF = fracción de cielo visible del DEM)
-     Tasa de dosis = tasa_base × índice × (factor rover) × (multiplicador de evento solar).
-     Cada parámetro dice si viene de una fuente o es un SUPUESTO (ver RAD.ASSUMPTIONS). */
+  /* ---------- radiation: SIMPLIFIED model (not a measurement) ----------
+     Relative exposure index: 1.00 = crater floor under open sky.
+       index = height_factor × relief_factor
+       height_factor = 1 + s·(1 − column/ref_column)   (less atmosphere above → more dose)
+       relief_factor = a + (1 − a)·SVF                 (SVF = visible sky fraction of the DEM)
+     Dose rate = base_rate × index × (rover factor) × (solar event multiplier).
+     Each parameter states whether it comes from a source or is an ASSUMPTION (see RAD.ASSUMPTIONS). */
   const RAD = (MR.radiation = {});
   RAD.P = {
-    baseMsvDay: 0.65,              // FUENTE: MSL-RAD en el piso de Gale ≈ 0,64–0,7 mSv/día (Simonsen 2024; Tasoula et al.)
-    refElev: -4500, refColumn: 23, // FUENTE: ≈ 23 g/cm² de CO₂ sobre el piso de Gale (Simonsen 2024)
-    scaleH: 11100,                 // escala de altura de la presión que ya usa el clima del prototipo (aproximación)
-    elevSens: 0.5,                 // SUPUESTO: cuánto sube la dosis al perder atmósfera. Solo la dirección está respaldada
-    albedoFrac: 0.2,               // FUENTE: neutrones de albedo ≈ 20 % de la dosis en superficie (Simonsen 2024); no los tapa el relieve
-    roverFactor: 0.012 / 0.027,    // SUPUESTO: blindaje del rover presurizado respecto a caminar con traje
-    speMult: 40,                   // SUPUESTO: multiplicador de la tasa durante un evento solar (MSL-RAD en tránsito: ×10 a ×100)
-    speHours: 36,                  // SUPUESTO: duración del evento de demostración
+    baseMsvDay: 0.65,              // SOURCE: MSL-RAD on the Gale floor ≈ 0.64–0.7 mSv/day (Simonsen 2024; Tasoula et al.)
+    refElev: -4500, refColumn: 23, // SOURCE: ≈ 23 g/cm² of CO₂ above the Gale floor (Simonsen 2024)
+    scaleH: 11100,                 // scale height of the pressure already used by the prototype's weather (approximation)
+    elevSens: 0.5,                 // ASSUMPTION: how much the dose rises as atmosphere is lost. Only the direction is supported
+    albedoFrac: 0.2,               // SOURCE: albedo neutrons ≈ 20 % of the surface dose (Simonsen 2024); not blocked by relief
+    roverFactor: 0.012 / 0.027,    // ASSUMPTION: shielding of the pressurized rover relative to walking in a suit
+    speMult: 40,                   // ASSUMPTION: dose-rate multiplier during a solar event (MSL-RAD in transit: ×10 to ×100)
+    speHours: 36,                  // ASSUMPTION: duration of the demonstration event
   };
   RAD.baseRate = RAD.P.baseMsvDay / 24; // mSv/h
   RAD.ASSUMPTIONS = [
-    { k: "Tasa base", v: "0,65 mSv/día (≈ 27 µSv/h)", kind: "fuente", n: "MSL-RAD en el piso de Gale, Simonsen (NASA, 2024)." },
-    { k: "Atmósfera en el piso de Gale", v: "≈ 23 g/cm²", kind: "fuente", n: "Simonsen (NASA, 2024)." },
-    { k: "Albedo del suelo", v: "20 % de la dosis", kind: "fuente", n: "Neutrones que vienen del suelo: el relieve no los frena." },
-    { k: "Sensibilidad a la altura", v: "+50 % si no hubiera atmósfera", kind: "supuesto", n: "Solo se sabe que menos atmósfera da más dosis; el tamaño del efecto no está en las fuentes del repo." },
-    { k: "Blindaje del relieve", v: "cielo visible del DEM (177 m/celda)", kind: "supuesto", n: "Simplificación geométrica; ignora paredes del cráter fuera del recuadro." },
-    { k: "Rover presurizado", v: "× 0,44 frente a caminar", kind: "supuesto", n: "Valor heredado del prototipo, sin fuente." },
-    { k: "Evento solar (demo)", v: `× ${RAD.P.speMult} durante ${RAD.P.speHours} h`, kind: "supuesto", n: "Orden de magnitud coherente con un evento de referencia de 40 mSv sin blindaje (Simonsen) y con saltos de ×10 a ×100 medidos en tránsito." },
-    { k: "Dentro del refugio", v: "no se suma dosis", kind: "supuesto", n: "El modelo solo cuenta horas al aire libre." },
-    { k: "Umbral de alerta", v: "5 mSv por jornada (configurable)", kind: "supuesto", n: "Umbral operativo de la app, mucho menor que los límites de la NASA (250 mSv por evento solar; 600 mSv de carrera)." },
+    { k: "Base rate", v: "0.65 mSv/day (≈ 27 µSv/h)", kind: "source", n: "MSL-RAD on the Gale floor, Simonsen (NASA, 2024)." },
+    { k: "Atmosphere on the Gale floor", v: "≈ 23 g/cm²", kind: "source", n: "Simonsen (NASA, 2024)." },
+    { k: "Ground albedo", v: "20 % of the dose", kind: "source", n: "Neutrons coming from the ground: relief does not stop them." },
+    { k: "Sensitivity to elevation", v: "+50 % with no atmosphere", kind: "assumption", n: "It is only known that less atmosphere gives more dose; the size of the effect is not in the repo's sources." },
+    { k: "Relief shielding", v: "visible sky of the DEM (177 m/cell)", kind: "assumption", n: "Geometric simplification; ignores crater walls outside the frame." },
+    { k: "Pressurized rover", v: "× 0.44 vs. walking", kind: "assumption", n: "Value inherited from the prototype, unsourced." },
+    { k: "Solar event (demo)", v: `× ${RAD.P.speMult} for ${RAD.P.speHours} h`, kind: "assumption", n: "Order of magnitude consistent with a reference event of 40 mSv unshielded (Simonsen) and with jumps of ×10 to ×100 measured in transit." },
+    { k: "Inside the shelter", v: "no dose is added", kind: "assumption", n: "The model only counts hours outdoors." },
+    { k: "Alert threshold", v: "5 mSv per workday (configurable)", kind: "assumption", n: "Operational threshold of the app, much lower than NASA limits (250 mSv per solar event; 600 mSv career)." },
   ];
   (function buildRadiationIndex() {
     const Z = MR.F.dem; if (!Z) return;
@@ -340,23 +340,23 @@
     }
     MR.F.radiation = out; RAD.range = [lo, hi];
   })();
-  // índice en un punto; fuera de Gale no hay modelo (la columna de atmósfera de referencia es la de Gale)
+  // index at a point; outside Gale there is no model (the reference atmosphere column is Gale's)
   RAD.index = (lon, lat) => (MR.currentRegion === "gale" && MR.F.radiation ? MR.sample("radiation", lon, lat) : 1);
   RAD.speActive = (spe, simMin) => !!spe && simMin >= spe.start && simMin < spe.end;
   RAD.startSpe = simMin => ({ start: simMin, end: simMin + RAD.P.speHours * 60 });
-  // tasa de dosis (mSv/h) de quien está al aire libre en el punto p = [lon, lat, …]
+  // dose rate (mSv/h) of someone outdoors at point p = [lon, lat, …]
   RAD.rate = (p, mobility, spe, simMin) => RAD.baseRate * RAD.index(p[0], p[1])
     * (mobility === "rover" ? RAD.P.roverFactor : 1) * (RAD.speActive(spe, simMin) ? RAD.P.speMult : 1);
-  // dosis prevista del recorrido solo por GCR (sin eventos solares), integrada a lo largo de la ruta
+  // predicted dose of the traverse from GCR only (no solar events), integrated along the route
   RAD.routeDose = function (pts, mobility = "rover") {
     const zones = MR.hazardZones(pts); let dose = 0;
     for (let i = 1; i < pts.length; i++) dose += ((pts[i][2] - pts[i - 1][2]) / MR.speedAt(pts, i, mobility, zones)) * RAD.rate(pts[i], mobility, null, 0);
     return dose;
   };
 
-  /* ---------- clima (REMS de Curiosity) ----------
-     Perfil diurno real por hora solar local + corrección por altura:
-     temperatura −2,5 °C/km y presión con escala de altura de 11,1 km.      */
+  /* ---------- weather (Curiosity REMS) ----------
+     Real daytime profile by local solar hour + elevation correction:
+     temperature −2.5 °C/km and pressure with a scale height of 11.1 km.      */
   const REF_ELEV = -4500;
   function interp(arr, hour) {
     const n = arr.length; const x = ((hour % 24) + 24) % 24 / 24 * n;
@@ -377,9 +377,9 @@
     };
   };
 
-  /* ---------- A* sobre la grilla de 300 × 300 ----------
-     costo = 1 + w_r·(1 − p)² + w_s·penalización_pendiente²
-     Se bloquean celdas con pendiente > máxima o marcadas como bloqueadas por el backend. */
+  /* ---------- A* on the 300 × 300 grid ----------
+     cost = 1 + w_r·(1 − p)² + w_s·slope_penalty²
+     Cells with slope > maximum or marked as blocked by the backend are blocked. */
   function buildCost(o) {
     const n = G * G, cost = new Float32Array(n), blocked = new Uint8Array(n);
     const T = MR.F.traversability, SL = MR.F.slope, BL = MR.F.blocked;
@@ -459,7 +459,7 @@
     out.expanded = expanded; out.cost = best[g];
     return out;
   };
-  // suavizado ligero de la polilínea (media móvil de 3) para que no se vea escalonada
+  // light smoothing of the polyline (moving average of 3) so it does not look stepped
   function smooth(pts) {
     if (pts.length < 4) return pts;
     return pts.map((p, i) => {
@@ -468,7 +468,7 @@
       return [(a[0] + p[0] * 2 + b[0]) / 4, (a[1] + p[1] * 2 + b[1]) / 4, 0, p[3], p[4], p[5], p[6]];
     });
   }
-  // une varios tramos A* consecutivos
+  // joins several consecutive A* segments
   MR.chain = function (stops, opts) {
     let all = [];
     for (let i = 0; i < stops.length - 1; i++) {
@@ -477,7 +477,7 @@
     }
     return MR.withKm(all);
   };
-  // densifica una polilínea lon/lat (cada ~150 m) y le agrega los atributos del terreno
+  // densifies a lon/lat polyline (every ~150 m) and adds the terrain attributes to it
   MR.densify = function (lls, stepKm = 0.15) {
     const out = [];
     for (let i = 0; i < lls.length - 1; i++) {
@@ -491,7 +491,7 @@
     out.push([l[0], l[1], 0, MR.sample("dem", l[0], l[1]), MR.sample("slope", l[0], l[1]), MR.sample("roughness", l[0], l[1]), MR.sample("traversability", l[0], l[1])]);
     return MR.withKm(out);
   };
-  // índice del punto de la ruta más cercano a un lon/lat (desde un índice mínimo)
+  // index of the route point closest to a lon/lat (from a minimum index)
   MR.nearestIdx = function (pts, ll, from = 0) {
     let bi = from, bd = Infinity;
     for (let i = from; i < pts.length; i++) { const d = MR.distKm(pts[i], ll); if (d < bd) { bd = d; bi = i; } }
@@ -501,7 +501,7 @@
     let bd = Infinity; for (let i = 0; i < pts.length; i += 3) bd = Math.min(bd, MR.distKm(pts[i], ll)); return bd;
   };
 
-  /* ---------- paletas de color para capas ---------- */
+  /* ---------- color palettes for layers ---------- */
   function ramp(stops) {
     return t => {
       t = Math.min(1, Math.max(0, t));
@@ -513,32 +513,32 @@
     };
   }
   MR.LAYERS = [
-    { key: "traversability", name: "Facilidad de paso", sub: "Predicción del modelo (0–1)", lo: "Difícil", hi: "Fácil", prov: "der", provLabel: "DERIVADA",
+    { key: "traversability", name: "Traversability", sub: "Model prediction (0–1)", lo: "Hard", hi: "Easy", prov: "der", provLabel: "DERIVED",
       norm: v => v, ramp: ramp([[0, 196, 40, 40], [0.45, 240, 178, 60], [1, 18, 140, 80]]),
-      src: "Bosque aleatorio entrenado con el recorrido real de Curiosity. Variables: pendiente, rugosidad, textura óptica, gradiente y térmico." },
-    { key: "hazard", name: "Zonas no recomendadas", sub: "Pendiente alta o paso difícil", lo: "", hi: "Evitar", prov: "der", provLabel: "DERIVADA",
-      src: "Celdas con pendiente sobre el umbral crítico o facilidad de paso bajo el umbral de aviso. Ajustable en Ruta → Umbrales." },
-    { key: "slope", name: "Pendiente", sub: "Grados, del DEM MOLA/HRSC", lo: "0°", hi: "30°+", prov: "der", provLabel: "DERIVADA",
+      src: "Random forest trained on Curiosity's actual traverse. Features: slope, roughness, optical texture, gradient and thermal." },
+    { key: "hazard", name: "Not-recommended zones", sub: "High slope or hard passage", lo: "", hi: "Avoid", prov: "der", provLabel: "DERIVED",
+      src: "Cells with slope above the critical threshold or traversability below the warning threshold. Adjustable in Route → Thresholds." },
+    { key: "slope", name: "Slope", sub: "Degrees, from the MOLA/HRSC DEM", lo: "0°", hi: "30°+", prov: "der", provLabel: "DERIVED",
       norm: v => v / 30, ramp: ramp([[0, 255, 247, 220], [0.3, 250, 200, 90], [0.6, 220, 90, 40], [1, 120, 10, 30]]),
-      src: "Derivada del modelo de elevación MOLA/HRSC (200 m) remuestreado a 44 m." },
-    { key: "roughness", name: "Rugosidad", sub: "Desv. estándar local de la altura", lo: "Lisa", hi: "Rugosa", prov: "der", provLabel: "DERIVADA",
+      src: "Derived from the MOLA/HRSC elevation model (200 m) resampled to 44 m." },
+    { key: "roughness", name: "Roughness", sub: "Local std. deviation of height", lo: "Smooth", hi: "Rough", prov: "der", provLabel: "DERIVED",
       norm: v => v / 40, ramp: ramp([[0, 240, 240, 250], [0.5, 140, 120, 200], [1, 50, 20, 100]]),
-      src: "Desviación estándar de la elevación en ventanas de 7 × 7 celdas." },
-    { key: "thermal", name: "Térmico diurno", sub: "THEMIS IR (relativo)", lo: "Frío", hi: "Cálido", prov: "obs", provLabel: "OBSERVADA",
+      src: "Standard deviation of elevation in 7 × 7 cell windows." },
+    { key: "thermal", name: "Daytime thermal", sub: "THEMIS IR (relative)", lo: "Cold", hi: "Warm", prov: "obs", provLabel: "OBSERVED",
       norm: v => v / 255, ramp: ramp([[0, 10, 10, 40], [0.35, 120, 30, 110], [0.7, 240, 110, 40], [1, 255, 240, 160]]),
-      src: "Mosaico THEMIS infrarrojo diurno de 100 m (ASU JMARS). Ayuda a distinguir roca expuesta de polvo." },
-    { key: "color_index", name: "Índice de color", sub: "Viking MDIM (rojo − azul)", lo: "Azulado", hi: "Rojizo", prov: "obs", provLabel: "OBSERVADA",
+      src: "Daytime infrared THEMIS mosaic at 100 m (ASU JMARS). Helps distinguish exposed rock from dust." },
+    { key: "color_index", name: "Color index", sub: "Viking MDIM (red − blue)", lo: "Bluish", hi: "Reddish", prov: "obs", provLabel: "OBSERVED",
       norm: v => (v - D.layers.color_index.min) / (D.layers.color_index.max - D.layers.color_index.min),
       ramp: ramp([[0, 40, 90, 170], [0.5, 235, 235, 235], [1, 190, 50, 30]]),
-      src: "Mosaico Viking MDIM 2.1 a color. Las anomalías señalan cambios de composición del suelo." },
-    { key: "confidence", name: "Confianza del modelo", sub: "Acuerdo entre los 300 árboles", lo: "Baja", hi: "Alta", prov: "der", provLabel: "DERIVADA",
+      src: "Viking MDIM 2.1 color mosaic. Anomalies point to changes in soil composition." },
+    { key: "confidence", name: "Model confidence", sub: "Agreement among the 300 trees", lo: "Low", hi: "High", prov: "der", provLabel: "DERIVED",
       norm: v => v, ramp: ramp([[0, 252, 236, 210], [0.5, 150, 172, 205], [1, 28, 66, 148]]),
-      src: "Qué tanto coinciden los 300 árboles del bosque aleatorio sobre una celda (1 = todos coinciden). Ojo: que coincidan no garantiza acierto; fuera del corredor donde entrenó (Curiosity, 19 km) pueden equivocarse todos juntos. Ver Condiciones → Modelo predictivo." },
-    { key: "radiation", name: "Radiación", sub: "Índice relativo de exposición", lo: "Menor", hi: "Mayor", prov: "sim", provLabel: "SIMPLIFICADO",
+      src: "How much the 300 trees of the random forest agree on a cell (1 = all agree). Note: agreement does not guarantee correctness; outside the corridor where it trained (Curiosity, 19 km) they can all be wrong together. See Conditions → Predictive model." },
+    { key: "radiation", name: "Radiation", sub: "Relative exposure index", lo: "Lower", hi: "Higher", prov: "sim", provLabel: "SIMPLIFIED",
       norm: v => { const r = MR.radiation.range; return (v - r[0]) / Math.max(1e-6, r[1] - r[0]); },
       ramp: ramp([[0, 235, 247, 235], [0.45, 250, 222, 110], [1, 170, 30, 110]]),
-      src: "Modelo simplificado, no una medición. 1,00 = suelo del cráter a cielo abierto (≈ 0,65 mSv/día medido por MSL-RAD; Simonsen, NASA 2024). Sube con la altura (menos atmósfera encima) y baja donde el relieve tapa el cielo. El tamaño de esos dos efectos es un SUPUESTO." },
-    { key: "none", name: "Sin capa", sub: "Solo mapa base", src: "", prov: "", provLabel: "" },
+      src: "Simplified model, not a measurement. 1.00 = crater floor under open sky (≈ 0.65 mSv/day measured by MSL-RAD; Simonsen, NASA 2024). It rises with elevation (less atmosphere above) and drops where relief blocks the sky. The size of those two effects is an ASSUMPTION." },
+    { key: "none", name: "No layer", sub: "Base map only", src: "", prov: "", provLabel: "" },
   ];
   if (!MR.F.confidence) MR.LAYERS.splice(MR.LAYERS.findIndex(l => l.key === "confidence"), 1);
   MR.layerRGBA = function (key) {
@@ -578,7 +578,7 @@
     return `linear-gradient(90deg, ${stops.join(",")})`;
   };
 
-  /* ---------- curvas de nivel (marching squares) ---------- */
+  /* ---------- contour lines (marching squares) ---------- */
   MR.contours = function (step = 500) {
     const Z = MR.F.dem, segs = [];
     const lo = Math.ceil(D.layers.dem.min / step) * step;
@@ -603,7 +603,7 @@
     return segs;
   };
 
-  /* ---------- utilidades ---------- */
+  /* ---------- utilities ---------- */
   MR.esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   MR.clean = (s, max = 140) => String(s || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, max);
   MR.solTime = function (min) {
@@ -613,6 +613,6 @@
   };
   MR.store = {
     get(k, d) { try { const v = localStorage.getItem("mr_" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem("mr_" + k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } },
+    set(k, v) { try { localStorage.setItem("mr_" + k, JSON.stringify(v)); } catch (e) { /* no storage available */ } },
   };
 })();

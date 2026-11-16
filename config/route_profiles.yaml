@@ -1,7 +1,7 @@
 profiles:
-  segura:
-    id: segura
-    name: Ruta Segura (Bajo Riesgo y Máxima Reserva)
+  safe:
+    id: safe
+    name: Safe Route (Low Risk and Maximum Reserve)
     risk_weight: 6.0
     slope_weight: 5.0
     max_slope_deg: 20.0
@@ -11,13 +11,13 @@ profiles:
     speed_factor: 0.85
     min_reserve_pct: 25.0
     description: >
-      Prioriza la integridad física del explorador y el margen de seguridad de los trajes EVA.
-      Evita pendientes pronunciadas y terrenos de baja transitabilidad. Exige al menos 25%
-      de reserva de oxígeno y batería al llegar al refugio.
+      Prioritizes the explorer's physical integrity and the safety margin of the EVA suits.
+      Avoids steep slopes and low-traversability terrain. Requires at least 25%
+      oxygen and battery reserve on arrival at the shelter.
 
-  rapida:
-    id: rapida
-    name: Ruta Rápida (Mínimo Tiempo EVA y Distancia)
+  fast:
+    id: fast
+    name: Fast Route (Minimum EVA Time and Distance)
     risk_weight: 1.5
     slope_weight: 1.5
     max_slope_deg: 22.0
@@ -27,12 +27,12 @@ profiles:
     speed_factor: 1.15
     min_reserve_pct: 15.0
     description: >
-      Minimiza el tiempo de exposición ambiental siguiendo el corredor geométrico más veloz.
-      Acepta pendientes de hasta 22° si la cinemática de marcha lo permite.
+      Minimizes environmental exposure time by following the fastest geometric corridor.
+      Accepts slopes of up to 22° if the walking kinematics allow it.
 
-  cientifica:
-    id: cientifica
-    name: Ruta Científica (Máximo Retorno de Muestras y Hallazgos)
+  scientific:
+    id: scientific
+    name: Scientific Route (Maximum Return of Samples and Findings)
     risk_weight: 3.5
     slope_weight: 3.0
     max_slope_deg: 20.0
@@ -42,9 +42,9 @@ profiles:
     speed_factor: 0.95
     min_reserve_pct: 20.0
     description: >
-      Desvía la trayectoria hacia zonas con huellas espectrales CRISM, minerales hidratados
-      o depósitos sedimentarios de alto valor geológico, manteniendo la obligación de terminar
-      en un refugio seguro con reserva mínima del 20%.
+      Diverts the trajectory toward areas with CRISM spectral footprints, hydrated minerals
+      or sedimentary deposits of high geological value, while keeping the obligation to end
+      at a safe shelter with a minimum 20% reserve.
 
 hard_constraints:
   require_final_shelter: true

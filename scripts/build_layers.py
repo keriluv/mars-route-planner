@@ -28,13 +28,13 @@ def main() -> None:
     )
     meta = json.loads((ROOT / "data" / "processed" / "layers_meta.json").read_text(encoding="utf-8"))
     valid = layers["valid"].astype(bool)
-    print(f"Grilla: {layers['dem'].shape[0]} x {layers['dem'].shape[1]}")
-    print(f"Celda: {meta['dx_m']:.2f} m x {meta['dy_m']:.2f} m")
-    print(f"Validos: {100.0 * valid.mean():.1f} %")
-    print(f"Elevacion: {np.nanmin(layers['dem']):.0f} a {np.nanmax(layers['dem']):.0f} m")
-    print(f"Pendiente media: {np.nanmean(layers['slope']):.1f} deg, maxima: {np.nanmax(layers['slope']):.1f} deg")
+    print(f"Grid: {layers['dem'].shape[0]} x {layers['dem'].shape[1]}")
+    print(f"Cell: {meta['dx_m']:.2f} m x {meta['dy_m']:.2f} m")
+    print(f"Valid: {100.0 * valid.mean():.1f} %")
+    print(f"Elevation: {np.nanmin(layers['dem']):.0f} to {np.nanmax(layers['dem']):.0f} m")
+    print(f"Mean slope: {np.nanmean(layers['slope']):.1f} deg, max: {np.nanmax(layers['slope']):.1f} deg")
     reloaded = load_layers(ROOT / "data" / "processed" / "layers.npz")
-    print(f"Capas guardadas: {', '.join(sorted(reloaded))}")
+    print(f"Layers saved: {', '.join(sorted(reloaded))}")
 
 
 if __name__ == "__main__":

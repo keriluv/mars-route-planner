@@ -1,31 +1,31 @@
 /* =========================================================
-   shared.js — avisos compartidos entre exploradores
-   Un hallazgo o una alerta registrada por un explorador llega como aviso a los demás
-   (zona en el mapa + mensaje en su bitácora). Cada uno sigue con su viaje separado:
-   el aviso no cambia su ruta ni su reloj.
+   shared.js — notices shared between explorers
+   A finding or alert recorded by one explorer reaches the others as a notice
+   (zone on the map + message in their logbook). Each one continues their own separate trip:
+   the notice does not change their route or their clock.
 
-   Dónde viven los avisos:
-     · localStorage ("mr_shared"): siempre. Sin servidor, dos pestañas del mismo navegador
-       se avisan entre sí por el evento "storage".
-     · Backend (SQLite tabla aviso + eventos en JSONL): si la página se sirve con backend/server.py,
-       se sincroniza cada pocos segundos, así que otros navegadores también los reciben.
+   Where the notices live:
+     · localStorage ("mr_shared"): always. Without a server, two tabs of the same browser
+       notify each other through the "storage" event.
+     · Backend (SQLite aviso table + events in JSONL): if the page is served by backend/server.py,
+       it syncs every few seconds, so other browsers receive them too.
    ========================================================= */
 (function () {
   "use strict";
   const MR = window.MR, KEY = "shared", MAX = 300, POLL_MS = 4000;
   const S = (MR.Shared = { list: [], subs: [] });
 
-  // radiusKm solo dimensiona la zona dibujada en el mapa (ayuda visual); no es una distancia de seguridad medida
+  // radiusKm only sizes the zone drawn on the map (visual aid); it is not a measured safety distance
   S.kinds = {
-    hallazgo: { label: "Hallazgo", radiusKm: 0.5, icon: "hallazgo" },
-    alerta_pendiente: { label: "Alerta de pendiente", radiusKm: 0.8, icon: "warn" },
-    alerta_radiacion: { label: "Alerta de radiación", radiusKm: 1.5, icon: "warn" },
+    hallazgo: { label: "Finding", radiusKm: 0.5, icon: "hallazgo" },
+    alerta_pendiente: { label: "Slope alert", radiusKm: 0.8, icon: "warn" },
+    alerta_radiacion: { label: "Radiation alert", radiusKm: 1.5, icon: "warn" },
   };
   let seq = 1;
   const newId = () => "av_" + Date.now().toString(36) + (seq++) + Math.random().toString(36).slice(2, 6);
   const valid = n => n && typeof n.id === "string" && S.kinds[n.kind] && typeof n.author === "string" && isFinite(n.lon) && isFinite(n.lat);
 
-  // incorpora avisos a la lista (sin duplicar por id); devuelve qué es nuevo y qué cambió
+  // adds notices to the list (without duplicating by id); returns what is new and what changed
   function absorb(items) {
     const added = [], changed = [];
     (items || []).forEach(n => {
@@ -39,9 +39,9 @@
   }
   function notify(res, silent) {
     if (!res.added.length && !res.changed.length) return;
-    S.subs.forEach(fn => { try { fn(res, !!silent); } catch (e) { /* un suscriptor roto no frena a los demás */ } });
+    S.subs.forEach(fn => { try { fn(res, !!silent); } catch (e) { /* a broken subscriber does not stop the others */ } });
   }
-  // lee lo guardado por otras pestañas antes de escribir, para no pisarlo
+  // reads what other tabs saved before writing, so as not to overwrite it
   function persist() {
     const res = absorb(MR.store.get(KEY, []));
     MR.store.set(KEY, S.list);
@@ -49,7 +49,7 @@
   }
   S.onChange = fn => { S.subs.push(fn); };
 
-  // carga inicial (silenciosa: no repite banners de avisos viejos)
+  // initial load (silent: does not repeat banners of old notices)
   S.load = function () { const res = absorb(MR.store.get(KEY, [])); notify(res, true); };
 
   S.publish = function ({ kind, author, lon, lat, text, simMin, region }) {
@@ -67,10 +67,10 @@
   };
   S.ack = (id, crew) => MR.API.ackAviso(id, crew);
 
-  // avisos de otros exploradores visibles para `crewId` en la región dada
+  // notices from other explorers visible to `crewId` in the given region
   S.visibleFor = (crewId, region) => S.list.filter(n => n.estado === "activo" && n.author !== crewId && (n.region || "gale") === region);
 
-  // sincroniza con el backend: trae lo ajeno y sube lo que quedó sin enviar (el servidor ignora los repetidos)
+  // syncs with the backend: fetches what others sent and uploads what was left unsent (the server ignores duplicates)
   S.sync = async function () {
     const remote = await MR.API.getAvisos(); if (!remote) return;
     const ids = new Set(remote.map(r => r.id));
@@ -80,9 +80,9 @@
   };
   S.startPolling = function () { if (S.timer) return; S.sync(); S.timer = setInterval(S.sync, POLL_MS); };
 
-  // otra pestaña del mismo navegador escribió avisos (funciona también por file://)
+  // another tab of the same browser wrote notices (also works over file://)
   window.addEventListener("storage", e => {
     if (e.key !== "mr_" + KEY || !e.newValue) return;
-    try { const res = absorb(JSON.parse(e.newValue)); notify(res); } catch (err) { /* valor dañado: se ignora */ }
+    try { const res = absorb(JSON.parse(e.newValue)); notify(res); } catch (err) { /* corrupted value: ignored */ }
   });
 })();

@@ -1,330 +1,327 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="light">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https://trek.nasa.gov; connect-src 'self' https://trek.nasa.gov; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%23FC3D21%27/%3E%3Cpath d=%27M8 24l8-16 8 16z%27 fill=%27white%27/%3E%3C/svg%3E">
-<title>Ruta segura a Mount Sharp · Planificador predictivo de recorridos en Marte</title>
+<title>Safe Route to Mount Sharp · Predictive route planner for Mars</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-<a class="skip" href="#map">Saltar al mapa</a>
+<a class="skip" href="#map">Skip to map</a>
 
-<!-- ============ BARRA DE ESTADO (ARRIBA) ============ -->
+<!-- ============ STATUS BAR (TOP) ============ -->
 <header class="statusbar" role="banner">
   <div class="brand">
     <span class="brand-mark" aria-hidden="true"></span>
     <div>
-      <strong id="brandTitle">Ruta a Mount Sharp</strong>
-      <span class="brand-sub" id="brandSub">Cráter Gale · Marte</span>
+      <strong id="brandTitle">Safe Route to Mount Sharp</strong>
+      <span class="brand-sub" id="brandSub">Gale Crater · Mars</span>
     </div>
   </div>
 
-  <div class="region-picker" role="group" aria-label="Región marciana">
-    <label for="regionSelect" class="sr-only">Región:</label>
-    <select id="regionSelect" class="region-select" aria-label="Seleccionar región marciana">
-      <option value="gale" selected>Cráter Gale (Curiosity)</option>
-      <option value="jezero">Cráter Jezero (Perseverance)</option>
+  <div class="region-picker" role="group" aria-label="Martian region">
+    <label for="regionSelect" class="sr-only">Region:</label>
+    <select id="regionSelect" class="region-select" aria-label="Select Martian region">
+      <option value="gale" selected>Gale Crater (Curiosity)</option>
+      <option value="jezero">Jezero Crater (Perseverance)</option>
     </select>
   </div>
 
-  <div class="crew" role="group" aria-label="Explorador activo">
-    <!-- se llena por JS: EV1 / EV2 / EV3 -->
+  <div class="crew" role="group" aria-label="Active explorer">
+    <!-- filled by JS: EV1 / EV2 / EV3 -->
   </div>
 
-  <div class="sim" role="group" aria-label="Simulación">
-    <span class="mode-pill" id="modePill">Mapa base</span>
-    <span class="clock" id="clock" title="Sol = día marciano (24 h 39 min). Hora solar local verdadera (LTST)">Sol 1 · 08:00</span>
-    <button class="icon-btn play" id="btnPlay" aria-label="Iniciar simulación" title="Iniciar / pausar (Espacio)" disabled>
+  <div class="sim" role="group" aria-label="Simulation">
+    <span class="mode-pill" id="modePill">Base map</span>
+    <span class="clock" id="clock" title="Sol = Martian day (24 h 39 min). Local true solar time (LTST)">Sol 1 · 08:00</span>
+    <button class="icon-btn play" id="btnPlay" aria-label="Start simulation" title="Start / pause (Space)" disabled>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z"/><path class="i-pause" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
     </button>
-    <div class="speed" role="radiogroup" aria-label="Velocidad">
+    <div class="speed" role="radiogroup" aria-label="Speed">
       <button role="radio" aria-checked="true" data-speed="1">x1</button>
       <button role="radio" aria-checked="false" data-speed="10">x10</button>
       <button role="radio" aria-checked="false" data-speed="50">x50</button>
     </div>
-    <span class="km" id="kmReadout">0,0 / 0,0 km</span>
+    <span class="km" id="kmReadout">0.0 / 0.0 km</span>
   </div>
 
   <div class="status-right">
-    <span class="realdata" title="Capas NASA (MOLA/HRSC, THEMIS, Viking, CRISM, OMEGA) y clima REMS de Curiosity. El movimiento del explorador es simulado.">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/></svg>Simulación con datos reales</span>
-    <span class="conn" id="connBadge" title="Estado de conexión con el backend">Modo local</span>
-    <button class="icon-btn lang-btn" id="btnLang" title="Idioma: Español / English" aria-label="Cambiar idioma">
-      <span id="langLabel">ES</span>
-    </button>
-    <button class="icon-btn" id="btnConditions" title="Condiciones (D)" aria-label="Ver condiciones">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 16V9m4 7V5m4 11v-5m4 5V7" /></svg><span>Condiciones</span></button>
-    <button class="icon-btn" id="btnTheme" title="Tema claro / oscuro" aria-label="Cambiar tema">
+    <span class="realdata" title="NASA layers (MOLA/HRSC, THEMIS, Viking, CRISM, OMEGA) and REMS weather from Curiosity. The explorer's movement is simulated.">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/></svg>Simulation with real data</span>
+    <span class="conn" id="connBadge" title="Backend connection status">Local mode</span>
+    <button class="icon-btn" id="btnConditions" title="Conditions (D)" aria-label="View conditions">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 16V9m4 7V5m4 11v-5m4 5V7" /></svg><span>Conditions</span></button>
+    <button class="icon-btn" id="btnTheme" title="Light / dark theme" aria-label="Change theme">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button>
-    <button class="icon-btn" id="btnMotion" title="Reducir movimiento" aria-label="Reducir movimiento" aria-pressed="false">
+    <button class="icon-btn" id="btnMotion" title="Reduce motion" aria-label="Reduce motion" aria-pressed="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h4l2-5 4 10 2-5h4"/></svg></button>
-    <button class="icon-btn" id="btnHelp" title="Ayuda y atajos (?)" aria-label="Ayuda">
+    <button class="icon-btn" id="btnHelp" title="Help and shortcuts (?)" aria-label="Help">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17.5v.5"/></svg></button>
   </div>
 </header>
 
-<!-- Avisos ligeros (banner arriba) -->
+<!-- Light notices (banner at the top) -->
 <div class="banners" id="banners" aria-live="polite"></div>
 
 <main class="stage" id="stage">
-  <!-- ============ MAPA BASE (siempre debajo) ============ -->
-  <div class="map" id="map" tabindex="0" aria-label="Mapa de Marte (NASA Mars Trek)">
+  <!-- ============ BASE MAP (always underneath) ============ -->
+  <div class="map" id="map" tabindex="0" aria-label="Map of Mars (NASA Mars Trek)">
     <div class="world" id="world">
-      <img id="basemap" src="assets/basemap_relief.jpg" alt="Relieve de Marte" draggable="false">
+      <img id="basemap" src="assets/basemap_relief.jpg" alt="Relief of Mars" draggable="false">
       <canvas id="overlay" width="1200" height="1200"></canvas>
       <canvas id="contours" width="1200" height="1200"></canvas>
       <svg id="vector" viewBox="0 0 1200 1200" aria-hidden="true"></svg>
     </div>
     <div class="markers" id="markers"></div>
   </div>
-  <div class="map3d" id="map3d" hidden aria-label="Vista 3D del terreno"></div>
-  <div class="map3d" id="mapGlobe" hidden aria-label="Vista 3D planetaria de Marte"></div>
+  <div class="map3d" id="map3d" hidden aria-label="3D view of the terrain"></div>
+  <div class="map3d" id="mapGlobe" hidden aria-label="3D planetary view of Mars"></div>
 
-  <!-- Cambiador de vista -->
-  <div class="viewswitch" role="radiogroup" aria-label="Vista del mapa">
-    <button role="radio" aria-checked="true" data-view="2d">Mapa 2D</button>
-    <button role="radio" aria-checked="false" data-view="3d">Relieve 3D</button>
-    <button role="radio" aria-checked="false" data-view="globe">Planeta 3D</button>
+  <!-- View switcher -->
+  <div class="viewswitch" role="radiogroup" aria-label="Map view">
+    <button role="radio" aria-checked="true" data-view="2d">2D Map</button>
+    <button role="radio" aria-checked="false" data-view="3d">3D Relief</button>
+    <button role="radio" aria-checked="false" data-view="globe">3D Planet</button>
   </div>
   <div class="zoom" id="zoomCtl">
-    <button aria-label="Acercar" data-zoom="in">+</button>
-    <button aria-label="Alejar" data-zoom="out">−</button>
-    <button aria-label="Ajustar a la vista" data-zoom="fit" title="Ver todo">
+    <button aria-label="Zoom in" data-zoom="in">+</button>
+    <button aria-label="Zoom out" data-zoom="out">−</button>
+    <button aria-label="Fit to view" data-zoom="fit" title="Show all">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
   </div>
   <div class="ctl3d" id="ctl3d" hidden>
-    <label>Exageración vertical <input type="range" id="exag" min="1" max="6" step="0.5" value="2.5"><output id="exagOut">2,5×</output></label>
-    <label class="check"><input type="checkbox" id="follow3d" checked> Seguir al explorador</label>
-    <button type="button" class="btn-global3d" id="btnJumpGlobe" title="Alternar a vista planetaria 3D global">
+    <label>Vertical exaggeration <input type="range" id="exag" min="1" max="6" step="0.5" value="2.5"><output id="exagOut">2.5×</output></label>
+    <label class="check"><input type="checkbox" id="follow3d" checked> Follow the explorer</label>
+    <button type="button" class="btn-global3d" id="btnJumpGlobe" title="Switch to the global 3D planetary view">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      Planeta Global 3D
+      Global 3D Planet
     </button>
   </div>
 
   <div class="ctl3d ctl-globe" id="ctlGlobe" hidden>
     <div class="ctl-globe-main">
-      <button type="button" class="btn-globe-toggle-menu" id="btnGlobeToggleMenu" aria-expanded="false" title="Alternar panel de controles">
+      <button type="button" class="btn-globe-toggle-menu" id="btnGlobeToggleMenu" aria-expanded="false" title="Toggle controls panel">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        <span>Controles Planeta ▾</span>
+        <span>Planet Controls ▾</span>
       </button>
 
       <div class="ctl-globe-body" id="ctlGlobeBody">
         <div class="ctl-globe-row">
-          <label class="ctl-exag-lbl">Exageración: <input type="range" id="globeExag" min="1" max="25" step="0.5" value="6"><output id="globeExagVal">6×</output></label>
-          <div class="globe-layers-pills" role="group" aria-label="Capas rápidas">
+          <label class="ctl-exag-lbl">Exaggeration:<input type="range" id="globeExag" min="1" max="25" step="0.5" value="6"><output id="globeExagVal">6×</output></label>
+          <div class="globe-layers-pills" role="group" aria-label="Quick layers">
             <button type="button" class="btn-globe-layer active" data-base-layer="Mars_MOLA_blend200ppx_HRSC_ClrShade_clon0dd_200mpp_lzw" title="MOLA/HRSC Color">Color</button>
-            <button type="button" class="btn-globe-layer" data-base-layer="Mars_MOLA_blend200ppx_HRSC_Shade_clon0dd_200mpp_lzw" title="MOLA/HRSC Relieve gris">Relieve</button>
-            <button type="button" class="btn-globe-layer" data-base-layer="Mars_Viking_MDIM21_ClrMosaic_global_232m" title="Viking Color Real">Viking</button>
-            <button type="button" class="btn-globe-overlay" data-ov-layer="TES_Thermal_Inertia" title="Alternar capa de Inercia Térmica TES">+ Térmico</button>
-            <button type="button" class="btn-globe-overlay" data-ov-layer="TES_Plagioclase" title="Alternar capa de Plagioclasa TES">+ Plagioclasa</button>
+            <button type="button" class="btn-globe-layer" data-base-layer="Mars_MOLA_blend200ppx_HRSC_Shade_clon0dd_200mpp_lzw" title="MOLA/HRSC gray relief">Relief</button>
+            <button type="button" class="btn-globe-layer" data-base-layer="Mars_Viking_MDIM21_ClrMosaic_global_232m" title="Viking True Color">Viking</button>
+            <button type="button" class="btn-globe-overlay" data-ov-layer="TES_Thermal_Inertia" title="Toggle TES Thermal Inertia layer">+ Thermal</button>
+            <button type="button" class="btn-globe-overlay" data-ov-layer="TES_Plagioclase" title="Toggle TES Plagioclase layer">+ Plagioclase</button>
           </div>
         </div>
-        <div class="loc-shortcuts" role="group" aria-label="Saltar a hito geológico">
-          <span class="ctl-tag">Hitos:</span>
+        <div class="loc-shortcuts" role="group" aria-label="Jump to geological landmark">
+          <span class="ctl-tag">Landmarks:</span>
           <button type="button" class="loc-btn" data-globe-go="-133.8,18.65,14" title="Olympus Mons (+21.2 km)">Olympus Mons</button>
           <button type="button" class="loc-btn" data-globe-go="-59,-14,22" title="Valles Marineris (4,000 km)">Valles Marineris</button>
           <button type="button" class="loc-btn" data-globe-go="70,-42,16" title="Hellas Planitia (-8.2 km)">Hellas</button>
-          <button type="button" class="loc-btn" data-globe-go="137.4,-4.6,4.5" title="Cráter Gale (Curiosity)">Gale</button>
-          <button type="button" class="loc-btn" data-globe-go="77.45,18.38,4.5" title="Cráter Jezero (Perseverance)">Jezero</button>
-          <button type="button" class="loc-btn" data-globe-go="0,0,120" title="Vista Global">Global</button>
+          <button type="button" class="loc-btn" data-globe-go="137.4,-4.6,4.5" title="Gale Crater (Curiosity)">Gale</button>
+          <button type="button" class="loc-btn" data-globe-go="77.45,18.38,4.5" title="Jezero Crater (Perseverance)">Jezero</button>
+          <button type="button" class="loc-btn" data-globe-go="0,0,120" title="Global View">Global</button>
         </div>
       </div>
 
-      <span class="globe-coords" id="globeCoords">Lon 0.00° Lat 0.00° · Altitud: 7000 km</span>
+      <span class="globe-coords" id="globeCoords">Lon 0.00° Lat 0.00° · Altitude: 7000 km</span>
     </div>
   </div>
 
-  <!-- ============ IZQUIERDA: capas y filtros ============ -->
-  <aside class="leftpanel" id="leftPanel" aria-label="Capas y filtros">
+  <!-- ============ LEFT: layers and filters ============ -->
+  <aside class="leftpanel" id="leftPanel" aria-label="Layers and filters">
     <button class="lp-toggle" id="lpToggle" aria-expanded="true" aria-controls="lpBody">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
-      <span>Capas y filtros</span>
+      <span>Layers and filters</span>
     </button>
     <div class="lp-body" id="lpBody">
       <div class="tabs" role="tablist">
-        <button role="tab" aria-selected="true" data-lptab="capas">Capas</button>
-        <button role="tab" aria-selected="false" data-lptab="objetivos">Objetivos</button>
-        <button role="tab" aria-selected="false" data-lptab="minerales">Minerales</button>
-        <button role="tab" aria-selected="false" data-lptab="ruta">Ruta</button>
+        <button role="tab" aria-selected="true" data-lptab="capas">Layers</button>
+        <button role="tab" aria-selected="false" data-lptab="objetivos">Targets</button>
+        <button role="tab" aria-selected="false" data-lptab="minerales">Minerals</button>
+        <button role="tab" aria-selected="false" data-lptab="ruta">Route</button>
       </div>
 
       <section class="lp-sec" data-lpsec="capas">
-        <!-- Capas del Planeta 3D (NASA Mars Trek) -->
+        <!-- 3D Planet layers (NASA Mars Trek) -->
         <div id="globeLayersSection" hidden>
           <div class="globe-layers-head">
-            <h3>Capas Planetarias NASA Mars Trek</h3>
+            <h3>NASA Mars Trek Planetary Layers</h3>
             <span class="badge badge-nasa">NASA TREK WMTS</span>
           </div>
-          <p class="tl-intro">Sensores orbitales MOLA, HRSC, TES y Viking superpuestos en tiempo real sobre el modelo digital de elevación 3D.</p>
+          <p class="tl-intro">Orbital sensors MOLA, HRSC, TES and Viking overlaid in real time on the 3D digital elevation model.</p>
           <div class="globe-layers-list" id="globeLayersList"></div>
         </div>
 
-        <!-- Capas locales de cráter (Gale / Jezero) -->
+        <!-- Local crater layers (Gale / Jezero) -->
         <div id="craterLayersSection">
-          <h3>Región marciana</h3>
-          <div class="seg region-seg" role="radiogroup" aria-label="Seleccionar región">
-            <button role="radio" aria-checked="true" class="rqs-btn active" data-region="gale">Cráter Gale</button>
-            <button role="radio" aria-checked="false" class="rqs-btn" data-region="jezero">Cráter Jezero</button>
+          <h3>Martian region</h3>
+          <div class="seg region-seg" role="radiogroup" aria-label="Select region">
+            <button role="radio" aria-checked="true" class="rqs-btn active" data-region="gale">Gale Crater</button>
+            <button role="radio" aria-checked="false" class="rqs-btn" data-region="jezero">Jezero Crater</button>
           </div>
 
-          <h3>Mapa base</h3>
-          <div class="seg" id="baseSeg" role="radiogroup" aria-label="Mapa base">
-            <button role="radio" aria-checked="true" data-base="relief">Relieve</button>
-            <button role="radio" aria-checked="false" data-base="color">Altimetría color</button>
-            <button role="radio" aria-checked="false" data-base="thermal">Térmico</button>
+          <h3>Base map</h3>
+          <div class="seg" id="baseSeg" role="radiogroup" aria-label="Base map">
+            <button role="radio" aria-checked="true" data-base="relief">Relief</button>
+            <button role="radio" aria-checked="false" data-base="color">Color altimetry</button>
+            <button role="radio" aria-checked="false" data-base="thermal">Thermal</button>
           </div>
-          <h3>Capa de análisis</h3>
-          <div class="layer-list" id="layerList" role="radiogroup" aria-label="Capa de análisis"></div>
-          <label class="slider">Opacidad <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.55"></label>
+          <h3>Analysis layer</h3>
+          <div class="layer-list" id="layerList" role="radiogroup" aria-label="Analysis layer"></div>
+          <label class="slider">Opacity<input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.55"></label>
           <div class="legend" id="legend"></div>
-          <h3>Referencias</h3>
-          <label class="check"><input type="checkbox" id="chkContours"> Curvas de nivel (cada 500 m)</label>
-          <label class="check"><input type="checkbox" id="chkTraverse" checked> Recorrido real de Curiosity</label>
-          <label class="check"><input type="checkbox" id="chkCrism" checked> Huellas espectrales CRISM</label>
+          <h3>References</h3>
+          <label class="check"><input type="checkbox" id="chkContours"> Contour lines (every 500 m)</label>
+          <label class="check"><input type="checkbox" id="chkTraverse" checked> Actual Curiosity traverse</label>
+          <label class="check"><input type="checkbox" id="chkCrism" checked> CRISM spectral footprints</label>
         </div>
       </section>
 
       <section class="lp-sec" data-lpsec="objetivos" hidden>
-        <h3>Mostrar en el mapa</h3>
+        <h3>Show on the map</h3>
         <div class="chips" id="typeChips"></div>
-        <label class="slider">Solo a menos de <output id="distOut">60 km</output> de la ruta
+        <label class="slider">Only within <output id="distOut">60 km</output> of the route
           <input type="range" id="distFilter" min="1" max="60" step="1" value="60"></label>
         <ul class="obj-list" id="objList"></ul>
       </section>
 
       <section class="lp-sec" data-lpsec="minerales" hidden>
         <div class="min-head-row">
-          <h3>Búsqueda científica</h3>
-          <span class="min-region-badge" id="minRegionBadge">Cráter Gale</span>
+          <h3>Scientific search</h3>
+          <span class="min-region-badge" id="minRegionBadge">Gale Crater</span>
         </div>
         <div class="min-search-box">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input type="search" id="minSearch" placeholder="Buscar mineral, fórmula o instrumento..." aria-label="Buscar minerales">
+          <input type="search" id="minSearch" placeholder="Search mineral, formula or instrument..." aria-label="Search minerals">
         </div>
         <div class="min-filter-header">
-          <span class="min-filter-title">Categorías geoquímicas</span>
-          <span class="min-count" id="minCount">6 objetivos</span>
+          <span class="min-filter-title">Geochemical categories</span>
+          <span class="min-count" id="minCount">6 targets</span>
         </div>
         <div class="min-chips" id="minCategoryChips"></div>
-        <div class="min-list" id="minList" role="list" aria-label="Catálogo de minerales y rocas marcianas"></div>
+        <div class="min-list" id="minList" role="list" aria-label="Catalog of Martian minerals and rocks"></div>
       </section>
 
       <section class="lp-sec" data-lpsec="ruta" hidden>
-        <h3>Perfil de ruta</h3>
-        <div class="profile-seg" id="profileSeg" role="radiogroup" aria-label="Perfil de ruta">
-          <button role="radio" aria-checked="true" data-profile="segura" class="profile-opt">
-            <span class="p-title">Segura</span>
-            <span class="p-sub">Riesgo mín · O₂ &gt; 20%</span>
+        <h3>Route profile</h3>
+        <div class="profile-seg" id="profileSeg" role="radiogroup" aria-label="Route profile">
+          <button role="radio" aria-checked="true" data-profile="safe" class="profile-opt">
+            <span class="p-title">Safe</span>
+            <span class="p-sub">Min risk · O₂ &gt; 20%</span>
           </button>
-          <button role="radio" aria-checked="false" data-profile="rapida" class="profile-opt">
-            <span class="p-title">Rápida</span>
-            <span class="p-sub">Tiempo Tobler</span>
+          <button role="radio" aria-checked="false" data-profile="fast" class="profile-opt">
+            <span class="p-title">Fast</span>
+            <span class="p-sub">Tobler time</span>
           </button>
-          <button role="radio" aria-checked="false" data-profile="cientifica" class="profile-opt">
-            <span class="p-title">Científica</span>
+          <button role="radio" aria-checked="false" data-profile="scientific" class="profile-opt">
+            <span class="p-title">Scientific</span>
             <span class="p-sub">Targets CRISM</span>
           </button>
         </div>
 
-        <h3>Modo de movilidad</h3>
-        <div class="seg" id="mobilitySeg" role="radiogroup" aria-label="Modo de movilidad">
-          <button role="radio" aria-checked="false" data-mobility="rover">Rover presurizado</button>
-          <button role="radio" aria-checked="true" data-mobility="astronaut">EVA a pie (traje)</button>
+        <h3>Mobility mode</h3>
+        <div class="seg" id="mobilitySeg" role="radiogroup" aria-label="Mobility mode">
+          <button role="radio" aria-checked="false" data-mobility="rover">Pressurized rover</button>
+          <button role="radio" aria-checked="true" data-mobility="astronaut">EVA on foot (suit)</button>
         </div>
 
         <div class="profile-metrics" id="profileMetrics" aria-live="polite">
-          <!-- Métricas de recursos proyectados calculados dinámicamente -->
+          <!-- Projected resource metrics computed dynamically -->
         </div>
 
-        <h3>Pesos del planificador</h3>
-        <p class="hint">Ajuste manual de parámetros para el algoritmo A* en grilla marciana.</p>
-        <label class="slider">Peso del riesgo del modelo <output id="rwOut">4</output>
+        <h3>Planner weights</h3>
+        <p class="hint">Manual adjustment of parameters for the A* algorithm on the Martian grid.</p>
+        <label class="slider">Model risk weight<output id="rwOut">4</output>
           <input type="range" id="riskW" min="0" max="10" step="0.5" value="4"></label>
-        <label class="slider">Peso de la pendiente <output id="swOut">3</output>
+        <label class="slider">Slope weight<output id="swOut">3</output>
           <input type="range" id="slopeW" min="0" max="10" step="0.5" value="3"></label>
-        <label class="slider">Pendiente máxima permitida <output id="msOut">20°</output>
+        <label class="slider">Maximum allowed slope<output id="msOut">20°</output>
           <input type="range" id="maxSlope" min="10" max="25" step="1" value="20"></label>
-        <h3>Paradas intermedias</h3>
+        <h3>Intermediate stops</h3>
         <div id="stopList" class="stop-list"></div>
-        <button class="btn primary block" id="btnRecalc">Recalcular ruta</button>
-        <button class="btn ghost block" id="btnResetRoute">Volver a la ruta del modelo</button>
+        <button class="btn primary block" id="btnRecalc">Recalculate route</button>
+        <button class="btn ghost block" id="btnResetRoute">Back to the model route</button>
         
-        <h3>Escenario y simulación</h3>
-        <button class="btn ghost block btn-scenario" id="btnDemoAlert" title="Simular evento meteorológico crítico MDA-GALE-14 (11:30 LTST)">
+        <h3>Scenario and simulation</h3>
+        <button class="btn ghost block btn-scenario" id="btnDemoAlert" title="Simulate critical weather event MDA-GALE-14 (11:30 LTST)">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="vertical-align:text-bottom;margin-right:4px"><path fill="currentColor" d="M12 2L1 21h22L12 2zm0 3.5L20 19H4L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
-          Simular alerta climática (11:30 LTST)
+          Simulate weather alert (11:30 LTST)
         </button>
 
-        <h3>Jornada EVA <span class="tag-sup">SUPUESTO</span></h3>
+        <h3>EVA workday <span class="tag-sup">ASSUMPTION</span></h3>
         <p class="hint" id="evaSummary" aria-live="polite"></p>
-        <label class="slider">Hora de inicio <output id="evaStartOut">08:00</output>
+        <label class="slider">Start time<output id="evaStartOut">08:00</output>
           <input type="range" id="evaStart" min="6" max="10" step="0.5" value="8"></label>
-        <label class="slider">Duración de la jornada <output id="evaDurOut">9 h</output>
+        <label class="slider">Workday duration<output id="evaDurOut">9 h</output>
           <input type="range" id="evaDur" min="4" max="12" step="0.5" value="9"></label>
-        <label class="slider">Pausas (minutos por hora de marcha) <output id="evaPauseOut">0 min</output>
+        <label class="slider">Breaks (minutes per walking hour)<output id="evaPauseOut">0 min</output>
           <input type="range" id="evaPause" min="0" max="30" step="5" value="0"></label>
-        <label class="slider">Reserva de seguridad al final <output id="evaResOut">0 min</output>
+        <label class="slider">Safety reserve at the end<output id="evaResOut">0 min</output>
           <input type="range" id="evaReserve" min="0" max="120" step="15" value="0"></label>
-        <p class="hint">Ninguna de estas cifras viene de una fuente oficial: la NASA (Nelson, 2021) lista la duración y el ritmo de las EVA en Marte como brechas de conocimiento abiertas.</p>
-        <button class="btn ghost block" id="btnEvaReset">Restaurar valores por defecto</button>
+        <p class="hint">None of these figures comes from an official source: NASA (Nelson, 2021) lists the duration and pace of EVAs on Mars as open knowledge gaps.</p>
+        <button class="btn ghost block" id="btnEvaReset">Restore default values</button>
 
-        <h3>Umbrales de alerta</h3>
-        <label class="slider">Alerta crítica si la pendiente supera <output id="critOut">15°</output>
+        <h3>Alert thresholds</h3>
+        <label class="slider">Critical alert if the slope exceeds<output id="critOut">15°</output>
           <input type="range" id="critSlope" min="10" max="20" step="1" value="15"></label>
-        <label class="slider">Aviso si la facilidad de paso baja de <output id="travOut">0,25</output>
+        <label class="slider">Warning if traversability drops below <output id="travOut">0.25</output>
           <input type="range" id="travThr" min="0.05" max="0.5" step="0.05" value="0.25"></label>
       </section>
     </div>
   </aside>
 
-  <!-- ============ DERECHA: íconos fijos + panel lateral ============ -->
-  <nav class="rail" aria-label="Paneles">
-    <button class="rail-btn" data-panel="misiones" aria-label="Misiones (M)" title="Misiones (M)">
+  <!-- ============ RIGHT: fixed icons + side panel ============ -->
+  <nav class="rail" aria-label="Panels">
+    <button class="rail-btn" data-panel="misiones" aria-label="Missions (M)" title="Missions (M)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 0h11l-2 4 2 4H5"/></svg>
-      <span class="lbl">Misiones</span><span class="count" data-count="misiones" hidden>0</span></button>
-    <button class="rail-btn" data-panel="bitacora" aria-label="Bitácora (B)" title="Bitácora (B)">
+      <span class="lbl">Missions</span><span class="count" data-count="misiones" hidden>0</span></button>
+    <button class="rail-btn" data-panel="bitacora" aria-label="Logbook (B)" title="Logbook (B)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
-      <span class="lbl">Bitácora</span><span class="count" data-count="bitacora" hidden>0</span></button>
-    <button class="rail-btn" data-panel="hallazgos" aria-label="Hallazgos (H)" title="Hallazgos (H)">
+      <span class="lbl">Logbook</span><span class="count" data-count="bitacora" hidden>0</span></button>
+    <button class="rail-btn" data-panel="hallazgos" aria-label="Findings (H)" title="Findings (H)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-10a6 6 0 0 1 12 0c0 4.5-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg>
-      <span class="lbl">Hallazgos</span><span class="count" data-count="hallazgos" hidden>0</span></button>
+      <span class="lbl">Findings</span><span class="count" data-count="hallazgos" hidden>0</span></button>
   </nav>
   <aside class="sidepanel" id="sidePanel" aria-live="polite" hidden>
     <header class="sp-head"><h2 id="spTitle">Panel</h2>
-      <button class="icon-btn" id="spClose" aria-label="Cerrar panel">✕</button></header>
+      <button class="icon-btn" id="spClose" aria-label="Close panel">✕</button></header>
     <div class="sp-body" id="spBody"></div>
   </aside>
 
-  <!-- ============ ABAJO ============ -->
+  <!-- ============ BOTTOM ============ -->
   <section class="dock" id="dock" hidden>
     <div class="dock-plan" id="dockPlan" hidden></div>
     <div class="dock-walk" id="dockWalk" hidden>
-      <div class="profile" id="profile" aria-label="Perfil de altura de la ruta"></div>
-      <div class="live" id="live" aria-label="Datos en vivo"></div>
+      <div class="profile" id="profile" aria-label="Route elevation profile"></div>
+      <div class="live" id="live" aria-label="Live data"></div>
     </div>
   </section>
-  <button class="btn report" id="btnReport" title="Reportar en la posición del explorador (R)">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4h10l-1.5 3.5L16 11H6"/></svg>Reportar aquí</button>
+  <button class="btn report" id="btnReport" title="Report at the explorer's position (R)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4h10l-1.5 3.5L16 11H6"/></svg>Report here</button>
   <div class="stagecard" id="stageCard" hidden role="dialog" aria-live="assertive"></div>
 
-  <!-- Junto al punto -->
+  <!-- Next to the point -->
   <div class="ctxmenu" id="ctxMenu" hidden role="menu"></div>
   <div class="minicard" id="miniCard" hidden role="dialog"></div>
 </main>
 
-<!-- ============ VENTANAS CENTRALES ============ -->
+<!-- ============ CENTRAL WINDOWS ============ -->
 <div class="scrim" id="scrim" hidden></div>
 <div class="modal" id="modal" role="dialog" aria-modal="true" hidden></div>
 
-<!-- ============ VISTAS COMPLETAS ============ -->
-<section class="fullview" id="dashboard" hidden aria-label="Condiciones"></section>
-<section class="fullview" id="summary" hidden aria-label="Resumen de la misión"></section>
+<!-- ============ FULL VIEWS ============ -->
+<section class="fullview" id="dashboard" hidden aria-label="Conditions"></section>
+<section class="fullview" id="summary" hidden aria-label="Mission summary"></section>
 
 <div class="toast" id="toast" role="status" hidden></div>
 <div class="tour" id="tour" hidden></div>

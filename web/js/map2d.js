@@ -1,7 +1,7 @@
 /* =========================================================
-   map2d.js — mapa base 2D con capas, rutas y marcadores
-   (zoom con rueda, arrastre, clic → menú junto al punto)
-   Soporte multicráter: Cráter Gale (Curiosity) y Cráter Jezero (Perseverance)
+   map2d.js — 2D base map with layers, routes and markers
+   (wheel zoom, drag, click → menu next to the point)
+   Multi-crater support: Gale Crater (Curiosity) and Jezero Crater (Perseverance)
    ========================================================= */
 (function () {
   "use strict";
@@ -10,13 +10,13 @@
   const NS = "http://www.w3.org/2000/svg";
 
   MR.ICONS = {
-    meta: '<svg viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></svg>',
+    goal: '<svg viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></svg>',
     base: '<svg viewBox="0 0 24 24"><path d="M3 20l9-14 9 14z"/></svg>',
     mineral: '<svg viewBox="0 0 24 24"><path d="M12 3l7 6-7 12-7-12z"/></svg>',
-    espectral: '<svg viewBox="0 0 24 24"><path d="M4 18c3-8 5-8 8 0s5 8 8 0"/></svg>',
-    ciencia: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
-    referencia: '<svg viewBox="0 0 24 24"><path d="M4 18l6-6 4 4 6-8"/></svg>',
-    refugio: '<svg viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10z"/><path d="M9 21v-8h6v8"/></svg>',
+    spectral: '<svg viewBox="0 0 24 24"><path d="M4 18c3-8 5-8 8 0s5 8 8 0"/></svg>',
+    science: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
+    reference: '<svg viewBox="0 0 24 24"><path d="M4 18l6-6 4 4 6-8"/></svg>',
+    shelter: '<svg viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10z"/><path d="M9 21v-8h6v8"/></svg>',
     hallazgo: '<svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>',
     secundaria: '<svg viewBox="0 0 24 24"><path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 17l-5.5 3 1.5-6.5-5-4 6.5-.5z"/></svg>',
     warn: '<svg viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>',
@@ -35,9 +35,9 @@
     ["crism", "trav", "zones", "short", "shorthz", "main", "done", "sec", "hz", "measure"].forEach(k => {
       groups[k] = document.createElementNS(NS, "g"); svg.appendChild(groups[k]);
     });
-    // contornos y capa de análisis
+    // contours and analysis layer
     drawContours();
-    // interacción
+    // interaction
     let drag = null, moved = false;
     mapEl.addEventListener("pointerdown", e => {
       if (e.button !== 0 || e.target.closest(".mk")) return;
@@ -122,7 +122,7 @@
   M.el = () => mapEl;
   M.setPicking = on => mapEl.classList.toggle("picking", !!on);
 
-  /* ---------- cambio de región y mapa base ---------- */
+  /* ---------- region and base-map switching ---------- */
   M.setBase = function (key) {
     const reg = MR.activeRegion || MR.REGIONS.gale;
     $("basemap").src = (key === "color" && reg.basemapColor) ? reg.basemapColor : reg.basemapRelief;
@@ -163,7 +163,7 @@
     placeMarkers();
   };
 
-  /* ---------- contornos y capas de análisis ---------- */
+  /* ---------- contours and analysis layers ---------- */
   function drawContours() {
     const cv = $("contours"); const ctx = cv.getContext("2d");
     ctx.clearRect(0, 0, 1200, 1200);
@@ -195,7 +195,7 @@
   }
   M.setContours = on => ($("contours").hidden = !on);
 
-  /* ---------- vectores ---------- */
+  /* ---------- vectors ---------- */
   const d = pts => pts.map((p, i) => (i ? "L" : "M") + MR.toWorld(p[0], p[1]).map(v => v.toFixed(1)).join(",")).join("");
   function put(group, cls, pathD, extra) {
     const p = document.createElementNS(NS, "path"); p.setAttribute("d", pathD); p.setAttribute("class", cls);
@@ -214,9 +214,9 @@
   M.drawCrism = function (on) {
     M.clear("crism");
     if (!on) return;
-    const objs = (MR.currentRegion === "jezero" && window.JEZERO_DATA && window.JEZERO_DATA.objetivos)
-      ? window.JEZERO_DATA.objetivos
-      : MR.D.objetivos;
+    const objs = (MR.currentRegion === "jezero" && window.JEZERO_DATA && window.JEZERO_DATA.targets)
+      ? window.JEZERO_DATA.targets
+      : MR.D.targets;
     objs.filter(o => o.box).forEach(o => {
       const [w, s, e, n] = o.box; const a = MR.toWorld(w, n), b = MR.toWorld(e, s);
       const r = document.createElementNS(NS, "rect");
@@ -236,7 +236,7 @@
     const full = d(pts);
     const hz = () => (hazards || []).forEach(z => put("hz", "r-hz", d(pts.slice(Math.max(0, z.start - 1), z.end + 2))));
     if (!animate || MR.reduceMotion()) { cas.setAttribute("d", full); main.setAttribute("d", full); hz(); return; }
-    // animación: la ruta "se dibuja sola"
+    // animation: the route "draws itself"
     cancelAnimationFrame(animId);
     const t0 = performance.now(), dur = 1800;
     const step = now => {
@@ -256,7 +256,7 @@
   M.drawSecondary = function (list) {
     M.clear("sec"); (list || []).forEach(pts => pts && pts.length > 1 && put("sec", "r-sec", d(pts)));
   };
-  // zonas de aviso de otros exploradores: círculo discontinuo del color del autor (radio en km)
+  // notice zones from other explorers: dashed circle in the author's color (radius in km)
   M.drawZones = function (list) {
     M.clear("zones"); if (!list || !list.length) return;
     const b = MR.bbox, mid = (b[1] + b[3]) / 2, unitsPerKm = 1200 / MR.distKm([b[0], mid], [b[2], mid]);
@@ -271,7 +271,7 @@
     M.clear("measure"); if (a && b) put("measure", "r-measure", d([a, b]));
   };
 
-  /* ---------- marcadores HTML (tamaño constante) ---------- */
+  /* ---------- HTML markers (constant size) ---------- */
   M.setMarkers = function (list) {
     markerData = list;
     markersEl.querySelectorAll(".mk").forEach(n => n.remove());

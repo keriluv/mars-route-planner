@@ -1,9 +1,9 @@
-"""multicriteria.py — Planificador multicriterio y evaluación de recursos de soporte vital.
+"""multicriteria.py — Multi-criteria planner and life-support resource evaluation.
 
-Implementa los tres perfiles de ruta (Segura, Rápida, Científica),
-el modelo cinemático de caminata EVA (Tobler para traje presurizado),
-la contabilidad de oxígeno, energía y radiación, la validación estricta de refugio final,
-y la generación de explicaciones estructuradas.
+Implements the three route profiles (Safe, Fast, Scientific),
+the EVA walking kinematic model (Tobler adapted for a pressurized suit),
+oxygen, energy and radiation accounting, strict final-shelter validation,
+and the generation of structured explanations.
 """
 from __future__ import annotations
 
@@ -30,14 +30,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def load_profiles() -> Dict[str, RouteProfile]:
-    """Carga los perfiles de ruta y restricciones duras desde config/route_profiles.yaml."""
+    """Loads the route profiles and hard constraints from config/route_profiles.yaml."""
     cfg_file = ROOT / "config" / "route_profiles.yaml"
     if not cfg_file.exists():
-        # Valores por defecto seguros si el archivo no existiera
+        # Safe defaults if the file does not exist
         return {
-            "segura": RouteProfile("segura", "Ruta Segura", 6.0, 5.0, 15.0, 7.0, 0.15, 0.5, 0.85, "Máxima reserva"),
-            "rapida": RouteProfile("rapida", "Ruta Rápida", 2.0, 2.0, 20.0, 10.0, 0.05, 0.0, 1.15, "Menor tiempo"),
-            "cientifica": RouteProfile("cientifica", "Ruta Científica", 3.5, 3.0, 18.0, 8.0, 0.10, 4.0, 0.95, "Mayor retorno"),
+            "safe": RouteProfile("safe", "Safe Route", 6.0, 5.0, 15.0, 7.0, 0.15, 0.5, 0.85, "Maximum reserve"),
+            "fast": RouteProfile("fast", "Fast Route", 2.0, 2.0, 20.0, 10.0, 0.05, 0.0, 1.15, "Shortest time"),
+            "scientific": RouteProfile("scientific", "Scientific Route", 3.5, 3.0, 18.0, 8.0, 0.10, 4.0, 0.95, "Highest return"),
         }
     data = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
     profiles = {}
@@ -58,10 +58,10 @@ def load_profiles() -> Dict[str, RouteProfile]:
 
 
 def tobler_eva_speed_kmh(slope_grade: float, traversability: float, speed_factor: float = 1.0) -> float:
-    """Calcula la velocidad de caminata de un astronauta con traje presurizado en Marte.
+    """Computes the walking speed of an astronaut in a pressurized suit on Mars.
 
-    Fórmula: Tobler base v = 6 * exp(-3.5 * |grade + 0.05|) km/h
-    Ajustada por peso de traje y presurización (x0.55) y transitabilidad (1 - 0.35*(1 - trav)).
+    Formula: base Tobler v = 6 * exp(-3.5 * |grade + 0.05|) km/h
+    Adjusted for suit weight and pressurization (x0.55) and traversability (1 - 0.35*(1 - trav)).
     """
     tobler_base = 6.0 * math.exp(-3.5 * abs(slope_grade + 0.05))
     eva_speed = tobler_base * 0.55 * (1.0 - 0.35 * (1.0 - max(0.0, min(1.0, traversability))))
@@ -76,7 +76,7 @@ def compute_path_resources(
     battery_pct_per_h: float = 12.0,
     radiation_msv_per_h: float = 0.025,
 ) -> Tuple[float, float, ResourceState]:
-    """Evalúa la distancia total, horas estimadas y recursos de supervivencia a lo largo de la ruta."""
+    """Evaluates total distance, estimated hours and survival resources along the route."""
     if not points:
         return 0.0, 0.0, ResourceState()
 
@@ -97,23 +97,23 @@ def compute_path_resources(
         step_hours = d_km / speed
         total_hours += step_hours
 
-        # En rover presurizado el soporte vital es suministrado por cabina
+        # In a pressurized rover, life support is supplied by the cabin
         rate = (base_o2_l_min * 0.2) if is_rover else (base_o2_l_min * (1.3 if grade > 0.14 else 1.0))
         total_o2_liters += rate * (step_hours * 60.0)
 
-    # Capacidad: Astronauta traje EVA (8 h a 1.2 L/min = 576 L), Rover presurizado (72 h = 5184 L)
+    # Capacity: EVA suit astronaut (8 h at 1.2 L/min = 576 L), pressurized rover (72 h = 5184 L)
     o2_capacity = 5184.0 if is_rover else 576.0
     o2_pct = max(0.0, 100.0 - (total_o2_liters / o2_capacity) * 100.0)
 
-    # Batería: 12% por hora traje, 3% por hora en rover presurizado
+    # Battery: 12% per hour in suit, 3% per hour in pressurized rover
     bat_rate = 3.0 if is_rover else battery_pct_per_h
     battery_pct = max(0.0, 100.0 - total_hours * bat_rate)
 
-    # Dosis de radiación ionizante acumulada (blindaje de rover reduce al 40%)
+    # Accumulated ionizing radiation dose (rover shielding reduces it to 40%)
     rad_factor = 0.4 if is_rover else 1.0
     dose_msv = total_hours * radiation_msv_per_h * rad_factor
 
-    # Reserva al refugio (oxígeno restante al llegar al punto final)
+    # Shelter reserve (oxygen remaining on arrival at the final point)
     reserve_pct = o2_pct
 
     res = ResourceState(
@@ -130,11 +130,11 @@ def compute_path_resources(
 def check_shelter_proximity(
     lon: float, lat: float, shelters: List[Dict[str, Any]], tolerance_km: float = 1.0
 ) -> Optional[Dict[str, Any]]:
-    """Verifica si unas coordenadas se encuentran dentro del radio de alcance seguro de un refugio."""
+    """Checks whether some coordinates are within safe reach of a shelter."""
     for s in shelters:
         slon = s.get("lon", 0.0)
         slat = s.get("lat", 0.0)
-        # Distancia esférica aproximada en Marte
+        # Approximate spherical distance on Mars
         dlat = (lat - slat) * (math.pi / 180.0) * (MARS_RADIUS_M / 1000.0)
         dlon = (lon - slon) * (math.pi / 180.0) * (MARS_RADIUS_M / 1000.0) * math.cos(math.radians((lat + slat) / 2.0))
         dist = math.hypot(dlon, dlat)
@@ -144,7 +144,7 @@ def check_shelter_proximity(
 
 
 class MultiCriteriaPlanner:
-    """Planificador híbrido que genera y compara las 3 alternativas con restricciones duras."""
+    """Hybrid planner that generates and compares the 3 alternatives under hard constraints."""
 
     def __init__(self, layers: Dict[str, np.ndarray], bbox: Tuple[float, float, float, float], grid_size: int = 1200):
         self.layers = layers
@@ -160,7 +160,7 @@ class MultiCriteriaPlanner:
 
     @staticmethod
     def _find_nearest_free(blocked: np.ndarray, r: int, c: int, max_radius: int = 15) -> Tuple[int, int]:
-        """Encuentra la celda transitable más cercana si el punto cae en el margen de bloqueo."""
+        """Finds the nearest traversable cell if the point falls inside the blocked margin."""
         if not blocked[r, c]:
             return r, c
         rows, cols = blocked.shape
@@ -183,12 +183,12 @@ class MultiCriteriaPlanner:
         require_final_shelter: bool = True,
         mobility: Optional[str] = None,
     ) -> RouteAlternative:
-        """Calcula una alternativa bajo el perfil especificado y evalúa restricciones duras."""
-        profile = self.profiles.get(profile_id, self.profiles["segura"])
+        """Computes an alternative under the given profile and evaluates hard constraints."""
+        profile = self.profiles.get(profile_id, self.profiles["safe"])
         trav = self.layers["traversability"]
         slope = self.layers["slope"]
 
-        # Costo base con ponderaciones del perfil
+        # Base cost with profile weights
         cost, blocked = build_cost_surface(
             trav,
             slope,
@@ -200,16 +200,16 @@ class MultiCriteriaPlanner:
             margin_cells=1,
         )
 
-        # Incorporar recompensa científica si el perfil lo exige (reducir costo en zonas con minerales)
+        # Add science reward if the profile requires it (lower cost in mineral zones)
         if profile.science_reward_weight > 0 and "minerals" in self.layers:
             minerals = self.layers["minerals"]
             cost = np.maximum(0.5, cost - profile.science_reward_weight * (minerals > 0.1).astype("float32") * 0.4)
 
-        # Bloqueos dinámicos (ej. tormenta detectada por MDA)
+        # Dynamic blocks (e.g. storm detected by an MDA)
         if blocked_dynamic_cells is not None:
             blocked = blocked | blocked_dynamic_cells
 
-        # Construir secuencia de paradas: inicio -> objetivos -> refugio final
+        # Build the stop sequence: start -> targets -> final shelter
         all_stops = [start_lonlat] + target_lonlats
         if final_shelter_lonlat:
             all_stops.append(final_shelter_lonlat)
@@ -217,7 +217,7 @@ class MultiCriteriaPlanner:
         cells = [self._lonlat_to_cell(lon, lat) for lon, lat in all_stops]
         cells = [self._find_nearest_free(blocked, r, c) for r, c in cells]
 
-        # Validar restricción dura de refugio final
+        # Validate the hard final-shelter constraint
         alerts: List[Alert] = []
         is_valid = True
         rejection_reason = None
@@ -227,22 +227,22 @@ class MultiCriteriaPlanner:
         if require_final_shelter and not matched_shelter:
             is_valid = False
             rejection_reason = (
-                f"El destino final ({final_dest[0]:.3f}°, {final_dest[1]:.3f}°) no es un refugio seguro registrado. "
-                "La política de seguridad de la misión EVA exige culminar en un refugio presurizado."
+                f"The final destination ({final_dest[0]:.3f}°, {final_dest[1]:.3f}°) is not a registered safe shelter. "
+                "The EVA mission safety policy requires finishing at a pressurized shelter."
             )
             alerts.append(
                 Alert(
                     id="ALERT-NO-SHELTER",
-                    level=AlertLevel.CRITICA,
-                    variable="refugio",
+                    level=AlertLevel.CRITICAL,
+                    variable="shelter",
                     threshold=1.0,
                     observed_value=0.0,
-                    message="Destino sin refugio seguro disponible.",
-                    action_suggested="Seleccione una estación base o refugio registrado como destino final.",
+                    message="Destination without an available safe shelter.",
+                    action_suggested="Select a registered base station or shelter as the final destination.",
                 )
             )
 
-        # Ejecutar A* en tramos
+        # Run A* in segments
         full_cells: list[Tuple[int, int]] = []
         try:
             for a, b in zip(cells, cells[1:]):
@@ -251,16 +251,16 @@ class MultiCriteriaPlanner:
                 full_cells.extend(cell_list if not full_cells else cell_list[1:])
         except ValueError as err:
             is_valid = False
-            rejection_reason = f"No existe ruta continua practicable: {err}"
+            rejection_reason = f"No continuous traversable route exists: {err}"
             alerts.append(
                 Alert(
                     id="ALERT-BLOCKED",
-                    level=AlertLevel.CRITICA,
-                    variable="terreno_bloqueado",
+                    level=AlertLevel.CRITICAL,
+                    variable="blocked_terrain",
                     threshold=profile.max_slope_deg,
                     observed_value=99.0,
-                    message=f"Corredor impracticable bajo perfil {profile.name}.",
-                    action_suggested="Reduzca las paradas intermedias o incremente la tolerancia de pendiente.",
+                    message=f"Impassable corridor under profile {profile.name}.",
+                    action_suggested="Reduce the intermediate stops or increase the slope tolerance.",
                 )
             )
             return RouteAlternative(
@@ -275,11 +275,11 @@ class MultiCriteriaPlanner:
                 rejection_reason=rejection_reason,
             )
 
-        # Simplificar y convertir a coordenadas
+        # Simplify and convert to coordinates
         simplified = simplify(np.asarray(full_cells, dtype="int32"), tolerance=1.2)
         ll = route_lonlat(simplified, self.bbox, self.grid_size)
 
-        # Construir puntos completos con elevación, pendiente, rugosidad y transitabilidad
+        # Build full points with elevation, slope, roughness and traversability
         dem = self.layers["dem"]
         rough = self.layers.get("roughness", np.zeros_like(dem))
         points: List[List[float]] = []
@@ -298,41 +298,41 @@ class MultiCriteriaPlanner:
                 cum_km += math.hypot(dlon, dlat)
             points.append([float(lon), float(lat), round(cum_km, 3), round(elev, 1), round(sl, 1), round(ro, 2), round(tr, 2)])
 
-        # Evaluar recursos y tiempos (astronauta en distancias cortas, rover presurizado en expediciones largas)
+        # Evaluate resources and times (astronaut on short distances, pressurized rover on long expeditions)
         active_mobility = mobility or ("rover" if cum_km > 15.0 else "astronaut")
         total_km, total_hours, resources = compute_path_resources(points, profile, mobility=active_mobility)
 
-        # Validaciones de supervivencia adicionales (conservando rechazos previos por refugio ausente)
+        # Additional survival checks (keeping earlier rejections for a missing shelter)
         if not rejection_reason:
             if resources.oxygen_pct <= 0:
                 is_valid = False
-                rejection_reason = "Consumo de oxígeno proyectado supera la capacidad del traje EVA."
+                rejection_reason = "Projected oxygen consumption exceeds the EVA suit capacity."
             elif resources.battery_pct <= 0:
                 is_valid = False
-                rejection_reason = "Autonomía de baterías de soporte vital excedida."
+                rejection_reason = "Life-support battery endurance exceeded."
         elif total_hours > 8.0:
             alerts.append(
                 Alert(
                     id="ALERT-EVA-HOURS",
-                    level=AlertLevel.PRECAUCION,
-                    variable="tiempo_eva",
+                    level=AlertLevel.CAUTION,
+                    variable="eva_time",
                     threshold=8.0,
                     observed_value=total_hours,
-                    message=f"Duración de la misión ({total_hours:.1f} h) cercana al límite máximo de seguridad.",
-                    action_suggested="Considere acortar la travesía o establecer un punto de descanso en un refugio intermedio.",
+                    message=f"Mission duration ({total_hours:.1f} h) close to the maximum safety limit.",
+                    action_suggested="Consider shortening the traverse or setting up a rest stop at an intermediate shelter.",
                 )
             )
 
         explanation = {
-            "perfil_seleccionado": profile.name,
-            "distancia_total_km": total_km,
-            "duracion_horas": total_hours,
-            "reserva_oxigeno_final_pct": resources.reserve_to_next_shelter_pct,
-            "refugio_alcanzado": matched_shelter["name"] if matched_shelter else "Ninguno",
-            "criterio_optimizacion": (
-                "Riesgo minimizado y pendiente restringida" if profile_id == "segura"
-                else "Tiempo y distancia minimizados" if profile_id == "rapida"
-                else "Proximidad a objetivos científicos maximizada"
+            "selected_profile": profile.name,
+            "total_distance_km": total_km,
+            "duration_hours": total_hours,
+            "final_oxygen_reserve_pct": resources.reserve_to_next_shelter_pct,
+            "shelter_reached": matched_shelter["name"] if matched_shelter else "None",
+            "optimization_criterion": (
+                "Minimized risk and restricted slope" if profile_id == "safe"
+                else "Minimized time and distance" if profile_id == "fast"
+                else "Maximized proximity to scientific targets"
             ),
         }
 
@@ -358,9 +358,9 @@ class MultiCriteriaPlanner:
         blocked_dynamic_cells: Optional[np.ndarray] = None,
         require_final_shelter: bool = True,
     ) -> Dict[str, RouteAlternative]:
-        """Calcula las 3 alternativas simultáneamente para permitir la comparación directa."""
+        """Computes the 3 alternatives at once to allow direct comparison."""
         results = {}
-        for pid in ("segura", "rapida", "cientifica"):
+        for pid in ("safe", "fast", "scientific"):
             results[pid] = self.plan_alternative(
                 profile_id=pid,
                 start_lonlat=start_lonlat,

@@ -1,15 +1,15 @@
 id: jezero
-name: Cráter Jezero — Delta Fluvial y Abanico Sedimentario
+name: Jezero Crater — Fluvial Delta and Sedimentary Fan
 crs: EPSG:104905
 bbox: [77.30, 18.25, 77.65, 18.55]
 center: [77.45, 18.40]
 resolution_m: 50.0
 grid_size: 1200
 default_start: [77.4509, 18.4446]       # Octavia E. Butler Landing (Perseverance)
-default_shelter: [77.3750, 18.4620]     # Refugio Delta Front West
+default_shelter: [77.3750, 18.4620]     # Delta Front West Shelter
 description: >
-  Zona de exploración de Perseverance (Mars 2020). Antiguo lago y delta fluvial con
-  alto potencial de preservación de biofirmas y objetivos analizados por PIXL y SHERLOC.
+  Exploration zone of Perseverance (Mars 2020). Ancient lake and fluvial delta with
+  high biosignature preservation potential and targets analyzed by PIXL and SHERLOC.
 available_layers:
   - dem
   - slope
@@ -19,18 +19,18 @@ available_layers:
   - pixl_sherloc_targets
   - meda_weather
 unavailable_layers:
-  - crism_high_res: "NO DISPONIBLE (Cobertura espectral local pendiente de calibración PDS)"
-  - themis_night_thermal: "NO DISPONIBLE (Resolución THEMIS regional insuficiente para celda local)"
+  - crism_high_res: "NOT AVAILABLE (Local spectral coverage pending PDS calibration)"
+  - themis_night_thermal: "NOT AVAILABLE (Regional THEMIS resolution insufficient for the local cell)"
 shelters:
   - id: shelter-jezero-delta
-    name: Refugio Delta Front West
+    name: Delta Front West Shelter
     lon: 77.3750
     lat: 18.4620
     capacity: 4
     oxygen_reserves_h: 60.0
     power_reserves_h: 72.0
   - id: shelter-jezero-landing
-    name: Estación Base Octavia
+    name: Octavia Base Station
     lon: 77.4509
     lat: 18.4446
     capacity: 6

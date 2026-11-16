@@ -1,7 +1,7 @@
 /* =========================================================
-   scene3d.js — relieve 3D con Three.js (DEM MOLA/HRSC)
-   El terreno se construye en el navegador a partir de la grilla de alturas.
-   Versión original Three.js con soporte de minerales científicos e inspección interactiva.
+   scene3d.js — 3D relief with Three.js (MOLA/HRSC DEM)
+   The terrain is built in the browser from the elevation grid.
+   Original Three.js version with support for scientific minerals and interactive inspection.
    ========================================================= */
 (function () {
   "use strict";
@@ -10,7 +10,7 @@
   let renderer, scene, camera, controls, terrain, routeMesh, doneMesh, secMeshes = [], astro, beacon, pins = [], host;
   let exag = 2.5, follow = true, running = false;
   let raycaster, mouse;
-  const SIZE = 100;                       // el terreno mide 100 × 100 unidades (≈ 53 km)
+  const SIZE = 100;                       // the terrain measures 100 × 100 units (≈ 53 km)
   const KM_PER_UNIT = 53.2 / SIZE;
 
   function getDemInfo() {
@@ -86,7 +86,7 @@
     }
     geo.computeVertexNormals();
 
-    // El <img> del mapa base viene de un archivo: por file:// WebGL lo rechaza ("tainted canvas"). Se usa la copia data: URI.
+    // The base-map <img> comes from a file: over file:// WebGL rejects it ("tainted canvas"). The data: URI copy is used.
     const blank = document.createElement("canvas"); blank.width = blank.height = 4;
     const tex = new THREE.Texture(S3.textureCanvas || (MR.basemap3d && MR.basemap3d()) || blank);
     tex.needsUpdate = true;
@@ -100,7 +100,7 @@
     scene.add(terrain);
   }
 
-  // Compone mapa base + capa de análisis en una textura
+  // Composes base map + analysis layer into one texture
   S3.setTexture = function (baseImg, overlayCanvas, opacity) {
     const c = document.createElement("canvas");
     c.width = c.height = 1200;
@@ -108,7 +108,7 @@
     try {
       ctx.drawImage(baseImg, 0, 0, 1200, 1200);
     } catch (e) {
-      /* imagen aún no cargada */
+      /* image not loaded yet */
     }
     if (overlayCanvas) {
       ctx.globalAlpha = opacity;
@@ -192,13 +192,13 @@
     pins.forEach(p => scene.remove(p));
     pins = [];
     const col = {
-      meta: 0xfc3d21,
+      goal: 0xfc3d21,
       base: 0x1e64dc,
-      refugio: 0x10b981,
+      shelter: 0x10b981,
       mineral: 0x2f7fb8,
-      espectral: 0x2f7fb8,
-      ciencia: 0xb5651d,
-      referencia: 0xc0c8d4,
+      spectral: 0x2f7fb8,
+      science: 0xb5651d,
+      reference: 0xc0c8d4,
       hallazgo: 0x46c882,
       aviso: 0xf0963c,
       secundaria: 0xa68bff,
@@ -209,7 +209,7 @@
       const g = new THREE.Group();
       const base = toXYZ(m.lon, m.lat, 0);
       const isMin = m.type === "mineral" || m.isMineral;
-      const c = isMin ? (m.mineral && m.mineral.category === "Carbonatos / Olivino" ? 0x00d26a : 0x2f7fb8) : (col[m.type] || 0xffffff);
+      const c = isMin ? (m.mineral && m.mineral.category === "Carbonates / Olivine" ? 0x00d26a : 0x2f7fb8) : (col[m.type] || 0xffffff);
 
       const stick = new THREE.Mesh(
         new THREE.CylinderGeometry(0.06, 0.06, 3, 6),
@@ -234,9 +234,9 @@
         g.userData = { isMineral: true, mineral: m.mineral || m, onClick: m.onClick, label: m.label };
       } else {
         head = new THREE.Mesh(
-          m.type === "meta"
+          m.type === "goal"
             ? new THREE.ConeGeometry(0.7, 1.4, 4)
-            : m.type === "refugio"
+            : m.type === "shelter"
             ? new THREE.CylinderGeometry(0.5, 0.6, 1.0, 6)
             : new THREE.OctahedronGeometry(0.55),
           new THREE.MeshBasicMaterial({ color: c })
@@ -326,7 +326,7 @@
       if (!running) return;
       controls.update();
 
-      // Rotación suave de cristales minerales
+      // Smooth rotation of mineral crystals
       const tSec = now * 0.002;
       pins.forEach(p => {
         if (p.userData && p.userData.isMineral && p.children[1]) {

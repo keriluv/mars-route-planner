@@ -1,13 +1,13 @@
-"""Almacén de documentos NO RELACIONAL (estilo MongoDB) sobre archivos JSON Lines.
+"""NON-RELATIONAL document store (MongoDB-style) over JSON Lines files.
 
-Guarda lo que no tiene forma fija o crece mucho:
-  - telemetria   -> lecturas cada 30 min marcianos (posición + clima), una por documento
-  - capas        -> metadatos de capas raster
-  - objetivos    -> objetivos.json (puntos de interés con campos variables)
-  - rutas        -> rutas calculadas (listas de puntos de longitud variable)
+Stores what has no fixed shape or grows a lot:
+  - telemetria   -> readings every 30 Martian minutes (position + weather), one per document
+  - capas        -> raster layer metadata
+  - targets      -> targets.json (points of interest with variable fields)
+  - rutas        -> computed routes (lists of points of variable length)
 
-API mínima: insert(colección, doc), find(colección, filtro, limit), replace_all(colección, docs).
-Si se define la variable de entorno MONGO_URI y pymongo está instalado, se usa MongoDB real.
+Minimal API: insert(collection, doc), find(collection, filter, limit), replace_all(collection, docs).
+If the MONGO_URI environment variable is set and pymongo is installed, real MongoDB is used.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ class DocStore:
 
     def _path(self, collection: str) -> Path:
         if not collection or set(collection) - _SAFE:
-            raise ValueError("nombre de colección inválido")
+            raise ValueError("invalid collection name")
         return self.root / f"{collection}.jsonl"
 
     def insert(self, collection: str, doc: dict) -> str:

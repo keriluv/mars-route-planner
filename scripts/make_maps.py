@@ -69,18 +69,18 @@ def plot_rems(path: Path) -> None:
         axes[1, 0].plot(hours[order], data["UV_ABC"][order], ".", color=color, markersize=1.5, alpha=0.6, label=f"Sol {sol}")
         axes[1, 1].plot(hours[order], data["HUMIDITY_CHANNEL_A"][order], ".", color=color, markersize=1.5, alpha=0.6, label=f"Sol {sol}")
     titles = [
-        "Temperatura del aire (K)",
-        "Presión (Pa)",
-        "Radiación UV ABC (W/m²)",
-        "Humedad relativa (%)",
+        "Air temperature (K)",
+        "Pressure (Pa)",
+        "UV ABC radiation (W/m²)",
+        "Relative humidity (%)",
     ]
     for axis, title in zip(axes.ravel(), titles):
         axis.set_title(title)
-        axis.set_xlabel("Hora solar media local")
+        axis.set_xlabel("Local mean solar time")
         axis.grid(alpha=0.25)
         axis.legend(fontsize=8)
         axis.set_xlim(0, 24)
-    figure.suptitle("REMS - condiciones atmosféricas en Gale Crater")
+    figure.suptitle("REMS - atmospheric conditions in Gale Crater")
     figure.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(figure)
 

@@ -1,7 +1,7 @@
 -- =========================================================
--- Base de datos RELACIONAL (SQLite) — Ruta segura a Mount Sharp
--- Guarda lo que tiene estructura fija y relaciones claras:
--- exploradores, misiones, hallazgos y mensajes de la bitácora.
+-- RELATIONAL database (SQLite) — Safe route to Mount Sharp
+-- Stores what has a fixed structure and clear relations:
+-- explorers, missions, findings and logbook messages.
 -- =========================================================
 PRAGMA foreign_keys = ON;
 
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS mision (
     origen      TEXT CHECK (origen IN ('asignada', 'propia')),
     nombre      TEXT NOT NULL,
     lon         REAL, lat REAL,
-    estado      TEXT NOT NULL,                 -- propuesta, aceptada, en curso, completada, abortada
+    estado      TEXT NOT NULL,                 -- proposed, accepted, in progress, completed, aborted
     km          REAL,
     creado      TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS hallazgo (
     tipo        TEXT NOT NULL CHECK (tipo IN ('mineral', 'roca', 'otro')),
     nota        TEXT,
     lon         REAL NOT NULL, lat REAL NOT NULL, altura_m REAL,
-    sol_min     REAL,                          -- minutos marcianos desde el inicio
+    sol_min     REAL,                          -- Martian minutes since the start
     km          REAL,
     tiene_foto  INTEGER NOT NULL DEFAULT 0,
     creado      TEXT NOT NULL DEFAULT (datetime('now'))
@@ -61,18 +61,18 @@ CREATE TABLE IF NOT EXISTS reporte (
     creado      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Avisos compartidos: un hallazgo o una alerta de un explorador que los demás ven en su mapa y su bitácora.
--- Cada explorador sigue con su viaje separado; esto solo avisa. Los eventos (publicado, recibido, retirado)
--- van al almacén JSONL (colección "eventos"), no aquí.
+-- Shared notices: a finding or alert from one explorer that the others see on their map and logbook.
+-- Each explorer continues their own separate trip; this only notifies. The events (published, received, withdrawn)
+-- go to the JSONL store (collection "eventos"), not here.
 CREATE TABLE IF NOT EXISTS aviso (
     id          TEXT PRIMARY KEY,
     autor       TEXT NOT NULL REFERENCES explorador(id),
     tipo        TEXT NOT NULL CHECK (tipo IN ('hallazgo', 'alerta_pendiente', 'alerta_radiacion')),
     texto       TEXT NOT NULL,
     lon         REAL NOT NULL, lat REAL NOT NULL,
-    radio_km    REAL NOT NULL DEFAULT 0.3,       -- tamaño de la zona dibujada en el mapa
+    radio_km    REAL NOT NULL DEFAULT 0.3,       -- size of the zone drawn on the map
     region      TEXT NOT NULL DEFAULT 'gale',
-    sol_min     REAL,                            -- reloj del autor (cada viaje tiene el suyo)
+    sol_min     REAL,                            -- author's clock (each trip has its own)
     estado      TEXT NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo', 'retirado')),
     creado      TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -84,6 +84,6 @@ CREATE INDEX IF NOT EXISTS ix_mision_exp ON mision(explorador);
 CREATE INDEX IF NOT EXISTS ix_reporte_autor ON reporte(autor);
 
 INSERT OR IGNORE INTO explorador (id, rol, color) VALUES
-    ('ev1', 'Comandante', '#1E64DC'),
-    ('ev2', 'Geóloga',    '#B5651D'),
-    ('ev3', 'Ingeniero',  '#127846');
+    ('ev1', 'Commander', '#1E64DC'),
+    ('ev2', 'Geologist', '#B5651D'),
+    ('ev3', 'Engineer',  '#127846');

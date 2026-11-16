@@ -1,11 +1,11 @@
-"""test_smoke.py — Pruebas de humo de la Fase 1 para GaleX.
+"""test_smoke.py — Phase 1 smoke tests for GaleX.
 
-Valida:
-1. Carga íntegra de configuraciones regionales (Gale y Jezero).
-2. Carga y consistencia de los perfiles de ruta (segura, rápida, científica).
-3. Contratos de dominio y serialización JSON.
-4. Persistencia relacional SQLite (lectura/escritura de reportes y hallazgos).
-5. Integridad del escenario simulado reproducible.
+Validates:
+1. Full loading of the regional configurations (Gale and Jezero).
+2. Loading and consistency of the route profiles (safe, fast, scientific).
+3. Domain contracts and JSON serialization.
+4. Relational SQLite persistence (reading/writing reports and findings).
+5. Integrity of the reproducible simulated scenario.
 """
 from __future__ import annotations
 
@@ -35,12 +35,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_region_configs_exist_and_load():
-    """Verifica que las configuraciones de Gale y Jezero sean válidas y cumplan el contrato."""
+    """Checks that the Gale and Jezero configurations are valid and meet the contract."""
     gale_path = ROOT / "config" / "regions" / "gale.yaml"
     jezero_path = ROOT / "config" / "regions" / "jezero.yaml"
 
-    assert gale_path.exists(), "Falta config/regions/gale.yaml"
-    assert jezero_path.exists(), "Falta config/regions/jezero.yaml"
+    assert gale_path.exists(), "Missing config/regions/gale.yaml"
+    assert jezero_path.exists(), "Missing config/regions/jezero.yaml"
 
     gale_data = yaml.safe_load(gale_path.read_text(encoding="utf-8"))
     jezero_data = yaml.safe_load(jezero_path.read_text(encoding="utf-8"))
@@ -58,69 +58,69 @@ def test_region_configs_exist_and_load():
     assert jezero.bbox[0] < jezero.bbox[2]
     assert jezero.bbox[1] < jezero.bbox[3]
 
-    # Ambas regiones deben tener al menos un refugio
+    # Both regions must have at least one shelter
     assert len(gale_data.get("shelters", [])) >= 1
     assert len(jezero_data.get("shelters", [])) >= 1
 
 
 def test_route_profiles_config():
-    """Verifica que los tres perfiles requeridos (segura, rápida, científica) estén definidos."""
+    """Checks that the three required profiles (safe, fast, scientific) are defined."""
     prof_path = ROOT / "config" / "route_profiles.yaml"
-    assert prof_path.exists(), "Falta config/route_profiles.yaml"
+    assert prof_path.exists(), "Missing config/route_profiles.yaml"
 
     data = yaml.safe_load(prof_path.read_text(encoding="utf-8"))
     profiles = data.get("profiles", {})
 
-    for p in ("segura", "rapida", "cientifica"):
-        assert p in profiles, f"Perfil '{p}' no encontrado en route_profiles.yaml"
+    for p in ("safe", "fast", "scientific"):
+        assert p in profiles, f"Profile '{p}' not found in route_profiles.yaml"
         cfg = profiles[p]
         assert cfg["risk_weight"] >= 0.0
         assert cfg["slope_weight"] >= 0.0
         assert cfg["max_slope_deg"] >= 10.0
 
-    # Comprobar restricciones duras del sistema
+    # Check the system's hard constraints
     hard = data.get("hard_constraints", {})
     assert hard.get("require_final_shelter") is True
     assert hard.get("max_eva_hours", 0) > 0
 
 
 def test_domain_serialization():
-    """Valida serialización y validaciones del modelo de recursos y alertas."""
+    """Validates serialization and validations of the resource and alert model."""
     res = ResourceState(oxygen_pct=85.0, battery_pct=90.0, eva_time_min=120.0, radiation_dose_msv=0.45)
     is_safe, reason = res.is_safe()
     assert is_safe is True
     assert reason is None
 
-    # Caso de fallo crítico: oxígeno agotado
+    # Critical failure case: oxygen depleted
     dead_res = ResourceState(oxygen_pct=0.0)
     safe, err = dead_res.is_safe()
     assert safe is False
-    assert "Oxígeno agotado" in (err or "")
+    assert "Oxygen depleted" in (err or "")
 
-    # Serialización de alerta
+    # Alert serialization
     alert = Alert(
         id="ALT-01",
-        level=AlertLevel.CRITICA,
-        variable="pendiente",
+        level=AlertLevel.CRITICAL,
+        variable="slope",
         threshold=20.0,
         observed_value=23.5,
-        message="Pendiente peligrosa",
-        action_suggested="Desviar al norte",
+        message="Dangerous slope",
+        action_suggested="Divert to the north",
     )
     d = alert.to_dict()
-    assert d["level"] == "CRÍTICA"
+    assert d["level"] == "CRITICAL"
     assert d["threshold"] == 20.0
 
 
 def test_storage_sqlite_crud():
-    """Verifica la persistencia en SQLite de reportes, hallazgos y mensajes."""
+    """Checks SQLite persistence of reports, findings and messages."""
     with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tmp:
         temp_db = Path(tmp.name)
 
     try:
         store = Storage(temp_db)
 
-        # 1. Guardar y leer un reporte
+        # 1. Save and read a report
         rep = Report(
             id="rep-001",
             author="ev1",
@@ -130,7 +130,7 @@ def test_storage_sqlite_crud():
             elev_m=-3200.0,
             sol_min=150.0,
             km=5.4,
-            text="Muestra sedimentaria con posibles arcillas esmectitas.",
+            text="Sedimentary sample with possible smectite clays.",
             attachments={"photo": "sample_001.jpg"},
         )
         store.save_report(rep)
@@ -142,12 +142,12 @@ def test_storage_sqlite_crud():
         assert read_rep.text == rep.text
         assert read_rep.attachments.get("photo") == "sample_001.jpg"
 
-        # 2. Guardar y listar hallazgos
+        # 2. Save and list findings
         store.save_finding({
             "id": "h-100",
             "crew": "ev2",
             "type": "mineral",
-            "note": "Sulfato de calcio detectado",
+            "note": "Calcium sulfate detected",
             "lon": 137.6,
             "lat": -4.9,
             "elev": -3100.0,
@@ -159,11 +159,11 @@ def test_storage_sqlite_crud():
         assert len(findings) == 1
         assert findings[0]["id"] == "h-100"
 
-        # 3. Guardar y listar mensajes
+        # 3. Save and list messages
         store.save_message({
             "crew": "ev1",
             "from": "tierra",
-            "text": "Autorización para proseguir hacia estación MDA-14 concedida.",
+            "text": "Authorization to proceed to station MDA-14 granted.",
             "kind": "texto",
             "sol_min": 200.0,
         })
@@ -177,25 +177,25 @@ def test_storage_sqlite_crud():
 
 
 def test_demo_scenario_structure():
-    """Verifica que el archivo de escenario reproducible contenga estaciones y eventos."""
+    """Checks that the reproducible scenario file contains stations and events."""
     scen_path = ROOT / "data" / "simulated" / "demo_scenario.json"
-    assert scen_path.exists(), "Falta data/simulated/demo_scenario.json"
+    assert scen_path.exists(), "Missing data/simulated/demo_scenario.json"
 
     data = json.loads(scen_path.read_text(encoding="utf-8"))
     assert "scenario_id" in data
     assert "stations" in data
     assert len(data["stations"]) >= 2
 
-    # Verificar que existe el evento meteorológico crítico
+    # Check that the critical weather event exists
     events = data.get("timeline_events", [])
-    has_critical = any(e.get("severity") == "CRÍTICA" or e.get("type") == "CRITICAL_WEATHER_EVENT" for e in events)
-    assert has_critical, "El escenario debe incluir al menos un evento crítico para disparar alerta"
+    has_critical = any(e.get("severity") == "CRITICAL" or e.get("type") == "CRITICAL_WEATHER_EVENT" for e in events)
+    assert has_critical, "The scenario must include at least one critical event to trigger an alert"
 
 
 def test_server_modules_importable(tmp_path, monkeypatch):
-    """Verifica que el servidor backend cargue sin errores con las nuevas rutas y módulos.
+    """Checks that the backend server loads without errors with the new routes and modules.
 
-    Usa una carpeta de datos temporal: importar el servidor abre y migra la base SQLite, y no debe tocar la versionada.
+    Uses a temporary data folder: importing the server opens and migrates the SQLite database, and it must not touch the versioned one.
     """
     monkeypatch.setenv("MARS_DATA_DIR", str(tmp_path))
     sys.path.insert(0, str(ROOT / "backend"))
@@ -212,7 +212,7 @@ def test_server_modules_importable(tmp_path, monkeypatch):
 
 
 def test_multicriteria_planner_and_rejection():
-    """Verifica el cálculo de alternativas y el rechazo reproducible por destino sin refugio."""
+    """Checks the alternatives computation and the reproducible rejection of a destination without a shelter."""
     import numpy as np
     from marsroute.layers import load_layers
     from marsroute.multicriteria import MultiCriteriaPlanner
@@ -226,36 +226,36 @@ def test_multicriteria_planner_and_rejection():
     planner = MultiCriteriaPlanner(layers, bbox, gale_cfg["grid_size"])
 
     start = (137.4416, -4.5895)  # Bradbury
-    goal_shelter = (137.8599, -5.3709)  # Base Mount Sharp
-    arbitrary_point = (137.55, -4.75)  # Punto sin refugio
+    goal_shelter = (137.8599, -5.3709)  # Mount Sharp Base
+    arbitrary_point = (137.55, -4.75)  # Point without a shelter
 
-    # 1. Ruta válida a refugio
-    alt_segura = planner.plan_alternative(
-        profile_id="segura",
+    # 1. Valid route to a shelter
+    alt_safe = planner.plan_alternative(
+        profile_id="safe",
         start_lonlat=start,
         target_lonlats=[],
         final_shelter_lonlat=goal_shelter,
         shelters_catalog=shelters,
         require_final_shelter=True,
     )
-    assert alt_segura.is_valid is True
-    assert alt_segura.total_km > 0
-    assert alt_segura.resources.oxygen_pct > 0
-    assert alt_segura.rejection_reason is None
+    assert alt_safe.is_valid is True
+    assert alt_safe.total_km > 0
+    assert alt_safe.resources.oxygen_pct > 0
+    assert alt_safe.rejection_reason is None
 
-    # 2. Rechazo por destino sin refugio
-    alt_rechazada = planner.plan_alternative(
-        profile_id="segura",
+    # 2. Rejection due to a destination without a shelter
+    alt_rejected = planner.plan_alternative(
+        profile_id="safe",
         start_lonlat=start,
         target_lonlats=[],
         final_shelter_lonlat=arbitrary_point,
         shelters_catalog=shelters,
         require_final_shelter=True,
     )
-    assert alt_rechazada.is_valid is False
-    assert "no es un refugio seguro" in (alt_rechazada.rejection_reason or "")
+    assert alt_rejected.is_valid is False
+    assert "is not a registered safe shelter" in (alt_rejected.rejection_reason or "")
 
-    # 3. Cálculo de las 3 alternativas
+    # 3. Computation of the 3 alternatives
     alts = planner.plan_all_alternatives(
         start_lonlat=start,
         target_lonlats=[],
@@ -263,6 +263,6 @@ def test_multicriteria_planner_and_rejection():
         shelters_catalog=shelters,
         require_final_shelter=True,
     )
-    assert "segura" in alts and "rapida" in alts and "cientifica" in alts
+    assert "safe" in alts and "fast" in alts and "scientific" in alts
 
 

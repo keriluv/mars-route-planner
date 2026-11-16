@@ -1,30 +1,30 @@
-"""Servidor del prototipo — Ruta segura a Mount Sharp.
+"""Prototype server — Safe route to Mount Sharp.
 
-Sirve la página web (carpeta web/) y una API JSON pequeña:
+Serves the web page (web/ folder) and a small JSON API:
 
-  GET  /api/health                 estado del servidor
-  GET  /api/objetivos              objetivos fijos (almacén de documentos)
-  GET  /api/hallazgos?crew=ev1     hallazgos de un explorador (SQLite)
-  GET  /api/bitacora?crew=ev1      mensajes de la bitácora (SQLite)
-  GET  /api/telemetria?crew=ev1    lecturas de telemetría (almacén de documentos)
-  POST /api/hallazgos              guarda un hallazgo
-  POST /api/bitacora               guarda un mensaje
-  POST /api/misiones               guarda/actualiza una misión
-  POST /api/telemetria             guarda una lectura de telemetría
-  POST /api/route                  calcula una ruta A* en la grilla completa (44 m)
-  GET  /api/avisos                 avisos compartidos entre exploradores (SQLite)
-  POST /api/avisos                 publica un aviso (hallazgo o alerta) para los demás exploradores
-  POST /api/avisos/retirar         el autor retira un aviso
-  POST /api/avisos/recibido        un explorador confirma que recibió un aviso (solo evento)
-  GET  /api/eventos?tipo=...       eventos del almacén JSONL (aviso_publicado, aviso_recibido, aviso_retirado)
+  GET  /api/health                 server status
+  GET  /api/targets                fixed targets (document store)
+  GET  /api/hallazgos?crew=ev1     findings of an explorer (SQLite)
+  GET  /api/bitacora?crew=ev1      logbook messages (SQLite)
+  GET  /api/telemetria?crew=ev1    telemetry readings (document store)
+  POST /api/hallazgos              saves a finding
+  POST /api/bitacora               saves a message
+  POST /api/misiones               saves/updates a mission
+  POST /api/telemetria             saves a telemetry reading
+  POST /api/route                  computes an A* route on the full grid (44 m)
+  GET  /api/avisos                 notices shared between explorers (SQLite)
+  POST /api/avisos                 publishes a notice (finding or alert) for the other explorers
+  POST /api/avisos/retirar         the author withdraws a notice
+  POST /api/avisos/recibido        an explorer confirms receipt of a notice (event only)
+  GET  /api/eventos?tipo=...       events from the JSONL store (aviso_publicado, aviso_recibido, aviso_retirado)
 
-Variable de entorno MARS_DATA_DIR: carpeta de datos alternativa (SQLite + JSONL); sirve para pruebas.
+MARS_DATA_DIR environment variable: alternative data folder (SQLite + JSONL); useful for tests.
 
-Uso:
+Usage:
   python backend/server.py            -> http://127.0.0.1:8000
   python backend/server.py --port 9000 --host 0.0.0.0
 
-Solo usa la biblioteca estándar de Python (+ numpy/scipy para /api/route).
+Uses only the Python standard library (+ numpy/scipy for /api/route).
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ MAX_BODY = 64 * 1024
 CREW = {"ev1", "ev2", "ev3"}
 DB_LOCK = threading.Lock()
 
-# ---------------------------------------------------------------- bases de datos
+# ---------------------------------------------------------------- databases
 DATA.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA / "mars_route.sqlite"
 db = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -65,46 +65,46 @@ db.executescript((ROOT / "backend" / "schema.sql").read_text(encoding="utf-8"))
 docs = DocStore(DATA / "docstore")
 storage = Storage(DB_PATH)
 
-# carga inicial del almacén de documentos con los datos exportados
-_obj = WEB / "data" / "objetivos.json"
-if _obj.exists() and not docs.find("objetivos", limit=1):
-    docs.replace_all("objetivos", json.loads(_obj.read_text(encoding="utf-8")))
+# initial load of the document store with the exported data
+_obj = WEB / "data" / "targets.json"
+if _obj.exists() and not docs.find("targets", limit=1):
+    docs.replace_all("targets", json.loads(_obj.read_text(encoding="utf-8")))
 
 
-# ---------------------------------------------------------------- validación
+# ---------------------------------------------------------------- validation
 def _num(v, lo=-1e9, hi=1e9):
     if v is None:
         return None
     try:
         f = float(v)
     except (TypeError, ValueError):
-        raise ValueError("número inválido")
+        raise ValueError("invalid number")
     if not (lo <= f <= hi):
-        raise ValueError("número fuera de rango")
+        raise ValueError("number out of range")
     return f
 
 
 def _txt(v, n=200, required=False):
     if v is None or v == "":
         if required:
-            raise ValueError("campo obligatorio vacío")
+            raise ValueError("required field is empty")
         return None
     s = re.sub(r"[\x00-\x1f<>]", "", str(v)).strip()[:n]
     if required and not s:
-        raise ValueError("campo obligatorio vacío")
+        raise ValueError("required field is empty")
     return s
 
 
 def _crew(v):
     if v not in CREW:
-        raise ValueError("explorador desconocido")
+        raise ValueError("unknown explorer")
     return v
 
 
 def save_hallazgo(b):
     tipo = b.get("type")
     if tipo not in ("mineral", "roca", "otro"):
-        raise ValueError("tipo de hallazgo inválido")
+        raise ValueError("invalid finding type")
     row = (_txt(b.get("id"), 40, True), _crew(b.get("crew")), tipo, _txt(b.get("note"), 140),
            _num(b.get("lon"), 130, 145), _num(b.get("lat"), -10, 0), _num(b.get("elev")),
            _num(b.get("simMin"), 0, 1e7), _num(b.get("km"), 0, 1000), 1 if b.get("photo") else 0)
@@ -138,7 +138,7 @@ def save_telemetria(b):
     doc = {"crew": _crew(b.get("crew")), "t": _num(b.get("t"), 0, 1e7), "km": _num(b.get("km"), 0, 1000),
            "lon": _num(b.get("lon"), 130, 145), "lat": _num(b.get("lat"), -10, 0), "elev": _num(b.get("elev")),
            "clima": {k: _num(wx.get(k)) for k in ("air", "ground", "uv", "rh", "p") if k in wx}}
-    if b.get("dosis_msv") is not None:  # dosis EVA acumulada del viaje (modelo simplificado, mSv)
+    if b.get("dosis_msv") is not None:  # accumulated EVA dose of the trip (simplified model, mSv)
         doc["dosis_msv"] = _num(b.get("dosis_msv"), 0, 1e6)
     docs.insert("telemetria", doc)
 
@@ -147,10 +147,10 @@ AVISO_TIPOS = ("hallazgo", "alerta_pendiente", "alerta_radiacion")
 
 
 def save_aviso(b):
-    """Publica un aviso compartido. Es idempotente: reenviar el mismo id no lo duplica ni repite el evento."""
+    """Publishes a shared notice. It is idempotent: resending the same id neither duplicates it nor repeats the event."""
     tipo = b.get("kind")
     if tipo not in AVISO_TIPOS:
-        raise ValueError("tipo de aviso inválido")
+        raise ValueError("invalid notice type")
     row = (_txt(b.get("id"), 60, True), _crew(b.get("author")), tipo, _txt(b.get("text"), 300, True),
            _num(b.get("lon"), -180, 180), _num(b.get("lat"), -90, 90), _num(b.get("radiusKm"), 0.05, 20) or 0.3,
            _txt(b.get("region"), 20) or "gale", _num(b.get("simMin"), 0, 1e7))
@@ -186,7 +186,7 @@ def list_avisos(region=None):
              "radiusKm": r["radio_km"], "region": r["region"], "simMin": r["sol_min"], "estado": r["estado"], "creado": r["creado"]} for r in rows]
 
 
-# ---------------------------------------------------------------- rutas multicriterio
+# ---------------------------------------------------------------- multi-criteria routes
 _planner = {}
 
 
@@ -209,13 +209,13 @@ def plan_route(b):
 
     stops = b.get("stops") or []
     if not (2 <= len(stops) <= 8):
-        raise ValueError("se necesitan entre 2 y 8 puntos")
+        raise ValueError("between 2 and 8 points are required")
 
     start = (float(stops[0][0]), float(stops[0][1]))
     targets = [(float(p[0]), float(p[1])) for p in stops[1:-1]]
     final_dest = (float(stops[-1][0]), float(stops[-1][1]))
 
-    requested_profile = b.get("profile", "segura")
+    requested_profile = b.get("profile", "safe")
     require_shelter = b.get("require_shelter", True)
 
     if requested_profile == "all":
@@ -226,7 +226,7 @@ def plan_route(b):
             shelters_catalog=shelters,
             require_final_shelter=require_shelter,
         )
-        first = alts.get("segura") or list(alts.values())[0]
+        first = alts.get("safe") or list(alts.values())[0]
         return {
             "alternatives": {k: v.to_dict() for k, v in alts.items()},
             "route": [[p[0], p[1]] for p in first.points],
@@ -263,7 +263,7 @@ SEC_HEADERS = {
 class Handler(BaseHTTPRequestHandler):
     server_version = "MarsRoute/1.0"
 
-    def log_message(self, fmt, *args):  # registro compacto
+    def log_message(self, fmt, *args):  # compact log
         sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
 
     def _send(self, code, body: bytes, ctype="application/json; charset=utf-8"):
@@ -291,8 +291,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if name == "health":
                     return self._json(200, {"status": "ok", "sqlite": DB_PATH.name, "docstore": "mongodb" if docs.mongo else "jsonl"})
-                if name == "objetivos":
-                    return self._json(200, [{k: v for k, v in d.items() if not k.startswith("_")} for d in docs.find("objetivos")])
+                if name == "targets":
+                    return self._json(200, [{k: v for k, v in d.items() if not k.startswith("_")} for d in docs.find("targets")])
                 crew = _crew(q.get("crew", "ev1"))
                 if name == "hallazgos":
                     rows = db.execute("SELECT * FROM hallazgo WHERE explorador = ? ORDER BY creado", (crew,)).fetchall()
@@ -330,7 +330,7 @@ class Handler(BaseHTTPRequestHandler):
                     c = q.get("c", "0")
                     ext = q.get("ext", "jpg")
                     if not re.match(r"^[A-Za-z0-9_-]+$", layer) or not (z.isdigit() and r.isdigit() and c.isdigit()) or ext not in ("jpg", "png"):
-                        return self._json(400, {"error": "parámetros de tesela inválidos"})
+                        return self._json(400, {"error": "invalid tile parameters"})
                     cache_dir = DATA / "cache_trek" / layer / z / r
                     cache_dir.mkdir(parents=True, exist_ok=True)
                     cache_file = cache_dir / f"{c}.{ext}"
@@ -347,19 +347,19 @@ class Handler(BaseHTTPRequestHandler):
                             ctype = resp.headers.get("Content-Type") or ("image/png" if ext == "png" else "image/jpeg")
                             return self._send(200, data, ctype)
                     except Exception as exc:
-                        return self._json(502, {"error": f"Fallo al obtener tesela de NASA Trek: {exc}"})
+                        return self._json(502, {"error": f"Failed to fetch tile from NASA Trek: {exc}"})
             except ValueError as exc:
                 return self._json(400, {"error": str(exc)})
-            return self._json(404, {"error": "ruta de API desconocida"})
-        # archivos estáticos (web/ o 3dView/ o mars-terreno-3d.html)
+            return self._json(404, {"error": "unknown API route"})
+        # static files (web/ or 3dView/ or mars-3d-terrain.html)
         rel = url.path.lstrip("/") or "index.html"
         target = (WEB / rel).resolve()
         if not (WEB.resolve() in target.parents and target.is_file()):
             alt_target = (ROOT / rel).resolve()
-            if (rel.startswith("3dView/") or rel == "mars-terreno-3d.html") and ROOT.resolve() in alt_target.parents and alt_target.is_file():
+            if (rel.startswith("3dView/") or rel == "mars-3d-terrain.html") and ROOT.resolve() in alt_target.parents and alt_target.is_file():
                 target = alt_target
             else:
-                return self._send(404, b"No encontrado", "text/plain; charset=utf-8")
+                return self._send(404, b"Not found", "text/plain; charset=utf-8")
         ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
             ctype += "; charset=utf-8"
@@ -369,13 +369,13 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > MAX_BODY:
-            return self._json(413, {"error": "cuerpo vacío o demasiado grande"})
+            return self._json(413, {"error": "empty or oversized body"})
         if "application/json" not in (self.headers.get("Content-Type") or ""):
-            return self._json(415, {"error": "se espera JSON"})
+            return self._json(415, {"error": "JSON expected"})
         try:
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
-                raise ValueError("se espera un objeto JSON")
+                raise ValueError("a JSON object is expected")
             name = url.path[5:] if url.path.startswith("/api/") else ""
             if name == "reportes":
                 rep = Report(
@@ -405,11 +405,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(201, {"ok": True})
             if name == "route":
                 return self._json(200, plan_route(body))
-            return self._json(404, {"error": "ruta de API desconocida"})
+            return self._json(404, {"error": "unknown API route"})
         except (ValueError, json.JSONDecodeError) as exc:
             return self._json(400, {"error": str(exc)})
         except FileNotFoundError:
-            return self._json(503, {"error": "faltan capas procesadas: ejecuta scripts/build_layers.py"})
+            return self._json(503, {"error": "processed layers are missing: run scripts/build_layers.py"})
 
 
 def main():
@@ -417,12 +417,12 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8000)
     a = ap.parse_args()
-    try:  # la consola de Windows usa cp1252 cuando la salida se redirige y el mensaje lleva "→"
+    try:  # the Windows console uses cp1252 when output is redirected and the message contains "→"
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
-    print(f"Ruta segura a Mount Sharp → http://{a.host}:{a.port}  (Ctrl+C para salir)")
+    print(f"Safe route to Mount Sharp → http://{a.host}:{a.port}  (Ctrl+C to exit)")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

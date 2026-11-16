@@ -1,12 +1,12 @@
 @echo off
 rem =========================================================
-rem GaleX — Planificador predictivo de recorridos en Marte
-rem Script de inicio rápido (Windows) — Web Offline-First
+rem GaleX — Predictive route planner for Mars
+rem Quick-start script (Windows) — Offline-First Web
 rem =========================================================
 
 echo =========================================================
-echo   GaleX — NASA Space Apps Challenge (Marte)
-echo   Iniciando servidor local y abriendo interfaz web...
+echo   GaleX — NASA Space Apps Challenge (Mars)
+echo   Starting local server and opening the web interface...
 echo =========================================================
 
 cd /d "%~dp0"
@@ -18,6 +18,6 @@ timeout /t 2 /nobreak >nul
 start http://127.0.0.1:8000/
 
 echo.
-echo Servidor activo en http://127.0.0.1:8000/
-echo Para detener el servidor, cierra esta ventana.
+echo Server running at http://127.0.0.1:8000/
+echo To stop the server, close this window.
 pause

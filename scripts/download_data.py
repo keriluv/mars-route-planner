@@ -269,7 +269,7 @@ def main() -> None:
         "mars_radius_m": MARS_RADIUS_M,
     }
     (RAW / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    print("Listo")
+    print("Done")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
-"""domain.py — Contratos de dominio unificados para GaleX.
+"""domain.py — Unified domain contracts for GaleX.
 
-Define las estructuras compartidas para regiones, observaciones meteorológicas,
-estaciones MDA, objetivos científicos, refugios, recursos del explorador,
-solicitudes y alternativas de ruta, alertas y reportes de misión.
+Defines the shared structures for regions, weather observations,
+MDA stations, scientific targets, shelters, explorer resources,
+route requests and alternatives, alerts and mission reports.
 """
 from __future__ import annotations
 
@@ -13,28 +13,28 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 class Provenance(str, enum.Enum):
-    """Nivel de procedencia de los datos según principio de honestidad científica."""
-    OBSERVADA = "OBSERVADA"  # Medida por instrumento real (REMS, MEDA, MOLA, etc.)
-    DERIVADA = "DERIVADA"    # Calculada a partir de observaciones (pendiente, rugosidad, etc.)
-    SIMULADA = "SIMULADA"    # Generada para la demostración (MDA hipotéticas, soporte vital)
+    """Provenance level of the data, following the principle of scientific honesty."""
+    OBSERVED = "OBSERVED"    # Measured by a real instrument (REMS, MEDA, MOLA, etc.)
+    DERIVED = "DERIVED"      # Computed from observations (slope, roughness, etc.)
+    SIMULATED = "SIMULATED"  # Generated for the demonstration (hypothetical MDAs, life support)
 
 
 class AlertLevel(str, enum.Enum):
-    """Severidad de una alerta ambiental u operativa."""
+    """Severity of an environmental or operational alert."""
     INFO = "INFO"
-    PRECAUCION = "PRECAUCIÓN"
-    CRITICA = "CRÍTICA"
+    CAUTION = "CAUTION"
+    CRITICAL = "CRITICAL"
 
 
 @dataclass
 class Region:
-    """Configuración y metadatos de una región marciana."""
-    id: str                                  # 'gale' o 'jezero'
-    name: str                                # Nombre legible (ej. 'Cráter Gale - Mount Sharp')
-    bbox: Tuple[float, float, float, float]  # [west, south, east, north] en grados
-    crs: str                                 # EPSG:104905 u otro CRS marciano
+    """Configuration and metadata of a Martian region."""
+    id: str                                  # 'gale' or 'jezero'
+    name: str                                # Human-readable name (e.g. 'Gale Crater - Mount Sharp')
+    bbox: Tuple[float, float, float, float]  # [west, south, east, north] in degrees
+    crs: str                                 # EPSG:104905 or another Martian CRS
     center: Tuple[float, float]              # [lon, lat]
-    resolution_m: float                      # Resolución nativa en metros/celda
+    resolution_m: float                      # Native resolution in meters/cell
     description: str = ""
     available_layers: List[str] = field(default_factory=list)
 
@@ -59,29 +59,29 @@ class Region:
 
 @dataclass
 class MDAObservation:
-    """Lectura individual o combinada de una estación meteorológica automática (MDA)."""
+    """Single or combined reading from an automatic weather station (MDA)."""
     station_id: str
     variable: str                            # 'air_temp', 'ground_temp', 'pressure', 'wind_speed', 'dust_tau', 'uv', 'radiation_rate'
     value: float
     unit: str                                # '°C', 'Pa', 'm/s', 'dimensionless', 'W/m²', 'µSv/h'
     sol: int
-    hour_ltst: float                         # Hora solar local verdadera (0.0 - 24.0)
-    source: Provenance = Provenance.SIMULADA
-    quality: float = 1.0                     # 0.0 a 1.0
+    hour_ltst: float                         # Local true solar time (0.0 - 24.0)
+    source: Provenance = Provenance.SIMULATED
+    quality: float = 1.0                     # 0.0 to 1.0
 
 
 @dataclass
 class MDAStation:
-    """Estación meteorológica automática distribuida en la retícula marciana."""
-    id: str                                  # ej. 'MDA-GALE-14'
+    """Automatic weather station placed on the Martian grid."""
+    id: str                                  # e.g. 'MDA-GALE-14'
     region_id: str
-    cell_rc: Tuple[int, int]                 # (fila, columna) en la retícula regional
+    cell_rc: Tuple[int, int]                 # (row, column) in the regional grid
     lon: float
     lat: float
-    status: str = "nominal"                  # 'nominal', 'alerta', 'sin_comunicacion'
+    status: str = "nominal"                  # 'nominal', 'alert', 'no_comms'
     last_update_sol_min: float = 0.0
     readings: Dict[str, float] = field(default_factory=dict)
-    provenance: Provenance = Provenance.SIMULADA
+    provenance: Provenance = Provenance.SIMULATED
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -91,16 +91,16 @@ class MDAStation:
 
 @dataclass
 class ScientificTarget:
-    """Objetivo o punto de interés científico para la recolección de muestras."""
+    """Scientific target or point of interest for sample collection."""
     id: str
     region_id: str
     name: str
-    type: str                                # 'mineral', 'espectral', 'roca', 'geologia'
+    type: str                                # 'mineral', 'spectral', 'rock', 'geology'
     lon: float
     lat: float
-    priority: int = 1                        # 1 (alta) a 5 (baja)
-    instrument: str = ""                     # ej. 'CRISM', 'CHEMCAM', 'PIXL', 'SHERLOC'
-    source: Provenance = Provenance.OBSERVADA
+    priority: int = 1                        # 1 (high) to 5 (low)
+    instrument: str = ""                     # e.g. 'CRISM', 'CHEMCAM', 'PIXL', 'SHERLOC'
+    source: Provenance = Provenance.OBSERVED
     description: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -111,7 +111,7 @@ class ScientificTarget:
 
 @dataclass
 class Shelter:
-    """Refugio o hábitat seguro donde el explorador puede reabastecerse o finalizar la EVA."""
+    """Shelter or safe habitat where the explorer can resupply or end the EVA."""
     id: str
     region_id: str
     name: str
@@ -121,7 +121,7 @@ class Shelter:
     oxygen_reserves_h: float = 48.0
     power_reserves_h: float = 72.0
     is_active: bool = True
-    provenance: Provenance = Provenance.SIMULADA
+    provenance: Provenance = Provenance.SIMULATED
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -131,25 +131,25 @@ class Shelter:
 
 @dataclass
 class ResourceState:
-    """Estado y presupuesto de consumibles del explorador durante una EVA."""
-    oxygen_pct: float = 100.0                # 0.0% a 100.0%
-    battery_pct: float = 100.0               # 0.0% a 100.0%
-    eva_time_min: float = 0.0                # Duración transcurrida
-    max_eva_time_min: float = 480.0          # 8 horas nominales
-    radiation_dose_msv: float = 0.0          # Dosis acumulada (límite demostrativo 5 mSv)
+    """State and budget of the explorer's consumables during an EVA."""
+    oxygen_pct: float = 100.0                # 0.0% to 100.0%
+    battery_pct: float = 100.0               # 0.0% to 100.0%
+    eva_time_min: float = 0.0                # Elapsed duration
+    max_eva_time_min: float = 480.0          # 8 nominal hours
+    radiation_dose_msv: float = 0.0          # Accumulated dose (demonstration limit 5 mSv)
     max_radiation_dose_msv: float = 5.0
-    reserve_to_next_shelter_pct: float = 25.0  # Margen de oxígeno reservado para alcanzar refugio
+    reserve_to_next_shelter_pct: float = 25.0  # Oxygen margin reserved to reach a shelter
 
     def is_safe(self) -> Tuple[bool, Optional[str]]:
-        """Comprueba si los consumibles están dentro de los límites de supervivencia."""
+        """Checks whether consumables are within survival limits."""
         if self.oxygen_pct <= 0.0:
-            return False, "Oxígeno agotado."
+            return False, "Oxygen depleted."
         if self.battery_pct <= 0.0:
-            return False, "Batería de soporte vital agotada."
+            return False, "Life-support battery depleted."
         if self.eva_time_min > self.max_eva_time_min:
-            return False, f"Tiempo EVA excedido ({self.eva_time_min:.0f}/{self.max_eva_time_min:.0f} min)."
+            return False, f"EVA time exceeded ({self.eva_time_min:.0f}/{self.max_eva_time_min:.0f} min)."
         if self.radiation_dose_msv > self.max_radiation_dose_msv:
-            return False, f"Dosis de radiación crítica excedida ({self.radiation_dose_msv:.2f} mSv)."
+            return False, f"Critical radiation dose exceeded ({self.radiation_dose_msv:.2f} mSv)."
         return True, None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -158,10 +158,10 @@ class ResourceState:
 
 @dataclass
 class Alert:
-    """Alerta explicable emitida ante degradación del terreno o del clima."""
+    """Explainable alert issued when terrain or weather degrades."""
     id: str
     level: AlertLevel
-    variable: str                            # 'pendiente', 'viento', 'polvo', 'oxigeno', 'radiacion', 'refugio'
+    variable: str                            # 'slope', 'wind', 'dust', 'oxygen', 'radiation', 'shelter'
     threshold: float
     observed_value: float
     message: str
@@ -179,8 +179,8 @@ class Alert:
 
 @dataclass
 class RouteProfile:
-    """Parámetros de ponderación y umbrales para un perfil de ruta."""
-    id: str                                  # 'segura', 'rapida', 'cientifica'
+    """Weighting parameters and thresholds for a route profile."""
+    id: str                                  # 'safe', 'fast', 'scientific'
     name: str
     risk_weight: float
     slope_weight: float
@@ -188,7 +188,7 @@ class RouteProfile:
     caution_slope_deg: float
     min_traversability: float = 0.0
     science_reward_weight: float = 0.0
-    speed_factor: float = 1.0                # Multiplicador sobre velocidad nominal
+    speed_factor: float = 1.0                # Multiplier on nominal speed
     description: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -197,18 +197,18 @@ class RouteProfile:
 
 @dataclass
 class RouteRequest:
-    """Solicitud de cálculo de ruta enviada al planificador."""
+    """Route computation request sent to the planner."""
     region_id: str
     start: Tuple[float, float]               # (lon, lat)
     targets: List[Tuple[float, float]] = field(default_factory=list)  # [(lon, lat), ...]
-    final_shelter: Optional[Tuple[float, float]] = None                # (lon, lat) Obligatorio para rutas válidas
-    profile_id: str = "segura"
+    final_shelter: Optional[Tuple[float, float]] = None                # (lon, lat) Required for valid routes
+    profile_id: str = "safe"
     user_overrides: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class RoutePoint:
-    """Punto a lo largo de una ruta calculada."""
+    """Point along a computed route."""
     lon: float
     lat: float
     km: float
@@ -220,7 +220,7 @@ class RoutePoint:
 
 @dataclass
 class RouteAlternative:
-    """Ruta generada bajo un perfil específico con sus métricas y recursos."""
+    """Route generated under a specific profile, with its metrics and resources."""
     profile_id: str
     profile_name: str
     points: List[List[float]]                # [[lon, lat, km, elev, slope, rough, trav], ...]
@@ -240,10 +240,10 @@ class RouteAlternative:
 
 @dataclass
 class Report:
-    """Reporte de bitácora o hallazgo geológico persistido en SQLite."""
+    """Logbook report or geological finding persisted in SQLite."""
     id: str
-    author: str                              # 'ev1', 'ev2', 'ev3', 'sistema', 'tierra'
-    type: str                                # 'hallazgo', 'mensaje', 'mision', 'alerta'
+    author: str                              # 'ev1', 'ev2', 'ev3', 'sistema', 'tierra' (stored wire values)
+    type: str                                # 'hallazgo' (finding), 'mensaje', 'mision', 'alerta' (stored wire values)
     lon: float
     lat: float
     elev_m: float = 0.0
@@ -251,7 +251,7 @@ class Report:
     km: float = 0.0
     text: str = ""
     attachments: Dict[str, Any] = field(default_factory=dict)
-    sync_status: str = "local"               # 'local', 'enviado', 'pendiente'
+    sync_status: str = "local"               # 'local', 'enviado' (sent), 'pendiente' (pending)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:

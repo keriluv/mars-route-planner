@@ -1,20 +1,20 @@
 /* =========================================================
-   minerals_data.js — Catálogo Científico de Minerales y Objetivos
-   Basado en datos de Curiosity (Cráter Gale) y Perseverance (Cráter Jezero)
-   Fuentes: NASA PDS, CheMin, CRISM, PIXL, SHERLOC, MAHLI, Mastcam
+   minerals_data.js — Scientific Catalog of Minerals and Targets
+   Based on data from Curiosity (Gale Crater) and Perseverance (Jezero Crater)
+   Sources: NASA PDS, CheMin, CRISM, PIXL, SHERLOC, MAHLI, Mastcam
    ========================================================= */
 (function () {
   "use strict";
 
   window.MARS_MINERALS = [
     // =======================================================
-    // CRÁTER GALE — Misión Curiosity (MSL)
+    // GALE CRATER — Curiosity Mission (MSL)
     // =======================================================
     {
       id: "min_gale_smectite",
       region: "gale",
-      name: "Arcillas de Glen Torridon (Esmectitas)",
-      category: "Arcillas / Filosilicatos",
+      name: "Glen Torridon Clays (Smectites)",
+      category: "Clays / Phyllosilicates",
       type: "mineral",
       formula: "(Na,Ca)₀.₃₃(Al,Mg)₂(Si₄O₁₀)(OH)₂·nH₂O",
       lon: 137.3820,
@@ -24,19 +24,19 @@
       rover: "Curiosity (MSL)",
       instrument: "CheMin XRD / SAM / Mastcam",
       camera: "MAHLI (Mars Hand Lens Imager)",
-      image_title: "Laminaciones de lutita rica en arcillas esmectitas en Glen Torridon (PIA23047)",
+      image_title: "Smectite clay-rich shale laminations in Glen Torridon (PIA23047)",
       image_url: "assets/minerals/min_smectite.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA23047/PIA23047~small.jpg",
       nasa_raw_url: "https://mars.nasa.gov/msl/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0&mission=msl",
-      summary: "Depósitos masivos de filosilicatos (arcillas) formados en aguas poco ácidas y habitables.",
-      geology: "La unidad portadora de arcilla en el valle de Glen Torridon representa un lago ancestral con condiciones neutras a ligeramente alcalinas, excelente potencial de preservación orgánica y alta retención de agua en red cristalina.",
-      spectral_signature: "Bandas de absorción en 1.4 µm, 1.9 µm y 2.2 µm características de enlaces Al-OH e hidratación intercapas detectadas por CRISM y confirmadas por difracción de rayos X (CheMin)."
+      summary: "Massive phyllosilicate (clay) deposits formed in mildly acidic, habitable waters.",
+      geology: "The clay-bearing unit in the Glen Torridon valley represents an ancient lake with neutral to slightly alkaline conditions, excellent organic preservation potential and high water retention in the crystal lattice.",
+      spectral_signature: "Absorption bands at 1.4 µm, 1.9 µm and 2.2 µm characteristic of Al-OH bonds and interlayer hydration, detected by CRISM and confirmed by X-ray diffraction (CheMin)."
     },
     {
       id: "min_gale_hematite",
       region: "gale",
-      name: "Hematita Cristalina de Vera Rubin",
-      category: "Óxidos de hierro",
+      name: "Vera Rubin Crystalline Hematite",
+      category: "Iron oxides",
       type: "mineral",
       formula: "α-Fe₂O₃",
       lon: 137.3685,
@@ -46,19 +46,19 @@
       rover: "Curiosity (MSL)",
       instrument: "ChemCam / CheMin / Mastcam",
       camera: "Mastcam & MAHLI",
-      image_title: "Afloramiento rocoso con hematita gris cristalina en Vera Rubin Ridge (PIA21851)",
+      image_title: "Rock outcrop with crystalline gray hematite on Vera Rubin Ridge (PIA21851)",
       image_url: "assets/minerals/min_hematite.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA21851/PIA21851~medium.jpg",
       nasa_raw_url: "https://mars.nasa.gov/msl/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0&mission=msl",
-      summary: "Cresta de hematita gris cristalina indicativa de fluidos subterráneos oxidantes.",
-      geology: "La cresta Vera Rubin Ridge destaca orbitalmente en CRISM por su fuerte absorción en 0.86 µm. In situ, Curiosity reveló laminaciones delgadas ricas en hematita precipitada por interacción de agua subterránea con rocas sedimentarias.",
-      spectral_signature: "Máximo de reflectancia cerca de 0.75 µm y fuerte caída hacia el ultravioleta e infrarrojo cercano típica de óxidos de hierro férrico bien cristalizados."
+      summary: "Ridge of crystalline gray hematite indicative of oxidizing subsurface fluids.",
+      geology: "Vera Rubin Ridge stands out from orbit in CRISM for its strong absorption at 0.86 µm. In situ, Curiosity revealed thin laminations rich in hematite precipitated by the interaction of groundwater with sedimentary rocks.",
+      spectral_signature: "Reflectance maximum near 0.75 µm and a sharp drop toward the ultraviolet and near infrared, typical of well-crystallized ferric iron oxides."
     },
     {
       id: "min_gale_sulfates",
       region: "gale",
-      name: "Sulfatos de Magnesio de Mount Sharp",
-      category: "Sulfatos hidratados",
+      name: "Mount Sharp Magnesium Sulfates",
+      category: "Hydrated sulfates",
       type: "mineral",
       formula: "MgSO₄·nH₂O (Starkeyita / Kieserita)",
       lon: 137.4210,
@@ -68,19 +68,19 @@
       rover: "Curiosity (MSL)",
       instrument: "CheMin XRD / ChemCam / Mastcam",
       camera: "Mastcam Telephoto & ChemCam RMI",
-      image_title: "Estratos cruzados de arenisca con cemento de sulfato de magnesio (PIA25415)",
+      image_title: "Cross-bedded sandstone with magnesium sulfate cement (PIA25415)",
       image_url: "assets/minerals/min_sulfates.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA25415/PIA25415~medium.jpg",
       nasa_raw_url: "https://mars.nasa.gov/msl/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0&mission=msl",
-      summary: "Transición paleoclimática marciana hacia condiciones áridas y evaporíticas.",
-      geology: "La unidad de sulfatos de Mount Sharp documenta el desecamiento progresivo de Marte hace 3.500 millones de años. Los sulfatos de magnesio y polihidratados se depositaron en lagunas hipersalinas efímeras con dunas eólicas entrelazadas.",
-      spectral_signature: "Fuertes absorciones en 1.4 µm, 1.9 µm y 2.4 µm en espectroscopía de reflectancia orbital CRISM."
+      summary: "Martian paleoclimatic transition toward arid, evaporitic conditions.",
+      geology: "The Mount Sharp sulfate unit documents the progressive drying of Mars 3.5 billion years ago. Magnesium and polyhydrated sulfates were deposited in ephemeral hypersaline lagoons with interbedded aeolian dunes.",
+      spectral_signature: "Strong absorptions at 1.4 µm, 1.9 µm and 2.4 µm in CRISM orbital reflectance spectroscopy."
     },
     {
       id: "min_gale_gypsum",
       region: "gale",
-      name: "Venas de Yeso en Yellowknife Bay",
-      category: "Sulfatos hidratados",
+      name: "Gypsum Veins in Yellowknife Bay",
+      category: "Hydrated sulfates",
       type: "mineral",
       formula: "CaSO₄·2H₂O (Yeso / Basanita)",
       lon: 137.4485,
@@ -90,19 +90,19 @@
       rover: "Curiosity (MSL)",
       instrument: "ChemCam LIBS / APXS / MAHLI",
       camera: "MAHLI (Mars Hand Lens Imager)",
-      image_title: "Venas blanquecinas de sulfato de calcio cortando la lutita de Sheepbed (PIA16615)",
+      image_title: "Whitish calcium sulfate veins cutting the Sheepbed mudstone (PIA16615)",
       image_url: "assets/minerals/min_gypsum.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA16615/PIA16615~medium.jpg",
       nasa_raw_url: "https://mars.nasa.gov/msl/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0&mission=msl",
-      summary: "Fracturas rellenas de sulfato cálcico hidratado por hidrotermalismo de baja temperatura.",
-      geology: "El análisis con el láser de ChemCam confirmó niveles altos de calcio y azufre sin magnesio, demostrando precipitación de agua pura a través de fracturas rocosas tras la sedimentación del lecho lacustre primitivo.",
-      spectral_signature: "Triplete característico de bandas de agua en 1.44, 1.49 y 1.53 µm y banda ancha en 1.9 µm."
+      summary: "Fractures filled with hydrated calcium sulfate by low-temperature hydrothermal activity.",
+      geology: "ChemCam laser analysis confirmed high levels of calcium and sulfur without magnesium, demonstrating precipitation of pure water through rock fractures after the sedimentation of the primitive lake bed.",
+      spectral_signature: "Characteristic triplet of water bands at 1.44, 1.49 and 1.53 µm and a broad band at 1.9 µm."
     },
     {
       id: "min_gale_basalt",
       region: "gale",
-      name: "Arenas Basálticas de Bagnold Dunes",
-      category: "Silicatos basálticos",
+      name: "Basaltic Sands of the Bagnold Dunes",
+      category: "Basaltic silicates",
       type: "mineral",
       formula: "(Mg,Fe)₂SiO₄ (Olivino) + Piroxenos",
       lon: 137.3590,
@@ -112,19 +112,19 @@
       rover: "Curiosity (MSL)",
       instrument: "CheMin / APXS / Mastcam",
       camera: "MAHLI Focus Merge & Mastcam",
-      image_title: "Granos de arena eólica no meteorizada en el campo de dunas Namib (PIA20316)",
+      image_title: "Unweathered aeolian sand grains in the Namib dune field (PIA20316)",
       image_url: "assets/minerals/min_basalt.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA20316/PIA20316~medium.jpg",
       nasa_raw_url: "https://mars.nasa.gov/msl/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0&mission=msl",
-      summary: "Dunas activas con arenas oscuras ricas en olivino y piroxeno sin alteración acuosa.",
-      geology: "Las arenas móviles del campo de dunas de Bagnold son el primer campo de dunas extraterrestre activo investigado in situ. Presentan granos bien clasificados de composición ígnea primaria con bajo contenido de arcilla.",
-      spectral_signature: "Banda ancha y profunda centrada en 1.0 µm asociada a Fe²⁺ en la estructura de olivinos forsteríticos y piroxenos pigeoníticos."
+      summary: "Active dunes with dark sands rich in olivine and pyroxene without aqueous alteration.",
+      geology: "The mobile sands of the Bagnold dune field are the first active extraterrestrial dune field investigated in situ. They show well-sorted grains of primary igneous composition with low clay content.",
+      spectral_signature: "Broad, deep band centered at 1.0 µm associated with Fe²⁺ in the structure of forsteritic olivines and pigeonitic pyroxenes."
     },
     {
       id: "min_gale_jarosite",
       region: "gale",
-      name: "Jarosita y Sulfatos Férricos en Pahrump",
-      category: "Sulfatos hidratados",
+      name: "Jarosite and Ferric Sulfates at Pahrump",
+      category: "Hydrated sulfates",
       type: "mineral",
       formula: "KFe³⁺₃(SO₄)₂(OH)₆",
       lon: 137.3620,
@@ -134,23 +134,23 @@
       rover: "Curiosity (MSL)",
       instrument: "CheMin XRD / SAM / ChemCam",
       camera: "MAHLI & Mastcam",
-      image_title: "Nódulos diagenéticos y laminaciones de jarosita en Pahrump Hills (PIA19039)",
+      image_title: "Diagenetic nodules and jarosite laminations in Pahrump Hills (PIA19039)",
       image_url: "assets/minerals/min_jarosite.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA19039/PIA19039~medium.jpg",
       nasa_raw_url: "https://mars.nasa.gov/msl/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0&mission=msl",
-      summary: "Mineral sulfato de potasio y hierro formado en aguas ácidas superficiales.",
-      geology: "La jarosita indica episodios de acidez localizada y condiciones oxidantes durante las etapas finales de interacción agua-roca en la base de Mount Sharp.",
-      spectral_signature: "Rasgo estrecho de absorción en 2.26 µm atribuido al sobretono Fe-OH y banda de sulfato en 1.85 µm."
+      summary: "Potassium iron sulfate mineral formed in acidic surface waters.",
+      geology: "Jarosite indicates episodes of localized acidity and oxidizing conditions during the final stages of water-rock interaction at the base of Mount Sharp.",
+      spectral_signature: "Narrow absorption feature at 2.26 µm attributed to the Fe-OH overtone and a sulfate band at 1.85 µm."
     },
 
     // =======================================================
-    // CRÁTER JEZERO — Misión Perseverance (Mars 2020)
+    // JEZERO CRATER — Perseverance Mission (Mars 2020)
     // =======================================================
     {
       id: "min_jez_carbonate",
       region: "jezero",
-      name: "Carbonatos de Magnesio del Delta de Jezero",
-      category: "Carbonatos / Olivino",
+      name: "Jezero Delta Magnesium Carbonates",
+      category: "Carbonates / Olivine",
       type: "mineral",
       formula: "MgCO₃ (Magnesita) + FeCO₃",
       lon: 77.3820,
@@ -160,19 +160,19 @@
       rover: "Perseverance (Mars 2020)",
       instrument: "PIXL / SHERLOC / SuperCam",
       camera: "WATSON (Wide Angle Topographic Sensor for Operations and eNgineering)",
-      image_title: "Microtextura con inclusiones de carbonato en el Delta Front (PIA24926)",
+      image_title: "Microtexture with carbonate inclusions in the Delta Front (PIA24926)",
       image_url: "assets/minerals/min_carbonate.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA24926/PIA24926~medium.jpg",
       nasa_raw_url: "https://mars.nasa.gov/mars2020/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0",
-      summary: "Carbonatos sedimentarios con capacidad excepcional para atrapar y preservar biofirmas fósiles.",
-      geology: "Los carbonatos de Jezero se formaron en las orillas someras y el abanico fluvial del lago antiguo. Tienen alta prioridad para la recolección de muestras (Mars Sample Return) debido a que en la Tierra preservan estromatolitos y microfósiles.",
-      spectral_signature: "Bandas de vibración de carbonato prominentes en 2.3 µm y 2.5 µm identificadas inicialmente por CRISM orbital y verificadas por Raman SHERLOC."
+      summary: "Sedimentary carbonates with exceptional capacity to trap and preserve fossil biosignatures.",
+      geology: "The Jezero carbonates formed on the shallow shores and the fluvial fan of the ancient lake. They are a high priority for sample collection (Mars Sample Return) because on Earth they preserve stromatolites and microfossils.",
+      spectral_signature: "Prominent carbonate vibration bands at 2.3 µm and 2.5 µm, first identified by orbital CRISM and verified by SHERLOC Raman."
     },
     {
       id: "min_jez_olivine",
       region: "jezero",
-      name: "Olivino y Piroxeno de Séítah",
-      category: "Carbonatos / Olivino",
+      name: "Séítah Olivine and Pyroxene",
+      category: "Carbonates / Olivine",
       type: "mineral",
       formula: "(Mg₀.₈Fe₀.₂)₂SiO₄",
       lon: 77.4190,
@@ -182,21 +182,21 @@
       rover: "Perseverance (Mars 2020)",
       instrument: "PIXL / SuperCam / Mastcam-Z",
       camera: "WATSON & Mastcam-Z 110mm",
-      image_title: "Roca ígnea máfica con cristales acumulados de olivino en South Séítah (PIA25024)",
+      image_title: "Mafic igneous rock with accumulated olivine crystals in South Séítah (PIA25024)",
       image_url: "assets/minerals/min_olivine.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA25024/PIA25024~medium.jpg",
       nasa_raw_url: "https://mars.nasa.gov/mars2020/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0",
-      summary: "Cuerpo ígneo intrusivo o flujo lávico grueso enriquecido en olivino primitivo.",
-      geology: "La formación Séítah representa rocas ígneas de grano grueso que sufrieron una posterior carbonatación por aguas ricas en CO₂.",
-      spectral_signature: "Absorción muy ancha alrededor de 1.05 µm en espectros de reflectancia visible e infrarrojo cercano."
+      summary: "Intrusive igneous body or thick lava flow enriched in primitive olivine.",
+      geology: "The Séítah formation represents coarse-grained igneous rocks that later underwent carbonation by CO₂-rich waters.",
+      spectral_signature: "Very broad absorption around 1.05 µm in visible and near-infrared reflectance spectra."
     },
     {
       id: "min_jez_silica",
       region: "jezero",
-      name: "Sílice Hidratada del Abanico Deltaico",
-      category: "Minerales hidratados",
+      name: "Delta Fan Hydrated Silica",
+      category: "Hydrated minerals",
       type: "mineral",
-      formula: "SiO₂·nH₂O (Ópalo / Calcedonia)",
+      formula: "SiO₂·nH₂O (Opal / Chalcedony)",
       lon: 77.3690,
       lat: 18.4680,
       elev_m: -2480,
@@ -204,13 +204,13 @@
       rover: "Perseverance (Mars 2020)",
       instrument: "SHERLOC / PIXL / Mastcam-Z",
       camera: "WATSON & SuperCam RMI",
-      image_title: "Capas ricas en sílice hidratada y sulfato en Wildcat Ridge (PIA25246)",
+      image_title: "Layers rich in hydrated silica and sulfate at Wildcat Ridge (PIA25246)",
       image_url: "assets/minerals/min_silica.jpg",
       fallback_url: "https://images-assets.nasa.gov/image/PIA25246/PIA25246~small.jpg",
       nasa_raw_url: "https://mars.nasa.gov/mars2020/multimedia/raw-images/?order=sol+desc%2Cinstrument_sort+asc&sample_type_sort=asc&date_taken=desc&per_page=50&page=0",
-      summary: "Lutitas de sílice hidratada con concentración de compuestos orgánicos aromáticos.",
-      geology: "El análisis por fluorescencia de rayos X (PIXL) y espectroscopía UV Raman (SHERLOC) en la muestra 'Wildcat Ridge' demostró la coexistencia de sílice amorfa hidratada con compuestos aromáticos policíclicos.",
-      spectral_signature: "Hombro en 1.4 µm, absorción prominente en 1.9 µm y banda ancha de enlace Si-OH en 2.21 µm."
+      summary: "Hydrated silica shales with a concentration of aromatic organic compounds.",
+      geology: "X-ray fluorescence (PIXL) and UV Raman spectroscopy (SHERLOC) analysis of the 'Wildcat Ridge' sample demonstrated the coexistence of hydrated amorphous silica with polycyclic aromatic compounds.",
+      spectral_signature: "Shoulder at 1.4 µm, prominent absorption at 1.9 µm and a broad Si-OH bond band at 2.21 µm."
     }
   ];
 

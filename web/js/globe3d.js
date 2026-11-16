@@ -1,8 +1,8 @@
 /* =========================================================
-   globe3d.js — Visor planetario 3D global de Marte con Three.js
-   Integración multi-capa NASA Mars Trek (MOLA, HRSC, TES, Viking),
-   compositing en tiempo real sobre mallas DEM locales (Terrarium PNG),
-   control de opacidad por capa, navegación cinemática y diseño responsive.
+   globe3d.js — Global 3D planetary viewer of Mars with Three.js
+   Multi-layer integration of NASA Mars Trek (MOLA, HRSC, TES, Viking),
+   real-time compositing over local DEM meshes (Terrarium PNG),
+   per-layer opacity control, cinematic navigation and responsive design.
    ========================================================= */
 (function () {
   "use strict";
@@ -12,9 +12,9 @@
 
   const BASE_URL = "https://trek.nasa.gov/tiles/Mars/EQ";
   const LOCAL_DEM_PATH = "3dView/dem_tiles";
-  const SEGS = 48;                 // Resolución de malla por tesela (equilibrio velocidad/detalle)
-  const RADIUS = 3;                // Radio de teselas visibles alrededor del centro (7x7)
-  const M_PER_DEG = 59200;         // Metros por grado aproximado en Marte
+  const SEGS = 48;                 // Mesh resolution per tile (speed/detail trade-off)
+  const RADIUS = 3;                // Radius of visible tiles around the center (7x7)
+  const M_PER_DEG = 59200;         // Approximate meters per degree on Mars
   const $ = id => document.getElementById(id);
 
   let host, renderer, scene, camera, controls;
@@ -22,14 +22,14 @@
   let lastKey = "";
   let currentZ = 0;
   let currentNeeded = new Set();
-  const tiles = new Map();         // clave -> { mesh, z, canvas, ctx, demImg, terr }
+  const tiles = new Map();         // key -> { mesh, z, canvas, ctx, demImg, terr }
   const pending = new Set();
   const imageCache = new Map();    // url -> HTMLImageElement
   let fly = null;
   let raycaster, mouse;
   const beacons = [];
 
-  // Grupos 3D para puntos de control, minerales y rutas
+  // 3D groups for control points, minerals and routes
   let pinsGroup = null, routeGroup = null, roverGroup = null;
   let activeRouteMesh = null, doneRouteMesh = null, secRouteMeshes = [];
   let roverMesh = null, roverBeam = null;
@@ -37,27 +37,27 @@
   const pins = [];
 
   const PIN_COLORS = {
-    meta: 0xfc3d21,
+    goal: 0xfc3d21,
     base: 0x1e64dc,
-    refugio: 0x10b981,
+    shelter: 0x10b981,
     mineral: 0x2f7fb8,
-    espectral: 0x2f7fb8,
-    ciencia: 0xb5651d,
-    referencia: 0xc0c8d4,
+    spectral: 0x2f7fb8,
+    science: 0xb5651d,
+    reference: 0xc0c8d4,
     hallazgo: 0x46c882,
     secundaria: 0xa68bff,
     propuesta: 0xa68bff
   };
 
   const MINERAL_COLORS = {
-    "Carbonatos / Olivino": 0x00d26a,
-    "Arcillas / Filosilicatos": 0x00c8e0,
-    "Sulfatos hidratados": 0x4da6ff,
-    "Óxidos de hierro": 0xff7043,
-    "Silicatos basálticos": 0x90a4ae
+    "Carbonates / Olivine": 0x00d26a,
+    "Clays / Phyllosilicates": 0x00c8e0,
+    "Hydrated sulfates": 0x4da6ff,
+    "Iron oxides": 0xff7043,
+    "Basaltic silicates": 0x90a4ae
   };
 
-  // Catálogo oficial de capas NASA Mars Trek
+  // Official catalog of NASA Mars Trek layers
   const TREK_LAYERS = [
     {
       id: "Mars_MOLA_blend200ppx_HRSC_ClrShade_clon0dd_200mpp_lzw",
@@ -67,8 +67,8 @@
       instrument: "MGS MOLA (NASA) + Mars Express HRSC (ESA)",
       resolution: "200 m/px",
       ext: "jpg",
-      desc: "Modelo de elevación digital coloreado hipsométricamente con sombreado de relieve combinado de altimetría láser MOLA y la cámara estéreo de alta resolución HRSC.",
-      legendText: "Rango hipsométrico: -8,200 m (azul/violeta) a +21,200 m (blanco/rojo)",
+      desc: "Hypsometrically colored digital elevation model with combined relief shading from MOLA laser altimetry and the HRSC high-resolution stereo camera.",
+      legendText: "Hypsometric range: -8,200 m (blue/violet) to +21,200 m (white/red)",
       thumb: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MOLA_blend200ppx_HRSC_ClrShade_clon0dd_200mpp_lzw/1.0.0/default/default028mm/0/0/0.jpg",
       visible: true,
       opacity: 1.0,
@@ -77,13 +77,13 @@
     {
       id: "Mars_MOLA_blend200ppx_HRSC_Shade_clon0dd_200mpp_lzw",
       name: "MGS MOLA and Mars Express HRSC, Hillshade Blend",
-      shortName: "MOLA/HRSC Relieve",
+      shortName: "MOLA/HRSC Relief",
       category: "base",
       instrument: "MGS MOLA (NASA) + Mars Express HRSC (ESA)",
       resolution: "200 m/px",
       ext: "jpg",
-      desc: "Relieve sombreado pancromático (escala de grises) de alta definición morfológica, ideal para análisis estructural y visualización tectónica de fallas y cráteres.",
-      legendText: "Sombreado morfológico unidireccional con acentuación de pendientes",
+      desc: "Panchromatic (grayscale) hillshade of high morphological definition, ideal for structural analysis and tectonic visualization of faults and craters.",
+      legendText: "Unidirectional morphological shading with slope accentuation",
       thumb: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MOLA_blend200ppx_HRSC_Shade_clon0dd_200mpp_lzw/1.0.0/default/default028mm/0/0/0.jpg",
       visible: false,
       opacity: 1.0,
@@ -92,13 +92,13 @@
     {
       id: "Mars_Viking_MDIM21_ClrMosaic_global_232m",
       name: "Viking Orbiter, Color Mosaic MDIM 2.1",
-      shortName: "Viking Color Real",
+      shortName: "Viking True Color",
       category: "base",
       instrument: "Viking 1 & 2 Orbiter Visual Imaging System (VIS)",
       resolution: "232 m/px",
       ext: "jpg",
-      desc: "Mosaico óptico fotográfico global en color real calibrado y balanceado espectralmente por el USGS a partir de miles de imágenes de los orbitadores Viking.",
-      legendText: "Reflectancia óptica espectral del albedo superficial",
+      desc: "Global photographic optical mosaic in true color, calibrated and spectrally balanced by the USGS from thousands of images from the Viking orbiters.",
+      legendText: "Spectral optical reflectance of the surface albedo",
       thumb: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/0/0/0.jpg",
       visible: false,
       opacity: 1.0,
@@ -107,13 +107,13 @@
     {
       id: "TES_Thermal_Inertia",
       name: "MGS TES, Global Thermal Inertia",
-      shortName: "Inercia Térmica (TES)",
+      shortName: "Thermal Inertia (TES)",
       category: "overlay",
       instrument: "Mars Global Surveyor — Thermal Emission Spectrometer (TES)",
       resolution: "Global (3 km/px)",
       ext: "png",
-      desc: "Mide la resistencia del suelo al cambio térmico diario. Valores bajos (azul/verde) revelan manto de polvo fino y dunas eólicas; valores altos (rojo/magenta) corresponden a roca madre consolidada o duricrust.",
-      legendText: "Baja (polvo fino < 100 J m⁻² K⁻¹ s⁻½) → Alta (lecho rocoso > 600 J m⁻² K⁻¹ s⁻½)",
+      desc: "Measures the resistance of the ground to daily thermal change. Low values (blue/green) reveal fine dust mantle and aeolian dunes; high values (red/magenta) correspond to consolidated bedrock or duricrust.",
+      legendText: "Low (fine dust < 100 J m⁻² K⁻¹ s⁻½) → High (bedrock > 600 J m⁻² K⁻¹ s⁻½)",
       thumb: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Thermal_Inertia/1.0.0/default/default028mm/0/0/0.png",
       visible: false,
       opacity: 0.75,
@@ -122,13 +122,13 @@
     {
       id: "TES_Plagioclase",
       name: "MGS TES, Global Plagioclase Abundance",
-      shortName: "Plagioclasa Mineral (TES)",
+      shortName: "Plagioclase Mineral (TES)",
       category: "overlay",
       instrument: "Mars Global Surveyor — Thermal Emission Spectrometer (TES)",
       resolution: "Global (3 km/px)",
       ext: "png",
-      desc: "Abundancia espectral volumétrica del mineral plagioclasa (feldespato alumínico-silicatado). Mineral primordial de la corteza ígnea primitiva de Marte y de sus basaltos volcánicos.",
-      legendText: "0% Abundancia (azul oscuro) → 35%+ Abundancia (amarillo/rojo)",
+      desc: "Volumetric spectral abundance of the mineral plagioclase (aluminum silicate feldspar). A primordial mineral of Mars's early igneous crust and its volcanic basalts.",
+      legendText: "0% Abundance (dark blue) → 35%+ Abundance (yellow/red)",
       thumb: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Plagioclase/1.0.0/default/default028mm/0/0/0.png",
       visible: false,
       opacity: 0.75,
@@ -147,15 +147,15 @@
   };
 
   const LOCATIONS = [
-    { id: "gale", name: "Cráter Gale", sub: "Curiosity Rover (Bradbury Landing)", lon: 137.4, lat: -4.6, elev: -4500, hCam: 4.5, color: 0x00e5ff },
-    { id: "jezero", name: "Cráter Jezero", sub: "Perseverance Rover (Octavia E. Butler)", lon: 77.45, lat: 18.38, elev: -2500, hCam: 4.5, color: 0xff3b30 },
-    { id: "olympus", name: "Olympus Mons", sub: "Volcán más alto del Sistema Solar (+21.2 km)", lon: -133.8, lat: 18.65, elev: 21200, hCam: 14, color: 0xffa000 },
-    { id: "valles", name: "Valles Marineris", sub: "Gran Cañón Marciano (4,000 km)", lon: -59.0, lat: -14.0, elev: -3000, hCam: 22, color: 0x4caf50 },
-    { id: "hellas", name: "Hellas Planitia", sub: "Mayor cuenca de impacto de Marte (-8.2 km)", lon: 70.0, lat: -42.0, elev: -8200, hCam: 16, color: 0xab47bc },
-    { id: "global", name: "Vista Global", sub: "Órbita Planetaria Completa", lon: 0.0, lat: 0.0, elev: 0, hCam: 120, color: 0xffffff }
+    { id: "gale", name: "Gale Crater", sub: "Curiosity Rover (Bradbury Landing)", lon: 137.4, lat: -4.6, elev: -4500, hCam: 4.5, color: 0x00e5ff },
+    { id: "jezero", name: "Jezero Crater", sub: "Perseverance Rover (Octavia E. Butler)", lon: 77.45, lat: 18.38, elev: -2500, hCam: 4.5, color: 0xff3b30 },
+    { id: "olympus", name: "Olympus Mons", sub: "Highest volcano in the Solar System (+21.2 km)", lon: -133.8, lat: 18.65, elev: 21200, hCam: 14, color: 0xffa000 },
+    { id: "valles", name: "Valles Marineris", sub: "Martian Grand Canyon (4,000 km)", lon: -59.0, lat: -14.0, elev: -3000, hCam: 22, color: 0x4caf50 },
+    { id: "hellas", name: "Hellas Planitia", sub: "Largest impact basin on Mars (-8.2 km)", lon: 70.0, lat: -42.0, elev: -8200, hCam: 16, color: 0xab47bc },
+    { id: "global", name: "Global View", sub: "Full Planetary Orbit", lon: 0.0, lat: 0.0, elev: 0, hCam: 120, color: 0xffffff }
   ];
 
-  /* ---------- Inicialización ---------- */
+  /* ---------- Initialization ---------- */
   G3.init = function () {
     if (G3.ready || !window.THREE) return !!window.THREE;
     host = $("mapGlobe");
@@ -177,13 +177,13 @@
     camera = new THREE.PerspectiveCamera(45, (host.clientWidth || window.innerWidth) / (host.clientHeight || window.innerHeight), 0.001, 2500);
     camera.position.set(137.4, 4.5, 7.75);
 
-    // Iluminación solar marciana
+    // Martian solar lighting
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const sun = new THREE.DirectionalLight(0xfff2e6, 1.2);
     sun.position.set(-1.2, 1.8, 0.7);
     scene.add(sun);
 
-    // Controles tipo mapa optimizados para interacción táctil y ratón
+    // Map-style controls optimized for touch and mouse interaction
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -220,29 +220,29 @@
     return true;
   };
 
-  /* ---------- Gestión de Teselas y Capas ---------- */
+  /* ---------- Tile and Layer Management ---------- */
   const tilesX = z => 2 ** (z + 1);
   const tilesY = z => 2 ** z;
   const tileDeg = z => 180 / 2 ** z;
 
   function getTileUrl(layerId, z, r, c, ext) {
-    // Intenta primero mediante el proxy local con almacenamiento en caché permanente
+    // First try through the local proxy with permanent caching
     return `/api/proxy/trek?layer=${encodeURIComponent(layerId)}&z=${z}&r=${r}&c=${c}&ext=${ext}`;
   }
 
-  // Por file:// (doble clic) no hay proxy local ni archivos de teselas legibles (CORS): se evita intentarlos y se
-  // pide cada tesela directo a NASA Trek; si no hay internet, queda el relieve procedural de contingencia.
+  // Over file:// (double click) there is no local proxy or readable tile files (CORS): attempting them is avoided and
+  // each tile is requested directly from NASA Trek; if there is no internet, the procedural fallback relief remains.
   const SIN_SERVIDOR = location.protocol === "file:";
   function loadImageCached(url) {
     if (imageCache.has(url)) return Promise.resolve(imageCache.get(url));
     if (SIN_SERVIDOR) {
-      // Sin servidor no existen ni el proxy ni los archivos locales: se salta directo a NASA Trek (si hay internet).
+      // Without a server neither the proxy nor the local files exist: it jumps straight to NASA Trek (if there is internet).
       const m = /^\/api\/proxy\/trek\?layer=([^&]+)&z=(\d+)&r=(\d+)&c=(\d+)&ext=(\w+)/.exec(url);
-      if (!m) return Promise.reject(new Error("sin servidor: archivo local no disponible"));
+      if (!m) return Promise.reject(new Error("no server: local file not available"));
       return new Promise((resolve, reject) => {
         const img = new Image(); img.crossOrigin = "anonymous";
         img.onload = () => { imageCache.set(url, img); resolve(img); };
-        img.onerror = () => reject(new Error("Error cargando tesela: " + url));
+        img.onerror = () => reject(new Error("Error loading tile: " + url));
         img.src = `${BASE_URL}/${decodeURIComponent(m[1])}/1.0.0/default/default028mm/${m[2]}/${m[3]}/${m[4]}.${m[5]}`;
       });
     }
@@ -254,7 +254,7 @@
         resolve(img);
       };
       img.onerror = () => {
-        // Fallback directo a NASA Trek si el proxy falla
+        // Direct fallback to NASA Trek if the proxy fails
         if (url.startsWith("/api/proxy/trek")) {
           const u = new URL(url, window.location.origin);
           const layer = u.searchParams.get("layer");
@@ -269,17 +269,17 @@
             imageCache.set(url, fallbackImg);
             resolve(fallbackImg);
           };
-          fallbackImg.onerror = () => reject(new Error("Error cargando tesela: " + url));
+          fallbackImg.onerror = () => reject(new Error("Error loading tile: " + url));
           fallbackImg.src = remoteUrl;
           return;
         }
-        reject(new Error("Error cargando: " + url));
+        reject(new Error("Error loading: " + url));
       };
       img.src = url;
     });
   }
 
-  // FBM procedimental para contingencia
+  // Procedural FBM for fallback
   function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
   function vnoise(x, y) {
     const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
@@ -313,7 +313,7 @@
     const td = tileDeg(z);
     const lon0 = -180 + c * td, lat1 = 90 - r * td;
 
-    // 1. Cargar DEM (primero local en 3dView/dem_tiles, luego remoto si no está)
+    // 1. Load DEM (first local in 3dView/dem_tiles, then remote if not present)
     const loadDem = async () => {
       if (cfg.local) {
         try { return { img: await loadImageCached(`${cfg.local}/${z}/${r}/${c}.png`), terr: true }; } catch (e) {}
@@ -324,7 +324,7 @@
       return null;
     };
 
-    // 2. Determinar capa base activa y capas de superposición activas
+    // 2. Determine the active base layer and active overlay layers
     const baseLayerDef = TREK_LAYERS.find(l => l.id === cfg.activeBase) || TREK_LAYERS[0];
     const activeOverlays = TREK_LAYERS.filter(l => !l.isBase && l.visible && l.opacity > 0);
 
@@ -348,7 +348,7 @@
       } catch (e) { pix = null; }
     }
 
-    // 3. Crear geometría 3D a partir de la altimetría
+    // 3. Create 3D geometry from the altimetry
     const n = SEGS + 1;
     const pos = new Float32Array(n * n * 3);
     const uvs = new Float32Array(n * n * 2);
@@ -400,7 +400,7 @@
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     geo.setIndex(idx);
 
-    // 4. Compositing en Canvas 2D (Capas apiladas con opacidad)
+    // 4. Compositing in Canvas 2D (stacked layers with opacity)
     const cv = document.createElement("canvas");
     cv.width = 256; cv.height = 256;
     const ctx = cv.getContext("2d");
@@ -489,12 +489,12 @@
     const cc = Math.floor((lon + 180) / td), cr = Math.floor((90 - lat) / td);
     currentNeeded = new Set();
 
-    // Nivel base z=0 para horizonte planetario
+    // Base level z=0 for the planetary horizon
     for (let c = 0; c < tilesX(0); c++) {
       currentNeeded.add(`0/0/${c}`);
       ensure(0, 0, c);
     }
-    // Teselas en la región focal actual
+    // Tiles in the current focal region
     for (let dr = -RADIUS; dr <= RADIUS; dr++) {
       for (let dc = -RADIUS; dc <= RADIUS; dc++) {
         const r = cr + dr, c = cc + dc;
@@ -516,7 +516,7 @@
     }
   }
 
-  /* ---------- Coordenadas y Elevación en el Planeta ---------- */
+  /* ---------- Coordinates and Elevation on the Planet ---------- */
   function getElev(lon, lat, fallback = 0) {
     if (window.MR && typeof window.MR.sample === "function") {
       try {
@@ -551,28 +551,28 @@
     G3.flyTo(lon, lat, 2.5);
   };
 
-  /* ---------- Balizas y Marcadores Planetarios ---------- */
+  /* ---------- Beacons and Planetary Markers ---------- */
   function createBeacons() {
     LOCATIONS.forEach(loc => {
       const group = new THREE.Group();
       const k = cfg.exag / M_PER_DEG;
       const yBase = loc.elev * k;
 
-      // Anillo de pulso en la base
+      // Pulse ring at the base
       const ringGeo = new THREE.RingGeometry(0.2, 0.45, 24);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({ color: loc.color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       group.add(ring);
 
-      // Haz cilíndrico luminoso
+      // Luminous cylindrical beam
       const beamGeo = new THREE.CylinderGeometry(0.04, 0.08, 1.6, 12);
       beamGeo.translate(0, 0.8, 0);
       const beamMat = new THREE.MeshBasicMaterial({ color: loc.color, transparent: true, opacity: 0.75 });
       const beam = new THREE.Mesh(beamGeo, beamMat);
       group.add(beam);
 
-      // Prisma octaédrico flotante
+      // Floating octahedral prism
       const octaGeo = new THREE.OctahedronGeometry(0.35, 0);
       octaGeo.translate(0, 1.8, 0);
       const octaMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -586,7 +586,7 @@
     });
   }
 
-  /* ---------- Puntos de Control y Minerales 3D ---------- */
+  /* ---------- 3D Control Points and Minerals ---------- */
   G3.updatePins = function (list) {
     if (!pinsGroup) return;
     while (pinsGroup.children.length > 0) {
@@ -616,7 +616,7 @@
         c = MINERAL_COLORS[cat] || 0x00d26a;
       }
 
-      // Anillo de brillo en la base sobre el terreno
+      // Glow ring at the base over the terrain
       const ringGeo = new THREE.RingGeometry(0.12, 0.32, 16);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
@@ -624,7 +624,7 @@
       ring.position.y = 0.01;
       g.add(ring);
 
-      // Mástil vertical luminoso
+      // Luminous vertical mast
       const stemGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.9, 8);
       stemGeo.translate(0, 0.45, 0);
       const stemMat = new THREE.MeshBasicMaterial({ color: c });
@@ -650,10 +650,10 @@
         };
       } else {
         let headGeo;
-        if (m.type === "meta") {
+        if (m.type === "goal") {
           headGeo = new THREE.ConeGeometry(0.22, 0.45, 6);
           headGeo.translate(0, 1.05, 0);
-        } else if (m.type === "refugio") {
+        } else if (m.type === "shelter") {
           headGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.35, 6);
           headGeo.translate(0, 1.0, 0);
         } else if (m.type === "base") {
@@ -682,7 +682,7 @@
     });
   };
 
-  /* ---------- Rutas en Tubo 3D y Rover ---------- */
+  /* ---------- 3D Tube Routes and Rover ---------- */
   function buildGlobeTube(pts, color, radius, opacity = 1) {
     if (!pts || pts.length < 2) return null;
     const maxPts = 350;
@@ -856,12 +856,12 @@
           window.MR.showTip(`<b>${u.loc.name}</b><br><span style="color:${hexCol};font-size:11px;">${u.loc.sub}</span>`, e.clientX, e.clientY);
         } else if (u.isMineral) {
           const min = u.mineral || {};
-          const cat = min.category || "Depósito Mineral";
+          const cat = min.category || "Mineral Deposit";
           const catCol = MINERAL_COLORS[cat] ? ('#' + MINERAL_COLORS[cat].toString(16).padStart(6, '0')) : "#00d26a";
           window.MR.showTip(`<b>${min.name || u.label}</b><br><span style="color:${catCol};font-size:11px;font-weight:600;">${cat}</span>${min.formula ? `<br><i style="font-size:11px;opacity:0.85;">${min.formula}</i>` : ''}`, e.clientX, e.clientY);
         } else if (u.target) {
           const t = u.target;
-          const typeName = t.type ? (t.type.charAt(0).toUpperCase() + t.type.slice(1)) : 'Punto de Control';
+          const typeName = t.type ? (t.type.charAt(0).toUpperCase() + t.type.slice(1)) : 'Control Point';
           const pCol = PIN_COLORS[t.type] ? ('#' + PIN_COLORS[t.type].toString(16).padStart(6, '0')) : "var(--accent)";
           window.MR.showTip(`<b>${t.label || t.name || 'Punto de Control'}</b><br><span style="color:${pCol};font-size:11px;font-weight:600;">${typeName}</span>`, e.clientX, e.clientY);
         }
@@ -879,25 +879,25 @@
     if (loc.id === "gale" || loc.id === "jezero") {
       extraActions = `
         <div class="card-btn-grp">
-          <button class="btn btn-primary" id="btnExplore2D" style="flex:1;">Ver en Mapa 2D</button>
-          <button class="btn" id="btnExplore3D" style="flex:1;">Ver Relieve Cráter 3D</button>
+          <button class="btn btn-primary" id="btnExplore2D" style="flex:1;">View in 2D Map</button>
+          <button class="btn" id="btnExplore3D" style="flex:1;">View 3D Crater Relief</button>
         </div>
       `;
     }
 
     card.innerHTML = `
       <div class="card-head">
-        <span class="badge" style="background:${loc.color}22;color:${loc.color};border:1px solid ${loc.color}55;">HITO PLANETARIO</span>
+        <span class="badge" style="background:${loc.color}22;color:${loc.color};border:1px solid ${loc.color}55;">PLANETARY LANDMARK</span>
         <h3>${loc.name}</h3>
         <div class="sub">${loc.sub}</div>
       </div>
       <div class="card-facts">
-        <div><b>Longitud:</b> ${loc.lon.toFixed(2)}°</div>
-        <div><b>Latitud:</b> ${loc.lat.toFixed(2)}°</div>
-        <div><b>Elevación de referencia:</b> ${(loc.elev).toLocaleString()} m</div>
+        <div><b>Longitude:</b> ${loc.lon.toFixed(2)}°</div>
+        <div><b>Latitude:</b> ${loc.lat.toFixed(2)}°</div>
+        <div><b>Reference elevation:</b> ${(loc.elev).toLocaleString()} m</div>
       </div>
       ${extraActions}
-      <button class="btn btn-close" id="btnCloseLocCard" style="margin-top:10px;width:100%;">Cerrar</button>
+      <button class="btn btn-close" id="btnCloseLocCard" style="margin-top:10px;width:100%;">Close</button>
     `;
 
     card.hidden = false;
@@ -931,7 +931,7 @@
     }
   }
 
-  /* ---------- Interfaz de Capas NASA Mars Trek ---------- */
+  /* ---------- NASA Mars Trek Layers Interface ---------- */
   function renderLayersUI() {
     const listEl = $("globeLayersList");
     if (!listEl) return;
@@ -951,14 +951,14 @@
             <div class="tl-badge">${layer.instrument} · ${layer.resolution}</div>
           </div>
           <div class="tl-actions">
-            <button class="tl-btn ${layer.visible ? 'on' : 'off'}" data-action="toggle" title="${layer.visible ? 'Ocultar capa' : 'Mostrar capa'}" aria-label="Visibilidad">
+            <button class="tl-btn ${layer.visible ? 'on' : 'off'}" data-action="toggle" title="${layer.visible ? 'Hide layer' : 'Show layer'}" aria-label="Visibility">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                 ${layer.visible 
                   ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
                   : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'}
               </svg>
             </button>
-            <button class="tl-btn" data-action="info" title="Información científica" aria-label="Información">
+            <button class="tl-btn" data-action="info" title="Scientific information" aria-label="Information">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             </button>
           </div>
@@ -970,11 +970,11 @@
         <div class="tl-legend" style="${layer.visible ? '' : 'display:none;'}">${layer.legendText}</div>
       `;
 
-      // Eventos de la tarjeta
+      // Card events
       const btnToggle = card.querySelector('[data-action="toggle"]');
       btnToggle.addEventListener("click", () => {
         if (layer.isBase) {
-          // Si es capa base, selecciona como activa exclusiva
+          // If it is a base layer, select it as the exclusive active one
           TREK_LAYERS.filter(l => l.isBase).forEach(l => { l.visible = false; });
           layer.visible = true;
           cfg.activeBase = layer.id;
@@ -1009,7 +1009,7 @@
 
     modal.innerHTML = `
       <header class="modal-head">
-        <span class="badge">NASA MARS TREK · CAPA CIENTÍFICA</span>
+        <span class="badge">NASA MARS TREK · SCIENTIFIC LAYER</span>
         <h2>${layer.name}</h2>
         <div class="sub">${layer.instrument}</div>
       </header>
@@ -1017,13 +1017,13 @@
         <div style="text-align:center;margin:12px 0;">
           <img src="${layer.thumb}" alt="${layer.name}" style="max-width:100%;height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--border);" />
         </div>
-        <p><b>Descripción:</b> ${layer.desc}</p>
-        <p><b>Resolución espacial:</b> ${layer.resolution}</p>
-        <p><b>Interpretación de colores:</b> ${layer.legendText}</p>
-        <p><b>Fuente de datos:</b> Planetary Data System (PDS) / USGS Astrogeology / NASA Mars Trek API.</p>
+        <p><b>Description:</b> ${layer.desc}</p>
+        <p><b>Spatial resolution:</b> ${layer.resolution}</p>
+        <p><b>Color interpretation:</b> ${layer.legendText}</p>
+        <p><b>Data source:</b> Planetary Data System (PDS) / USGS Astrogeology / NASA Mars Trek API.</p>
       </div>
       <footer class="modal-actions">
-        <button class="btn btn-primary" id="btnModalClose">Entendido</button>
+        <button class="btn btn-primary" id="btnModalClose">Got it</button>
       </footer>
     `;
 
@@ -1040,13 +1040,13 @@
     };
   }
 
-  /* Aplica cambios de capas en vivo sin recargar mallas si las texturas están disponibles */
+  /* Applies layer changes live without reloading meshes if the textures are available */
   G3.applyLayerChanges = function () {
-    // Si la capa base cambió, o se habilitó una capa no cargada, reconstruimos las teselas suavemente
+    // If the base layer changed, or a not-yet-loaded layer was enabled, we smoothly rebuild the tiles
     G3.resetTerrain();
   };
 
-  /* ---------- Navegación y Vuelo (flyTo) ---------- */
+  /* ---------- Navigation and Flight (flyTo) ---------- */
   G3.flyTo = function (lon, lat, h, dur = 1600) {
     if (!controls) return;
     const actualDur = (window.MR && window.MR.reduceMotion && window.MR.reduceMotion()) ? 0 : dur;
@@ -1115,7 +1115,7 @@
     updateTiles();
   };
 
-  /* ---------- Control del Bucle de Renderizado ---------- */
+  /* ---------- Render Loop Control ---------- */
   G3.start = function () {
     if (!G3.ready) G3.init();
     running = true;
@@ -1141,7 +1141,7 @@
         controls.update();
       }
 
-      // Limitar a los límites equirectangulares
+      // Limit to the equirectangular bounds
       controls.target.x = Math.max(-180, Math.min(180, controls.target.x));
       controls.target.z = Math.max(-90, Math.min(90, controls.target.z));
 
@@ -1149,7 +1149,7 @@
       scene.fog.near = dist * 1.3;
       scene.fog.far = dist * 2.8 + 6;
 
-      // Animación orbital suave de balizas
+      // Smooth orbital animation of beacons
       const tSec = now * 0.0025;
       beacons.forEach((b, idx) => {
         if (b.userData && b.userData.diamond) {
@@ -1158,7 +1158,7 @@
         }
       });
 
-      // Animación de cristales minerales y escala adaptativa de pines
+      // Animation of mineral crystals and adaptive pin scale
       const pinScale = Math.max(0.035, Math.min(1.2, dist * 0.045));
       if (pinsGroup) {
         pinsGroup.children.forEach((p, idx) => {
@@ -1169,17 +1169,17 @@
         });
       }
 
-      // Pulso del haz del rover
+      // Rover beam pulse
       if (roverBeam && roverBeam.visible) {
         roverBeam.material.opacity = 0.55 + Math.sin(now * 0.006) * 0.25;
       }
 
-      // Reposicionar tarjeta emergente interactiva si está abierta
+      // Reposition the interactive pop-up card if open
       if (window.MR && window.MR.UI && window.MR.UI.repositionPointUI) {
         window.MR.UI.repositionPointUI();
       }
 
-      // Streaming de teselas dinámico al cambiar posición/zoom
+      // Dynamic tile streaming when position/zoom changes
       const zoom = chooseZoom();
       const td = tileDeg(zoom);
       const cellX = Math.floor((controls.target.x + 180) * 4 / td);
@@ -1190,11 +1190,11 @@
         updateTiles();
       }
 
-      // Lectura de coordenadas
+      // Coordinate readout
       const readout = $("globeCoords");
       if (readout) {
         const altKm = (dist * M_PER_DEG / 1000).toFixed(0);
-        readout.textContent = `Lon ${controls.target.x.toFixed(2)}°  Lat ${(-controls.target.z).toFixed(2)}°  ·  Altitud: ${altKm} km`;
+        readout.textContent = `Lon ${controls.target.x.toFixed(2)}°  Lat ${(-controls.target.z).toFixed(2)}°  ·  Altitude: ${altKm} km`;
       }
 
       renderer.render(scene, camera);

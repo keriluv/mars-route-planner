@@ -1,21 +1,21 @@
 {
-  "arboles": 300,
-  "desv_arboles": {
+  "trees": 300,
+  "tree_std": {
     "media": 0.16610659744670894,
     "p50": 0.06169229105415169,
     "p90": 0.4529337543839825,
     "max": 0.4905213939584583
   },
-  "celdas_confianza_baja_pct": 34.08659722222222,
-  "fuera_de_rango_entrenamiento_pct": 7.222708333333333,
-  "fuera_de_rango_por_variable_pct": {
+  "low_confidence_cells_pct": 34.08659722222222,
+  "out_of_training_range_pct": 7.222708333333333,
+  "out_of_range_by_feature_pct": {
     "slope": 1.9666666666666666,
     "roughness": 2.6547222222222224,
     "texture": 1.6745833333333335,
     "gradient": 0.0904861111111111,
     "thermal": 3.3629861111111112
   },
-  "rango_entrenamiento": {
+  "training_range": {
     "slope": [
       0.17387326061725616,
       28.17106819152832
@@ -37,50 +37,50 @@
       253.07809448242188
     ]
   },
-  "por_distancia_al_recorrido": {
-    "a menos de 1 km del recorrido": {
-      "celdas_pct": 1.0035416666666666,
-      "desv_arboles_media": 0.1264308722480197,
-      "confianza_media": 0.7471382555039606,
-      "fuera_de_rango_pct": 2.380458099785482,
-      "transitabilidad_media": 0.8828904148400492
+  "by_distance_to_traverse": {
+    "within 1 km of the traverse": {
+      "cells_pct": 1.0035416666666666,
+      "mean_tree_std": 0.1264308722480197,
+      "mean_confidence": 0.7471382555039606,
+      "out_of_range_pct": 2.380458099785482,
+      "mean_traversability": 0.8828904148400492
     },
-    "de 1 a 10 km": {
-      "celdas_pct": 13.668958333333334,
-      "desv_arboles_media": 0.17768579417474484,
-      "confianza_media": 0.6446284116505103,
-      "fuera_de_rango_pct": 12.404932099800337,
-      "transitabilidad_media": 0.5987527983503157
+    "1 to 10 km": {
+      "cells_pct": 13.668958333333334,
+      "mean_tree_std": 0.17768579417474484,
+      "mean_confidence": 0.6446284116505103,
+      "out_of_range_pct": 12.404932099800337,
+      "mean_traversability": 0.5987527983503157
     },
-    "a más de 10 km": {
-      "celdas_pct": 85.3275,
-      "desv_arboles_media": 0.16471830745559363,
-      "confianza_media": 0.6705633850888127,
-      "fuera_de_rango_pct": 6.4494968731586475,
-      "transitabilidad_media": 0.30963191518436145
+    "beyond 10 km": {
+      "cells_pct": 85.3275,
+      "mean_tree_std": 0.16471830745559363,
+      "mean_confidence": 0.6705633850888127,
+      "out_of_range_pct": 6.4494968731586475,
+      "mean_traversability": 0.30963191518436145
     }
   },
-  "rutas": {
+  "routes": {
     "summit": {
-      "confianza_media": 0.5622955067073913,
-      "fuera_de_rango_pct": 1.9424460431654675,
-      "puntos": 1390
+      "mean_confidence": 0.5622955067073913,
+      "out_of_range_pct": 1.9424460431654675,
+      "points": 1390
     },
     "summit_short": {
-      "confianza_media": 0.4184435482813693,
-      "fuera_de_rango_pct": 3.389830508474576,
-      "puntos": 1121
+      "mean_confidence": 0.4184435482813693,
+      "out_of_range_pct": 3.389830508474576,
+      "points": 1121
     },
     "crism": {
-      "confianza_media": 0.7059165109746732,
-      "fuera_de_rango_pct": 2.369077306733167,
-      "puntos": 802
+      "mean_confidence": 0.7059165109746732,
+      "out_of_range_pct": 2.369077306733167,
+      "points": 802
     },
     "traverse_end": {
-      "confianza_media": 0.8481013750574823,
-      "fuera_de_rango_pct": 0.0,
-      "puntos": 181
+      "mean_confidence": 0.8481013750574823,
+      "out_of_range_pct": 0.0,
+      "points": 181
     }
   },
-  "nota": "El desacuerdo entre árboles no cubre el error por extrapolación fuera del corredor de entrenamiento."
+  "note": "Disagreement between trees does not cover the extrapolation error outside the training corridor."
 }
