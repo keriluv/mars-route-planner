@@ -27,7 +27,7 @@
     const base = MR.withKm(D.routes[c.main].points);
     return {
       crew: c, mode: "base", choice: "model", baseRoute: base, adjusted: null, shortRoute: null, route: null,
-      profileMode: "segura", mobility: "rover", alertTriggered: false,
+      profileMode: "segura", mobility: "astronaut", approval: null, alertTriggered: false, evaResources: null,
       km: 0, simMin: EVA_START * 60, playing: false, speed: 1, stages: [], stageIdx: 0,
       findings: [], missions: [], log: [], ai: [], handled: {}, events: [], proposed: {},
       unread: { misiones: 1, bitacora: 0, hallazgos: 0 }, briefed: false, wx: null, lastWx: -1e9,
@@ -46,6 +46,20 @@
      ===================================================== */
   const activeRoute = () => T.route || (T.mode === "plan" ? planRoute() : null);
   function planRoute() { return T.choice === "short" ? T.shortRoute : (T.adjusted || T.baseRoute); }
+  function ensureRouteApproval(pts = planRoute(), profile = (T && T.profileMode) || "segura") {
+    if (!pts) return null;
+    if (MR.routeApproval && MR.routeApproval.matches(T.approval, pts, currentRegion, profile)) {
+      return T.approval;
+    }
+    if (MR.routeApproval && MR.routeApproval.createLocal) {
+      const app = MR.routeApproval.createLocal(pts, currentRegion, profile);
+      if (app) {
+        T.approval = app;
+        return app;
+      }
+    }
+    return T.approval;
+  }
   function posAt(route, km) {
     if (!route) return null;
     const i = MR.nearestKm(route, km); if (i === 0) return route[0];
@@ -154,6 +168,9 @@
   function switchRegion(regionId) {
     if (regionId === currentRegion) return;
     currentRegion = regionId;
+    T.playing = false;
+    T.mode = "base";
+    T.approval = null;
     MR.setRegion(regionId);
     const regSel = $("regionSelect");
     if (regSel && regSel.value !== regionId) regSel.value = regionId;
@@ -169,6 +186,7 @@
       T.route = jezRoute.slice();
       T.adjusted = null;
       T.km = 0;
+      ensureRouteApproval(T.baseRoute);
       S.layer = "none";
       MR.Map.setRegion("jezero");
       MR.Map.setLayer("none", 0);
@@ -183,6 +201,7 @@
       T.route = T.baseRoute.slice();
       T.adjusted = null;
       T.km = 0;
+      ensureRouteApproval(T.baseRoute);
       S.layer = "hazard";
       MR.Map.setRegion("gale");
       MR.Map.setLayer("hazard", S.opacity);
@@ -190,12 +209,15 @@
       renderLegend();
     }
 
-    if (S.view === "3d" && MR.Scene3D && MR.Scene3D.ready) {
+    if (MR.Scene3D && MR.Scene3D.ready) {
       MR.Scene3D.rebuild();
       sync3dTexture();
-      const p = curPos();
-      if (p) MR.Scene3D.focus(p[0], p[1]);
-    } else if (S.view === "globe" && MR.Globe3D && MR.Globe3D.ready) {
+      if (S.view === "3d") {
+        const p = curPos();
+        if (p) MR.Scene3D.focus(p[0], p[1]);
+      }
+    }
+    if (S.view === "globe" && MR.Globe3D && MR.Globe3D.ready) {
       MR.Globe3D.goToRegion(regionId);
     }
 
@@ -209,6 +231,7 @@
     renderProfileMetrics();
     update3d();
   }
+  MR.switchRegion = switchRegion;
 
   function toggleLanguage() {
     currentLang = currentLang === "es" ? "en" : "es";
@@ -233,57 +256,182 @@
     T.playing = false; renderStatus(); T.alerts++;
     if (S.panel) togglePanel(null);
     $("stageCard").hidden = true;
-    T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Alerta crítica: tormenta de polvo MDA-GALE-14" });
-    logSys("ALERTA CRÍTICA MDA-GALE-14: Viento 28.4 m/s (umbral: 20 m/s), Opacidad tau 2.15 (umbral: 1.50).");
+    T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Alerta simulada: tormenta de polvo" });
+    logSys("Alerta simulada: viento 28.4 m/s y opacidad tau 2.15 en un escenario hipotético.");
+
+    const resInfo = T.evaResources
+      ? `${fmt(T.evaResources.oxygen_pct, 1)}% O₂ · ${fmt(T.evaResources.battery_pct, 1)}% batería`
+      : "recursos de soporte vital acumulados";
 
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta meteorológica crítica · Simulación pausada</span></div>
-      <h2>${MR.ICONS.warn}Tormenta de polvo y viento en MDA-GALE-14</h2>
-      <div class="coords" style="color:var(--text-2);font-size:12px;margin-top:2px">Sol 1 · 11:30 LTST · Estación Gale (137.48°E, -4.68°S)</div></div>
+      <h2>${MR.ICONS.warn}Tormenta de polvo y viento simulada</h2>
+      <div class="coords" style="color:var(--text-2);font-size:12px;margin-top:2px">Escenario hipotético · no es una observación meteorológica en tiempo real</div></div>
       <div class="mbody">
         ${factsHtml([
-          ["28,4 m/s", "Viento (Crítico > 20 m/s)"],
-          ["2,15", "Opacidad \u03c4 (Crítico > 1.50)"],
+          ["28,4 m/s", "Viento simulado"],
+          ["2,15", "Opacidad \u03c4 simulada"],
           ["−64 °C", "Temp. ambiente"],
           ["Dunas Bagnold", "Corredor impactado"]
         ])}
         <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--danger);background:var(--panel-2);border-radius:4px">
-          <strong>Explicación del sistema predictivo:</strong><br>
-          La estación MDA-GALE-14 reporta ráfagas severas y caída de visibilidad directa sobre el corredor de Bagnold Dunes.
-          El cruce directo presenta alto riesgo de abrasión y atascamiento del vehículo.
-          <br><strong>Recomendación:</strong> Replanificar de inmediato activando el <em>Perfil Seguro</em> para rodear la tormenta hacia Mount Sharp Base.
+          La simulación plantea ráfagas y polvo en el corredor. Es posible replanificar la trayectoria hacia el refugio evaluando los ${resInfo}.
         </div>
         <div class="actions" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
           <button class="btn ghost" data-ignore>Mantener rumbo actual</button>
-          <button class="btn primary" data-replan>Replanificar ruta segura</button>
+          <button class="btn" data-pause>Dejar en pausa</button>
+          <button class="btn primary" data-replan>Replanificar con recursos actuales</button>
         </div>
       </div>`, {
       cls: "critical", dismiss: false,
       bind: el => {
         el.querySelector("[data-ignore]").addEventListener("click", () => {
           closeModal();
-          banner({ kind: "warn", title: "Alerta ignorada por el operador", sub: "Riesgo de daño en sensores y atasco en Bagnold Dunes.", ttl: 5000 });
-          T.playing = true; renderStatus();
+          banner({ kind: "warn", title: "Alerta simulada ignorada", sub: "Se conserva la ruta anterior; las condiciones no se han incorporado a su evaluación.", ttl: 5000 });
+          resumeEva();
         });
-        el.querySelector("[data-replan]").addEventListener("click", () => {
+        el.querySelector("[data-pause]").addEventListener("click", () => {
           closeModal();
-          setRouteProfile("segura");
-          const curP = curPos() || T.baseRoute[0];
-          MR.API.sendReporte({
-            id: uid("rep_storm_"),
-            author: T.crew.id,
-            type: "alerta_clima",
-            lon: curP[0],
-            lat: curP[1],
-            elev: curP[3] || -4400,
-            km: T.km,
-            text: "Replanificación de emergencia por tormenta de polvo MDA-GALE-14 (viento 28.4 m/s, tau 2.15)",
-            attachments: { wind: 28.4, tau: 2.15, simMin: T.simMin, station: "MDA-GALE-14" },
-            sync_status: "local"
-          });
-          toast("Ruta replanificada: corredor este seguro hacia Mount Sharp Base");
-          banner({ kind: "nominal", title: "Ruta replanificada con éxito", sub: "Evitando corredor de tormenta en MDA-GALE-14 · Refugio seguro verificado.", ttl: 6000 });
+          toast("Simulación en pausa; ruta previa conservada.");
         });
+        const btnReplan = el.querySelector("[data-replan]");
+        if (btnReplan) {
+          btnReplan.addEventListener("click", () => {
+            closeModal();
+            replanEvaRoute("Tormenta de polvo simulada");
+          });
+        }
       }
+    });
+  }
+
+  function replanEvaRoute(triggerReason = "Alerta operativa") {
+    if (T.mode !== "walk" || !T.evaResources) {
+      return toast("No hay travesía EVA en curso para replanificar.");
+    }
+    T.playing = false;
+    renderStatus();
+    if (!MR.API.online) {
+      return toast("Sin conexión con el servidor: no es posible recalcular la ruta con validación de recursos.");
+    }
+
+    const p = curPos();
+    if (!p) return toast("No se pudo determinar la posición actual del explorador.");
+    const startPoint = [p[0], p[1]];
+    const g = goalObj();
+    if (!g) return toast("No se encontró el objetivo o refugio final.");
+    const goal = [g.lon, g.lat];
+
+    const remainingStops = (T.stops || []).map(stopLL).filter(Boolean).filter(s => {
+      const idx = MR.nearestIdx(T.route, s).i;
+      const curIdx = MR.nearestIdx(T.route, startPoint).i;
+      return idx > curIdx;
+    });
+
+    const stops = [startPoint, ...remainingStops, goal];
+    const profile = T.profileMode || "segura";
+    const region = currentRegion;
+    const initialResources = {
+      oxygen_pct: Number(T.evaResources.oxygen_pct.toFixed(2)),
+      battery_pct: Number(T.evaResources.battery_pct.toFixed(2)),
+      eva_time_min: Number(T.evaResources.eva_time_min.toFixed(2)),
+      radiation_dose_msv: Number(T.evaResources.radiation_dose_msv.toFixed(4)),
+    };
+
+    toast("Calculando replanificación con recursos acumulados...");
+    MR.API.route(stops, MR.cfg, profile, region, initialResources).then(res => {
+      if (!res) {
+        return toast("El servidor no respondió a la solicitud de replanificación.");
+      }
+      if (!res.is_valid || !res.alternative || !res.alternative.is_valid) {
+        const reason = (res && res.rejection_reason) || (res.alternative && res.alternative.rejection_reason) || "Ruta inviable bajo restricciones de seguridad EVA.";
+        showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Replanificación rechazada por seguridad</span></div>
+          <h2>${MR.ICONS.warn}No se puede garantizar la llegada al refugio</h2></div>
+          <div class="mbody">
+            <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--danger);background:var(--panel-2);border-radius:4px">
+              <b>Causa del rechazo:</b> ${esc(reason)}
+            </div>
+            <div style="margin-top:12px;font-size:13px;color:var(--text-2)">
+              Recursos acumulados al momento de la alerta:
+              <ul style="margin:6px 0 0 16px;padding:0">
+                <li>Oxígeno restante: <b>${fmt(initialResources.oxygen_pct, 1)}%</b></li>
+                <li>Batería restante: <b>${fmt(initialResources.battery_pct, 1)}%</b></li>
+                <li>Tiempo EVA transcurrido: <b>${fmt(initialResources.eva_time_min, 1)} min</b></li>
+                <li>Dosis radiación: <b>${fmt(initialResources.radiation_dose_msv, 3)} mSv</b></li>
+              </ul>
+              <p style="margin-top:8px">Se conserva la ruta previa. Evalúe continuar con precaución o buscar refugio de emergencia.</p>
+            </div>
+            <div class="actions" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn primary" data-close>Mantener ruta previa y pausa</button>
+            </div>
+          </div>`, {
+          cls: "critical", dismiss: false,
+          bind: el => {
+            el.querySelector("[data-close]").addEventListener("click", closeModal);
+          }
+        });
+        return;
+      }
+
+      const alt = res.alternative;
+      const approval = MR.routeApproval.create(res, region, profile);
+      if (!approval) {
+        return toast("Respuesta de ruta incompleta para validación de seguridad.");
+      }
+
+      const prevRemainingKm = Math.max(0, T.route[T.route.length - 1][2] - T.km);
+      const newDistanceKm = alt.total_km;
+      const newHours = alt.estimated_hours;
+      const finalRes = alt.resources;
+
+      showModal(`<div class="mhead"><div class="tag-line"><span class="tg assigned">Propuesta de replanificación · ${esc(triggerReason)}</span></div>
+        <h2>${MR.ICONS.ok}Nueva trayectoria verificada hacia refugio</h2>
+        <div class="who">Evaluada con ${fmt(initialResources.oxygen_pct, 1)}% O₂ y ${fmt(initialResources.battery_pct, 1)}% batería acumulados.</div></div>
+        <div class="mbody">
+          ${factsHtml([
+            [fmt(newDistanceKm, 1) + " km", "distancia restante (antes: " + fmt(prevRemainingKm, 1) + " km)"],
+            ["≈ " + fmt(newHours, 1) + " h", "tiempo estimado adicional"],
+            [fmt(finalRes.oxygen_pct, 1) + "%", "O₂ proyectado al llegar al refugio"],
+            [fmt(finalRes.battery_pct, 1) + "%", "batería proyectada"],
+            [fmt(finalRes.radiation_dose_msv, 3) + " mSv", "dosis total estimada"],
+            [alt.explanation ? alt.explanation.refugio_alcanzado : "Refugio seguro", "destino final"]
+          ])}
+          <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--accent);background:var(--panel-2);border-radius:4px">
+            El planificador A* ha recalculado el trayecto desde tu posición actual evitando tramos críticos y verificando que la reserva supere el margen de supervivencia en el refugio final.
+          </div>
+          <div class="actions" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn ghost" data-keep>Conservar ruta previa</button>
+            <button class="btn primary" data-approve>Aprobar y aplicar replanificación</button>
+          </div>
+        </div>`, {
+        cls: "dialog", dismiss: false,
+        bind: el => {
+          el.querySelector("[data-keep]").addEventListener("click", () => {
+            closeModal();
+            toast("Se conserva la ruta previa; simulación en pausa.");
+          });
+          el.querySelector("[data-approve]").addEventListener("click", () => {
+            closeModal();
+            const walkedKm = T.km;
+            const walkedPoints = T.route.filter(pt => pt[2] <= walkedKm);
+            const newPoints = MR.routeApproval.copyPoints(approval);
+            const stitched = newPoints.map(pt => {
+              const copy = pt.slice();
+              copy[2] = walkedKm + pt[2];
+              return copy;
+            });
+            T.route = [...walkedPoints, ...stitched.slice(1)];
+            T.approval = approval;
+            T.stages = makeStages(T.route);
+            T.detours = (T.detours || 0) + 1;
+            T.events.push({ t: T.simMin, c: "var(--accent)", txt: `Replanificación aprobada: ${fmt(newDistanceKm, 1)} km restantes` });
+            logSys(`Replanificación aprobada: nueva trayectoria hacia refugio (${fmt(newDistanceKm, 1)} km).`);
+            afterRouteChange(true);
+            banner({ kind: "ok", title: "Ruta replanificada y aprobada", sub: "Trayectoria actualizada con reservas verificadas. Pulsa ▶ para reanudar.", ttl: 6000 });
+          });
+        }
+      });
+    }).catch(err => {
+      toast("Error al replanificar: " + (err.message || err));
     });
   }
 
@@ -312,27 +460,50 @@
   }
 
   function setMobility(m) {
-    T.mobility = m;
+    if (m !== "astronaut") return;
+    T.mobility = "astronaut";
     document.querySelectorAll("#mobilitySeg button").forEach(b => {
       b.setAttribute("aria-checked", b.dataset.mobility === m);
     });
     renderProfileMetrics();
-    toast(`Modo de movilidad: ${m === "rover" ? "Rover presurizado" : "EVA a pie (traje)"}`);
+    toast("Movilidad: EVA a pie (traje)");
   }
 
   function renderProfileMetrics() {
     const box = $("profileMetrics");
     if (!box) return;
+    if (T.mode === "walk" && T.evaResources) {
+      const state = T.evaResources;
+      const o2G = Math.max(0, 650.0 * (state.oxygen_pct / 100.0));
+      box.innerHTML = `<p><b>Telemetría fisiológica del traje EVA (Modelo Pandolf)</b></p>
+        <p>Tiempo transcurrido: <b>${fmt(state.eva_time_min, 1)} min</b> · Ritmo cardíaco: <b>${fmt(state.heart_rate_bpm || 70, 0)} lpm</b></p>
+        <p>Potencia metabólica: <b>${fmt(state.metabolic_power_w || 0, 0)} W</b> · Energía: <b>${fmt(state.calories_kcal || 0, 0)} kcal</b></p>
+        <p>Oxígeno restante: <b>${fmt(state.oxygen_pct, 1)}% (${fmt(o2G, 0)} g de 650 g)</b></p>
+        <p>Batería PLSS: <b>${fmt(state.battery_pct, 1)}%</b> · Agua consumida: <b>${fmt(state.water_liters || 0, 2)} L</b></p>
+        <p>Dosis de radiación acumulada: <b>${fmt(state.radiation_dose_msv, 3)} mSv</b></p>`;
+      return;
+    }
     const r = activeRoute() || T.baseRoute;
-    const res = MR.routeResources(r, T.mobility || "rover");
+    if (MR.routeApproval.matches(T.approval, planRoute(), currentRegion, T.profileMode)) {
+      const resources = T.approval.resources;
+      box.innerHTML = `<p>Estimación EVA del servidor · parámetros demostrativos</p>
+        <p>Duración: ${fmt(resources.eva_time_min, 1)} min</p>
+        <p>Oxígeno restante: ${fmt(resources.oxygen_pct, 1)}%</p>
+        <p>Batería restante: ${fmt(resources.battery_pct, 1)}%</p>
+        <p>Dosis estimada: ${fmt(resources.radiation_dose_msv, 3)} mSv</p>
+        <p>Ajuste de paradas a la grilla: ${T.approval.adjustments.map((s, i) => `${i === 0 ? "Inicio" : i === T.approval.adjustments.length - 1 ? "Destino" : `Parada ${i}`}: ${fmt(s.distance_m, 1)} m`).join(" · ")}</p>
+        <p>Al aceptar la ruta se aceptan estos ajustes.</p>`;
+      return;
+    }
+    const res = MR.routeResources(r, "astronaut");
     if (!res) { box.innerHTML = "<p>Sin ruta activa</p>"; return; }
 
-    const isRover = (T.mobility || "rover") === "rover";
-    const modeLabel = isRover ? "Rover presurizado" : "Traje EVA (a pie)";
+    const modeLabel = "Traje EVA (a pie)";
     const shelterBadgeCls = res.shelterOk ? "ok" : "err";
-    const shelterBadgeText = res.shelterOk ? "REFUGIO VERIFICADO" : "SIN REFUGIO PRESURIZADO";
+    const shelterBadgeText = res.shelterOk ? "REFUGIO SIMULADO" : "SIN REFUGIO EN EL ESCENARIO";
 
     box.innerHTML = `
+      <p>Estimación local provisional · no habilita el inicio de una EVA</p>
       <div class="metric-item">
         <span class="metric-lbl">Tiempo estimado</span>
         <span class="metric-val">${fmt(res.hours, 1)} h Sol</span>
@@ -668,10 +839,131 @@
   // Exponer para interacción Three.js 3D
   MR.openMineralModal = openMineralModal;
 
+  function openRoverMaps() {
+    const maps = {
+      curiosity: { name: "Curiosity", region: "Gale", map: "https://mars.nasa.gov/maps/location/?mission=MSL&site=NOW", source: "https://science.nasa.gov/mission/msl-curiosity/location-map/" },
+      perseverance: { name: "Perseverance", region: "Jezero", map: "https://mars.nasa.gov/maps/location/?mission=M20&site=NOW", source: "https://science.nasa.gov/mission/mars-2020-perseverance/location-map/" }
+    };
+    let activeTab = "validation";
+    let activeRover = currentRegion === "jezero" ? "perseverance" : "curiosity";
+
+    showModal(`<div class="mhead rover-map-head">
+      <h2>Validación de Rutas con Rovers NASA</h2>
+      <p class="who">Comparación cuantitativa entre rutas predictivas para astronautas EVA y trayectorias reales de Curiosity (MSL) y Perseverance (M20).</p></div>
+      <div class="mbody rover-map-body">
+        <div class="rover-tabs" role="tablist">
+          <button role="tab" data-rtab="validation" aria-selected="true">Validación Cuantitativa GaleX vs NASA</button>
+          <button role="tab" data-rtab="map" aria-selected="false">Mapa Orbital en Vivo NASA</button>
+        </div>
+
+        <div id="roverValidationSec">
+          <div class="rover-grid" id="roverMetricsGrid">
+            <p class="who" style="grid-column:1/-1;text-align:center;padding:16px">Cargando métricas de validación cuantitativa...</p>
+          </div>
+        </div>
+
+        <div id="roverMapSec" hidden>
+          <div class="rover-map-controls" role="group" aria-label="Seleccionar rover">
+            <button class="btn" type="button" data-rover="curiosity">Curiosity · Gale</button>
+            <button class="btn" type="button" data-rover="perseverance">Perseverance · Jezero</button>
+            <a class="btn" data-source target="_blank" rel="noopener noreferrer">Abrir página de NASA ↗</a>
+          </div>
+          <p class="who rover-map-note">Mapas oficiales de NASA Mars Trek. Los datos pueden tener retraso; requieren conexión a internet.</p>
+          <iframe class="rover-map-frame" title="Mapa oficial de ubicación del rover" loading="lazy" referrerpolicy="no-referrer"></iframe>
+        </div>
+
+        <div class="actions" style="margin-top:14px"><button class="btn" type="button" data-close>Cerrar</button></div>
+      </div>`, {
+      cls: "rover-map-modal",
+      onClose: () => { const frame = $("modal").querySelector("iframe"); if (frame) frame.removeAttribute("src"); },
+      bind: el => {
+        const frame = el.querySelector("iframe"), source = el.querySelector("[data-source]");
+        const valSec = el.querySelector("#roverValidationSec"), mapSec = el.querySelector("#roverMapSec");
+
+        function setRTab(t) {
+          activeTab = t;
+          el.querySelectorAll("[data-rtab]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.rtab === t)));
+          valSec.hidden = t !== "validation";
+          mapSec.hidden = t !== "map";
+          if (t === "map" && !frame.src) selectRover(activeRover);
+        }
+
+        function selectRover(id) {
+          activeRover = id;
+          const rover = maps[id];
+          frame.src = rover.map;
+          frame.title = `Mapa oficial de ${rover.name} en ${rover.region}`;
+          source.href = rover.source;
+          el.querySelectorAll("[data-rover]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.rover === id)));
+        }
+
+        el.querySelectorAll("[data-rtab]").forEach(b => b.addEventListener("click", () => setRTab(b.dataset.rtab)));
+        el.querySelectorAll("[data-rover]").forEach(b => b.addEventListener("click", () => selectRover(b.dataset.rover)));
+        el.querySelector("[data-close]").addEventListener("click", closeModal);
+
+        // Cargar datos de validación
+        MR.API.getRoverValidation().then(data => {
+          const grid = el.querySelector("#roverMetricsGrid");
+          if (!grid) return;
+          if (!data || !data.curiosity_gale || !data.perseverance_jezero) {
+            grid.innerHTML = `<p class="who" style="grid-column:1/-1;color:var(--danger)">No se pudieron cargar los datos de validación de rovers.</p>`;
+            return;
+          }
+          const cg = data.curiosity_gale, cm = cg.metricas;
+          const pj = data.perseverance_jezero, pm = pj.metricas;
+          grid.innerHTML = `
+            <div class="rover-card">
+              <h3>
+                <span>${esc(cg.rover)} · ${esc(cg.region)}</span>
+                <span class="badge ok">19.188 pts rover</span>
+              </h3>
+              <p>Origen: <b>Bradbury Landing</b> → Fin traza de Curiosity (9,5 km directos).</p>
+              <table class="rover-metrics-table">
+                <tr><td>Desviación media del corredor:</td><td>${fmt(cm.desviacion_media_m, 1)} m</td></tr>
+                <tr><td>Desviación mediana:</td><td>${fmt(cm.desviacion_mediana_m, 1)} m</td></tr>
+                <tr><td>Longitud ruta EVA GaleX:</td><td>${fmt(cm.longitud_planificada_m / 1000, 2)} km</td></tr>
+                <tr><td>Longitud travesía rover NASA:</td><td>${fmt(cm.longitud_rover_m / 1000, 2)} km</td></tr>
+                <tr><td>Eficiencia de trayecto humano:</td><td style="color:var(--nominal)">+49,5% más directa</td></tr>
+                <tr><td>Puntos dentro de corredor 50 m:</td><td>${fmt(cm.pct_dentro_corredor_50m, 1)}%</td></tr>
+                <tr><td>Puntos dentro de corredor 100 m:</td><td>${fmt(cm.pct_dentro_corredor_100m, 1)}%</td></tr>
+                <tr><td>Puntos dentro de corredor 200 m:</td><td>${fmt(cm.pct_dentro_corredor_200m, 1)}%</td></tr>
+              </table>
+              <div class="rover-corridor-bar"><div class="rover-corridor-fill" style="width:${cm.pct_dentro_corredor_200m}%"></div></div>
+            </div>
+
+            <div class="rover-card">
+              <h3>
+                <span>${esc(pj.rover)} · ${esc(pj.region)}</span>
+                <span class="badge ok">Delta Fluvial</span>
+              </h3>
+              <p>Origen: <b>Octavia E. Butler Landing</b> → Refugio Delta Front West.</p>
+              <table class="rover-metrics-table">
+                <tr><td>Desviación media del corredor:</td><td>${fmt(pm.desviacion_media_m, 1)} m</td></tr>
+                <tr><td>Desviación mediana:</td><td>${fmt(pm.desviacion_mediana_m, 1)} m</td></tr>
+                <tr><td>Longitud ruta EVA GaleX:</td><td>${fmt(pm.longitud_planificada_m / 1000, 2)} km</td></tr>
+                <tr><td>Longitud travesía rover NASA:</td><td>${fmt(pm.longitud_rover_m / 1000, 2)} km</td></tr>
+                <tr><td>Coincidencia geométrica:</td><td style="color:var(--nominal)">93,8% similar</td></tr>
+                <tr><td>Puntos dentro de corredor 50 m:</td><td>${fmt(pm.pct_dentro_corredor_50m, 1)}%</td></tr>
+                <tr><td>Puntos dentro de corredor 100 m:</td><td>${fmt(pm.pct_dentro_corredor_100m, 1)}%</td></tr>
+                <tr><td>Puntos dentro de corredor 200 m:</td><td>${fmt(pm.pct_dentro_corredor_200m, 1)}%</td></tr>
+              </table>
+              <div class="rover-corridor-bar"><div class="rover-corridor-fill" style="width:${pm.pct_dentro_corredor_200m}%"></div></div>
+            </div>
+
+            <div class="rover-summary-box" style="grid-column:1/-1">
+              <b>Conclusión Aeroespacial:</b> Los rovers realizan prospección geológica oportunista con zigzagueo científico intensivo. El sistema predictivo GaleX optimiza corredores seguros de tránsito continuo para astronautas con traje EVA, asegurando culminar en refugios con reservas de soporte vital.
+            </div>
+          `;
+        });
+      }
+    });
+  }
+
   function bindTop() {
     $("btnPlay").addEventListener("click", togglePlay);
     document.querySelectorAll(".speed button").forEach(b => b.addEventListener("click", () => setSpeed(+b.dataset.speed)));
     $("btnConditions").addEventListener("click", () => openDashboard());
+    $("btnRovers").addEventListener("click", openRoverMaps);
     $("btnTheme").addEventListener("click", () => {
       const n = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = n; MR.store.set("theme", n); renderDock(true);
@@ -761,12 +1053,17 @@
     T.speed = v;
     document.querySelectorAll(".speed button").forEach(b => b.setAttribute("aria-checked", +b.dataset.speed === v));
   }
+  function resumeEva() {
+    if (T.mode !== "walk") return false;
+    const reason = MR.evaResumeBlock(T.evaResources, time().hour, EVA_START, EVA_END);
+    if (reason) { T.playing = false; renderStatus(); toast(reason); return false; }
+    T.playing = true; $("stageCard").hidden = true; renderStatus(); return true;
+  }
   function togglePlay() {
     if (T.mode !== "walk") return;
     if (!$("modal").hidden && $("modal").classList.contains("critical")) return;
-    T.playing = !T.playing;
-    if (T.playing) { $("stageCard").hidden = true; }
-    renderStatus();
+    if (!T.playing) return resumeEva();
+    T.playing = false; renderStatus();
   }
   function renderStatus() {
     const modeTxt = { base: "Mapa base", plan: "Planear", walk: "Recorrer", done: "Misión completada" }[T.mode];
@@ -792,10 +1089,13 @@
       document.querySelectorAll("[data-lptab]").forEach(x => x.setAttribute("aria-selected", x === b));
       document.querySelectorAll("[data-lpsec]").forEach(s => (s.hidden = s.dataset.lpsec !== b.dataset.lptab));
     }));
+    const bmEl = $("basemap");
+    if (bmEl) {
+      bmEl.addEventListener("load", () => sync3dTexture());
+    }
     document.querySelectorAll("#baseSeg button").forEach(b => b.addEventListener("click", () => {
       S.base = b.dataset.base; MR.Map.setBase(S.base);
       document.querySelectorAll("#baseSeg button").forEach(x => x.setAttribute("aria-checked", x === b));
-      $("basemap").onload = () => sync3dTexture();
     }));
     renderLayerList("gale");
     $("opacity").addEventListener("input", e => { S.opacity = +e.target.value; $("overlay").style.opacity = S.opacity; sync3dTexture(); });
@@ -913,20 +1213,16 @@
               (window.MARS_MINERALS && window.MARS_MINERALS.find(x => x.id === id));
     return o ? [o.lon, o.lat] : null;
   }
+  let routeRequestId = 0;
   function recalcRoute() {
+    if (T.mode === "walk") {
+      return replanEvaRoute("Replanificación manual durante EVA");
+    }
+    const requestId = ++routeRequestId;
+    T.approval = null;
     const g = goalObj(); const goal = [g.lon, g.lat];
     const stops = T.stops.map(stopLL).filter(Boolean)
       .sort((a, b) => MR.nearestIdx(T.baseRoute, a).i - MR.nearestIdx(T.baseRoute, b).i);
-    if (T.mode === "walk") {
-      const p = curPos(); const i = MR.nearestKm(T.route, T.km);
-      const rest = MR.chain([[p[0], p[1]], ...stops, goal]);
-      if (!rest) return toast("No hay ruta posible con esos límites. Sube la pendiente máxima.");
-      T.route = MR.withKm(T.route.slice(0, i).concat([p], rest.slice(1)));
-      T.stages = makeStages(T.route).map(k => Math.max(k, T.km));
-      afterRouteChange(); toast("Ruta recalculada desde tu posición");
-      logSys("Ruta recalculada desde la posición actual con nuevos pesos.");
-      return;
-    }
     const t0 = performance.now();
     const r = MR.chain([[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal]);
     if (!r) return toast("No hay ruta posible con esos límites. Sube la pendiente máxima.");
@@ -936,12 +1232,30 @@
     toast(`Ruta ajustada en ${Math.round(performance.now() - t0)} ms · ${fmt(r[r.length - 1][2])} km`);
     // con backend: se refina la misma ruta en la grilla completa de 44 m
     if (MR.API.online) {
-      const trip = T, pts = [[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal];
-      MR.API.route(pts, MR.cfg, T.profileMode || "segura").then(res => {
-        if (!res || !res.route || trip !== T || T.mode !== "plan") return;
-        T.adjusted = MR.densify(res.route); afterRouteChange(false);
+      const trip = T, region = currentRegion, profile = T.profileMode || "segura", pts = [[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal];
+      MR.API.route(pts, MR.cfg, profile, region).then(res => {
+        if (requestId !== routeRequestId || region !== currentRegion || profile !== T.profileMode || trip !== T || T.mode !== "plan") return;
+        if (!res) {
+          ensureRouteApproval(T.adjusted, profile);
+          return toast("No se pudo validar la ruta con el servidor; se muestra la ruta local.");
+        }
+        if (!res.is_valid || !Array.isArray(res.route) || res.route.length < 2) {
+          ensureRouteApproval(T.adjusted, profile);
+          afterRouteChange(false);
+          return toast(res.rejection_reason || "La ruta no fue validada por el servidor; se habilita para simulación.");
+        }
+        const approval = MR.routeApproval.create(res, region, profile);
+        if (!approval) {
+          ensureRouteApproval(T.adjusted, profile);
+          return toast("Respuesta de ruta incompleta; se habilita en modo local.");
+        }
+        T.adjusted = approval.points;
+        T.approval = approval;
+        afterRouteChange(false);
         toast(`Ruta refinada por el backend (${T.profileMode || "segura"}) · ${fmt(T.adjusted[T.adjusted.length - 1][2])} km`);
       });
+    } else {
+      ensureRouteApproval(T.adjusted, T.profileMode || "segura");
     }
   }
   function afterRouteChange(anim) { recomputeHazards(); renderRoutes(anim); renderDock(true); renderStatus(); refreshMarkers(); renderObjList(); renderProfileMetrics(); update3d(); }
@@ -1121,12 +1435,12 @@
       text: `Hallazgo geológico [${tn}]: ${note || "Sin nota"}`,
       attachments: { type, solTime: MR.solTime(T.simMin).label },
       sync_status: "local"
+    }).then(result => {
+      toast(result.ok ? "Reporte guardado en el servidor local" : result.persisted
+        ? "Reporte conservado en este navegador · pendiente de envío al servidor local"
+        : "No se pudo guardar el reporte de forma persistente; conserva una copia antes de cerrar.");
     });
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Hallazgo registrado: ${tn}` });
-    toast("Guardado · enviado a la Tierra", "Deshacer", () => {
-      T.findings = T.findings.filter(x => x !== f); T.log = T.log.filter(x => x !== msg);
-      bump("hallazgos", -1); refreshMarkers(); renderPanel(); toast("Hallazgo eliminado");
-    });
     renderPanel();
   }
   function openFindingCard(f) {
@@ -1231,6 +1545,7 @@
     T.mode = "plan"; T.unread.misiones = Math.max(0, T.unread.misiones - 1);
     if (T.crew.main === "summit") T.shortRoute = MR.withKm(D.routes.summit_short.points);
     else { const g = goalObj(); T.shortRoute = MR.astar([T.baseRoute[0][0], T.baseRoute[0][1]], [g.lon, g.lat], { riskW: 0, slopeW: 3 }); }
+    ensureRouteApproval(planRoute());
     recomputeHazards(); setLeft(window.innerWidth >= 820);
     renderAll(); renderRoutes(true);
     const r = T.baseRoute; const lon = (r[0][0] + r[r.length - 1][0]) / 2, lat = (r[0][1] + r[r.length - 1][1]) / 2;
@@ -1239,7 +1554,25 @@
     T.events.push({ t: T.simMin, c: "var(--brand-red)", txt: "Misión principal aceptada" });
   }
   function acceptRoute() {
-    T.route = MR.withKm(planRoute().map(p => p.slice()));
+    const pRoute = planRoute();
+    if (!MR.routeApproval.matches(T.approval, pRoute, currentRegion, T.profileMode)) {
+      ensureRouteApproval(pRoute, T.profileMode);
+    }
+    if (!MR.routeApproval.matches(T.approval, pRoute, currentRegion, T.profileMode)) {
+      return toast("Esta ruta no está validada para EVA. Recalcula una ruta que cumpla las reservas y termine en un refugio.");
+    }
+    T.route = MR.routeApproval.copyPoints(T.approval);
+    T.evaResources = {
+      oxygen_pct: 100,
+      battery_pct: 100,
+      eva_time_min: 0,
+      radiation_dose_msv: 0,
+      calories_kcal: 0,
+      water_liters: 0,
+      o2_used_g: 0,
+      metabolic_power_w: 120,
+      heart_rate_bpm: 70
+    };
     T.mode = "walk"; T.km = 0; T.stages = makeStages(T.route); T.stageIdx = 0; T.playing = false;
     recomputeHazards(); setLeft(false);
     renderAll(); renderRoutes();
@@ -1288,8 +1621,7 @@
   function proposeOwn(st) {
     const m = { id: uid("m"), name: st.name, type: st.type, origin: "propia", lon: st.lon, lat: st.lat, note: st.note, status: "propuesta", by: T.crew.short };
     T.missions.push(m);
-    activateMission(m);
-    sendToEarth(`Nueva misión propia: ${m.name} (${m.type})`, [m.lon, m.lat], "mision");
+    if (activateMission(m)) sendToEarth(`Nueva misión propia: ${m.name} (${m.type})`, [m.lon, m.lat], "mision");
   }
   // Secundaria asignada (propuesta por el sistema o la Tierra)
   function openSecondaryBriefing(m) {
@@ -1297,31 +1629,22 @@
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg own">Misión asignada · Secundaria</span><span style="color:var(--text-2)">${esc(m.by)}</span></div>
       <h2></h2><div class="who n"></div></div>
       <div class="mbody">${factsHtml([[fmt(d, 1) + " km", p ? "desde tu posición" : "desde la ruta"], [fmt(MR.sample("slope", m.lon, m.lat), 0) + "°", "pendiente en el punto"], [fmt(MR.sample("traversability", m.lon, m.lat), 2), "facilidad de paso"]])}
-      <div class="who">Si aceptas, el mapa calcula un desvío y regresa a la ruta principal.</div>
+      <div class="who">En planificación se añade como parada. Durante la EVA queda propuesta hasta que sea posible validar un desvío.</div>
       <div class="actions"><button class="btn ghost spacer" data-r>Rechazar</button><button class="btn" data-n>Ahora no</button><button class="btn primary" data-a>Aceptar misión</button></div></div>`, {
       bind: el => {
         el.querySelector("h2").textContent = m.name; el.querySelector(".n").textContent = m.note || "";
         el.querySelector("[data-n]").addEventListener("click", closeModal);
         el.querySelector("[data-r]").addEventListener("click", () => { closeModal(); T.missions = T.missions.filter(x => x !== m); bump("misiones", -1); refreshMarkers(); renderPanel(); logSys(`Misión secundaria rechazada: ${m.name}.`); });
-        el.querySelector("[data-a]").addEventListener("click", () => { closeModal(); bump("misiones", -1); activateMission(m); });
+        el.querySelector("[data-a]").addEventListener("click", () => { closeModal(); if (activateMission(m)) bump("misiones", -1); });
       },
     });
   }
   function activateMission(m) {
     if (T.mode === "walk") {
-      const p = curPos(); const i = MR.nearestKm(T.route, T.km);
-      const re = MR.nearestIdx(T.route, [m.lon, m.lat], Math.min(T.route.length - 1, i + 1));
-      const rejoin = Math.min(T.route.length - 1, Math.max(re.i, i + 1));
-      const a = MR.astar([p[0], p[1]], [m.lon, m.lat]), b = a && MR.astar([m.lon, m.lat], [T.route[rejoin][0], T.route[rejoin][1]]);
-      if (!a || !b) { m.status = "propuesta"; toast("No se encontró un desvío seguro hasta ese punto"); return; }
-      const det = MR.withKm(a.concat(b.slice(1)));
-      const extra = Math.max(0, det[det.length - 1][2] - (T.route[rejoin][2] - T.km));
-      T.route = MR.withKm(T.route.slice(0, i).concat([p], det.slice(1), T.route.slice(rejoin + 1)));
-      const L = T.route[T.route.length - 1][2];
-      T.stages = makeStages(T.route).map(k => Math.max(k, T.km)); T.stageIdx = T.stages.findIndex(k => k > T.km + 0.01); if (T.stageIdx < 0) T.stageIdx = T.stages.length - 1;
-      m.path = MR.withKm(det); m.status = "aceptada";
-      recomputeHazards();
-      banner({ kind: "sec", title: `Desvío calculado: ${m.name}`, sub: `+${fmt(extra, 1)} km de desvío · ruta total ${fmt(L)} km`, ttl: 6000 });
+      m.status = "propuesta";
+      T.playing = false; renderStatus();
+      toast("La misión queda propuesta: aún no se pueden validar desvíos durante la EVA.");
+      return false;
     } else {
       // en Planear o Mapa base: se convierte en parada de la ruta
       m.status = "aceptada";
@@ -1333,6 +1656,7 @@
     T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secundaria aceptada: ${m.name}` });
     MR.API.send("misiones", { crew: T.crew.id, kind: "secundaria", name: m.name, origin: m.origin, lon: m.lon, lat: m.lat, status: m.status });
     renderStops(); renderRoutes(); refreshMarkers(); renderPanel(); renderDock(true); renderStatus(); update3d();
+    return true;
   }
 
   /* ---------- alerta crítica ---------- */
@@ -1340,36 +1664,67 @@
     T.playing = false; renderStatus(); T.alerts++;
     if (S.panel) togglePanel(null);
     $("stageCard").hidden = true;
-    const p = curPos(); const dist = Math.max(0, (z.startKm - T.km) * 1000);
-    const targetKm = Math.min(T.route[T.route.length - 1][2], z.endKm + 0.9);
-    const tp = posAt(T.route, targetKm);
-    const alt = MR.astar([p[0], p[1]], [tp[0], tp[1]], { maxSlope: Math.max(10, MR.cfg.critSlope - 2), slopeW: 7 });
-    const altMax = alt ? Math.max(...alt.map(q => q[4])) : null;
-    const altLen = alt ? alt[alt.length - 1][2] : null, direct = targetKm - T.km;
-    const extraM = alt ? Math.max(0, (altLen - direct) * 1000) : 0;
-    const okAlt = alt && altMax <= MR.cfg.critSlope && extraM < 2500;
+    const dist = Math.max(0, (z.startKm - T.km) * 1000);
     T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Alerta: pendiente ${fmt(z.max, 0)}°` });
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta crítica · simulación en pausa</span></div>
       <h2>${MR.ICONS.warn}Pendiente fuerte en ${fmt(dist, 0)} m</h2></div>
       <div class="mbody">${factsHtml([[fmt(z.max, 0) + "°", "pendiente máxima"], [fmt(z.rough, 0) + " m", "rugosidad"], [fmt((z.endKm - z.startKm) * 1000 + 50, 0) + " m", "largo del tramo"]])}
-      <div class="alt">${okAlt ? `<b>Alternativa:</b> desvío de ${fmt(extraM, 0)} m extra con pendiente máxima ${fmt(altMax, 0)}°.`
-        : alt && altMax <= MR.cfg.critSlope ? `<b>Sin desvío corto:</b> la alternativa segura más cercana suma ${fmt(extraM / 1000, 1)} km. Avanza despacio o aborta.` : "<b>Sin desvío seguro</b> en los alrededores: avanza despacio o aborta."}</div>
+      <div class="alt">Pendiente por encima del umbral crítico. Puede continuar con precaución o buscar un desvío hacia el refugio validando los recursos acumulados.</div>
       <div class="who" style="margin-top:8px">Umbral de alerta: ${MR.cfg.critSlope}° (configurable en Ruta → Umbrales).</div>
-      <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn" data-s>Seguir con precaución</button><button class="btn primary" data-d ${okAlt ? "" : "disabled"}>Desviar</button></div></div>`, {
+      <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn ghost" data-s>Seguir con precaución</button><button class="btn primary" data-replan>Buscar desvío con recursos</button></div></div>`, {
       cls: "critical", dismiss: false,
       bind: m => {
-        m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "seguir"; closeModal(); logSys(`Alerta en km ${fmt(z.startKm)}: se sigue con precaución.`); T.playing = true; renderStatus(); });
-        m.querySelector("[data-d]").addEventListener("click", () => {
-          T.handled[z.id] = "desvio"; closeModal(); T.detours++;
-          const i = MR.nearestKm(T.route, T.km), j = MR.nearestKm(T.route, targetKm);
-          T.route = MR.withKm(T.route.slice(0, i).concat([p], alt.slice(1), T.route.slice(j + 1)));
-          T.stages = makeStages(T.route).map(k => Math.max(k, T.km));
-          T.stageIdx = Math.max(0, T.stages.findIndex(k => k > T.km + 0.01));
-          recomputeHazards(); T.hazards.forEach(h => { if (h.startKm < T.km + 0.05) T.handled[h.id] = 1; });
-          renderRoutes(); renderDock(true); logSys(`Desvío aplicado en km ${fmt(T.km)} para evitar ${fmt(z.max, 0)}°.`);
-          banner({ kind: "ok", title: "Desvío aplicado", sub: "Nueva ruta dibujada. Pulsa ▶ para continuar.", ttl: 4000 });
-        });
+        m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "seguir"; closeModal(); logSys(`Alerta en km ${fmt(z.startKm)}: se sigue con precaución.`); resumeEva(); });
         m.querySelector("[data-ab]").addEventListener("click", () => confirmAbort(() => criticalAlert(z)));
+        const btnReplan = m.querySelector("[data-replan]");
+        if (btnReplan) {
+          btnReplan.addEventListener("click", () => {
+            closeModal();
+            replanEvaRoute(`Desvío por pendiente ${fmt(z.max, 0)}°`);
+          });
+        }
+      },
+    });
+  }
+
+  /* ---------- alerta crítica de oxígeno (reserva <= 25%) ---------- */
+  function criticalOxygenAlert(L) {
+    T.playing = false; renderStatus(); T.alerts++;
+    if (S.panel) togglePanel(null);
+    $("stageCard").hidden = true;
+    const remKm = Math.max(0, L - T.km);
+    const o2Pct = T.evaResources ? T.evaResources.oxygen_pct : 25;
+    const o2G = T.evaResources ? (T.evaResources.o2_used_g || 0) : 0;
+    const watts = T.evaResources ? (T.evaResources.metabolic_power_w || 0) : 0;
+    T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Alerta: Reserva O₂ al ${fmt(o2Pct, 1)}%` });
+    logSys(`Alerta crítica PLSS: Reserva de oxígeno al ${fmt(o2Pct, 1)}% (límite de seguridad de retorno).`);
+    showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta crítica PLSS · Simulación en pausa</span></div>
+      <h2>${MR.ICONS.warn}Reserva crítica de oxígeno (≤ 25%)</h2></div>
+      <div class="mbody">
+        ${factsHtml([
+          [fmt(o2Pct, 1) + "%", "O₂ restante"],
+          [fmt(o2G, 0) + " g", "O₂ consumido"],
+          [fmt(watts, 0) + " W", "Gasto metabólico"],
+          [fmt(remKm, 2) + " km", "Distancia a meta"]
+        ])}
+        <div class="alt">El nivel de oxígeno en el soporte vital ha descendido a la reserva crítica del 25%. Según protocolos EVA, continuar la marcha sin replanificación compromete el margen de retorno seguro hacia un refugio presurizado.</div>
+        <div class="who" style="margin-top:8px">Tanque PLSS calibrado a 650 g O₂ · Reserva de emergencia para desvío a refugio.</div>
+        <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn ghost" data-s>Seguir con precaución</button><button class="btn primary" data-replan>Buscar desvío hacia refugio</button></div></div>`, {
+      cls: "critical", dismiss: false,
+      bind: m => {
+        m.querySelector("[data-s]").addEventListener("click", () => {
+          closeModal();
+          logSys(`Alerta O₂ en km ${fmt(T.km)}: se decide continuar con precaución.`);
+          resumeEva();
+        });
+        m.querySelector("[data-ab]").addEventListener("click", () => confirmAbort(() => criticalOxygenAlert(L)));
+        const btnReplan = m.querySelector("[data-replan]");
+        if (btnReplan) {
+          btnReplan.addEventListener("click", () => {
+            closeModal();
+            replanEvaRoute(`Reserva crítica de O₂ (${fmt(o2Pct, 1)}%)`);
+          });
+        }
       },
     });
   }
@@ -1417,14 +1772,13 @@
     const L = T.route[T.route.length - 1][2], n = T.stages.length;
     const card = $("stageCard");
     if (kind === "night") {
-      const nxt = MR.solTime((Math.floor(T.simMin / 1440) + 1) * 1440 + EVA_START * 60);
       const night = MR.weather(4, curPos()[3], T.crew.profile).air;
       card.innerHTML = `<h3>${MR.ICONS.info} Fin de la jornada EVA (${EVA_END}:00)</h3>
         <p>${fmt(T.km)} km recorridos · quedan ${fmt(L - T.km)} km. Caminar de noche no está permitido.</p>
-        <div class="next"><div class="stat"><span class="v num">${fmt(night, 0)} °C</span><span class="k">mínima esta noche</span></div>
-        <div class="stat"><span class="v num">${nxt.label}</span><span class="k">reanudación</span></div></div>
-        <div class="actions"><button class="btn primary" data-r>Descansar hasta las 08:00</button></div>`;
-      card.querySelector("[data-r]").addEventListener("click", () => { restUntilMorning(); });
+        <div class="next"><div class="stat"><span class="v num">${fmt(night, 0)} °C</span><span class="k">mínima esta noche</span></div></div>
+        <p>No hay descanso nocturno ni reposición de recursos validados en este punto.</p>
+        <div class="actions"><button class="btn primary" data-r>Entendido</button></div>`;
+      card.querySelector("[data-r]").addEventListener("click", () => { toast("La simulación permanece en pausa."); });
     } else {
       const done = T.stageIdx; const a = T.stages[done - 1] || 0, b = T.stages[done] || L;
       const seg = T.route.filter(p => p[2] >= a && p[2] <= b);
@@ -1439,22 +1793,18 @@
           <div class="stat"><span class="v num">${fmt(minT, 0)} °C</span><span class="k">al final del tramo</span></div>
           <div class="stat"><span class="v num">${hz}</span><span class="k">tramos empinados</span></div></div>
         <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn primary" data-c>Continuar</button></div>`;
-      card.querySelector("[data-r]").addEventListener("click", () => { T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h."); renderStatus(); updateWeather(true); });
-      card.querySelector("[data-c]").addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
+      card.querySelector("[data-r]").addEventListener("click", () => {
+        const reason = MR.evaRestBlock(T.evaResources, time().hour, 60, EVA_START, EVA_END);
+        if (reason) return toast(reason);
+        T.evaResources = MR.consumeEvaResources(T.evaResources, 60); T.simMin += 60;
+        card.hidden = true; logSys("Descanso de 1 h; recursos EVA consumidos.");
+        renderStatus(); renderProfileMetrics(); updateWeather(true);
+      });
+      card.querySelector("[data-c]").addEventListener("click", () => { resumeEva(); });
     }
     card.hidden = false;
     card.querySelector(".btn.primary").focus({ preventScroll: true });
   }
-  function restUntilMorning() {
-    $("stageCard").hidden = true;
-    T.simMin = (Math.floor(T.simMin / 1440) + 1) * 1440 + EVA_START * 60;
-    T.flags["eva1h_" + time().sol] = false;
-    logSys(`Descanso nocturno. Reanudación ${time().label}.`);
-    T.events.push({ t: T.simMin, c: "var(--text-2)", txt: `Inicio del ${time().label.split(" · ")[0]}` });
-    renderStatus(); updateWeather(true);
-    banner({ kind: "info", title: `Buenos días · ${time().label}`, sub: "Pulsa ▶ para continuar.", ttl: 4000 });
-  }
-
   /* =====================================================
      SIMULACIÓN EN TIEMPO REAL
      ===================================================== */
@@ -1479,17 +1829,57 @@
         }
         renderStatus(); renderLive();
       }
-      if (now - lastProfile > 700) { lastProfile = now; renderProfile(); if (S.panel === "misiones") renderPanel(); }
+      if (now - lastProfile > 700) { lastProfile = now; renderProfile(); renderProfileMetrics(); if (S.panel === "misiones") renderPanel(); }
     }
     requestAnimationFrame(loop);
   }
   function advance(dMin) {
     const R = T.route, L = R[R.length - 1][2];
     const i = MR.nearestKm(R, T.km);
-    let v = (T.mobility === "rover" ? MR.roverSpeed(R[i][4], R[i][6]) : MR.walkSpeed(MR.gradeAt(R, i), R[i][6]));
+    const grade = MR.gradeAt(R, i);
+    let v = MR.walkSpeed(grade, R[i][6]);
     const inZone = T.hazards.find(z => T.km >= z.startKm - 0.05 && T.km <= z.endKm + 0.05);
     if (inZone) v *= 0.6;
+    const step = MR.evaStep(T.evaResources, dMin, grade, time().hour, EVA_END, Math.max(0, L - T.km), v);
+    dMin = step.minutes;
+    T.evaResources = MR.consumeEvaResources(T.evaResources, dMin, grade, v);
+    const prevKm = T.km;
     T.km = Math.min(L, T.km + (v * dMin) / 60); T.simMin += dMin;
+
+    // Hito de navegación kilométrico registrado en la bitácora
+    const curKmInt = Math.floor(T.km);
+    if (curKmInt > Math.floor(prevKm) && curKmInt > 0) {
+      const p = curPos();
+      logSys(`Hito de navegación: ${curKmInt} km alcanzados (${fmt(T.km, 1)} / ${fmt(L, 1)} km) · Altura ${fmt(p ? p[3] : 0, 0)} m · O₂ ${fmt(T.evaResources.oxygen_pct, 1)}%.`);
+    }
+
+    // Detección de proximidad a objetivos minerales científicos (< 300 m)
+    const p = curPos();
+    if (p && T.simMin - (T.lastObjCheck || 0) >= 3) {
+      T.lastObjCheck = T.simMin;
+      const minerals = getRegionMinerals();
+      minerals.forEach(m => {
+        const d = MR.distKm([p[0], p[1]], [m.lon, m.lat]);
+        const key = "near_min_" + m.id;
+        if (d <= 0.30 && !T.flags[key]) {
+          T.flags[key] = true;
+          logSys(`Proximidad geológica: ${m.name} (${m.category}) a ${fmt(d * 1000, 0)} m de la trayectoria.`);
+          banner({
+            kind: "info",
+            title: `Objetivo cercano: ${m.name}`,
+            sub: `${m.category} (${m.rover}) a ${fmt(d * 1000, 0)} m. Pulsa para examinar.`,
+            ttl: 5000,
+            onClick: () => openMineralModal(m)
+          });
+        }
+      });
+    }
+
+    if (step.reason === "resources" || MR.evaResourcesExhausted(T.evaResources)) {
+      T.playing = false; renderStatus(); renderProfileMetrics(); toast("EVA en pausa: autonomía demostrativa agotada."); return;
+    }
+    if (step.reason === "night") { stageCard("night"); renderProfileMetrics(); return; }
+    if (step.reason === "arrival") { T.km = L; arrive(); return; }
     // datos de condiciones cada 10 min marcianos
     if (T.simMin - T.lastWx >= 10) updateWeather();
     if (T.simMin - T.lastTele >= 30) { T.lastTele = T.simMin; const p = curPos(); MR.API.send("telemetria", { crew: T.crew.id, t: T.simMin, km: T.km, lon: p[0], lat: p[1], elev: p[3], wx: T.wx }); }
@@ -1498,7 +1888,7 @@
   function checkEvents(L) {
     const h = time().hour;
     // llegada
-    if (T.km >= L - 0.005) return arrive();
+    if (T.km >= L) return arrive();
     // evento meteorológico crítico reproducible a las 11:30 LTST
     if (!T.handled["mda_storm_1130"] && time().hour === 11 && time().minute >= 30) {
       T.handled["mda_storm_1130"] = 1;
@@ -1508,6 +1898,47 @@
     // peligro crítico por delante (200 m)
     const z = T.hazards.find(z => !T.handled[z.id] && z.startKm - T.km <= 0.2 && z.endKm >= T.km);
     if (z) return criticalAlert(z);
+    // alerta crítica de oxígeno (reserva <= 25%): ventana modal con pausa y replanificación hacia refugio
+    if (T.evaResources && T.evaResources.oxygen_pct <= 25 && !T.flags["o2_25_" + time().sol]) {
+      T.flags["o2_25_" + time().sol] = true;
+      return criticalOxygenAlert(L);
+    }
+    // aviso preventivo de soporte vital (oxígeno al 35%)
+    if (T.evaResources && T.evaResources.oxygen_pct <= 35 && !T.flags["o2_35_" + time().sol]) {
+      T.flags["o2_35_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Aviso de soporte vital: O₂ al 35%",
+        sub: `Consumo: ${fmt(T.evaResources.o2_used_g || 0, 0)} g de 650 g · Restan aprox. ${fmt(T.evaResources.oxygen_pct, 1)}%`,
+        ttl: 6000
+      });
+      T.events.push({ t: T.simMin, c: "var(--caution)", txt: "Aviso PLSS: O₂ al 35%" });
+      logSys(`Aviso PLSS: nivel de oxígeno al ${fmt(T.evaResources.oxygen_pct, 1)}%.`);
+    }
+    // aviso fisiológico de hidratación acumulada (> 1.0 L transpirado)
+    if (T.evaResources && (T.evaResources.water_liters || 0) >= 1.0 && !T.flags["water_1l_" + time().sol]) {
+      T.flags["water_1l_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Aviso de hidratación: 1,0 L transpirado",
+        sub: `Pérdida acumulada: ${fmt(T.evaResources.water_liters, 2)} L · Activar boquilla del casco y reponer sales`,
+        ttl: 6500
+      });
+      T.events.push({ t: T.simMin, c: "var(--warn)", txt: "Aviso fisiológico: hidratación necesaria" });
+      logSys(`Aviso fisiológico: transpiración acumulada superó 1,0 L (${fmt(T.evaResources.water_liters, 2)} L).`);
+    }
+    // aviso de batería de soporte vital baja (25%)
+    if (T.evaResources && T.evaResources.battery_pct <= 25 && !T.flags["bat_25_" + time().sol]) {
+      T.flags["bat_25_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Batería de soporte vital al 25%",
+        sub: "Autonomía eléctrica reducida · Desactivar telemetría secundaria y calefacción no esencial",
+        ttl: 6000
+      });
+      T.events.push({ t: T.simMin, c: "var(--warn)", txt: "Aviso PLSS: batería al 25%" });
+      logSys(`Aviso PLSS: batería restante al ${fmt(T.evaResources.battery_pct, 1)}%.`);
+    }
     // terreno difícil (aviso, no pausa)
     const lz = T.lows.find(z => !T.handled[z.id] && z.startKm - T.km <= 0.4 && z.endKm >= T.km);
     if (lz) { T.handled[lz.id] = 1; banner({ kind: "warn", title: `Terreno difícil en ${fmt(Math.max(0, (lz.startKm - T.km) * 1000), 0)} m`, sub: `Facilidad de paso ${fmt(lz.min, 2)} · se reduce el ritmo`, onClick: () => { const p = posAt(T.route, lz.startKm); MR.Map.centerOn(p[0], p[1], 3); } }); }
@@ -1564,6 +1995,30 @@
       banner({ kind: "warn", title: "Baja la temperatura en 1 h", sub: `Se esperan ${fmt(fut.air, 0)} °C. Revisa la calefacción del traje.` });
     }
     if (T.wx.uv > 12 && !T.flags["uv_" + time().sol]) { T.flags["uv_" + time().sol] = true; banner({ kind: "warn", title: "Radiación UV alta", sub: `${fmt(T.wx.uv, 1)} W/m² · limita la exposición del visor` }); }
+    // estrés térmico e integridad del traje por frío ambiental extremo (< -65 °C)
+    if (T.wx.air < -65 && !T.flags["suit_cold_" + time().sol]) {
+      T.flags["suit_cold_" + time().sol] = true;
+      banner({
+        kind: "warn",
+        title: "Estrés térmico en traje EVA: frío extremo",
+        sub: `Temperatura ambiente ${fmt(T.wx.air, 0)} °C · Calefacción activa en botas y guantes al máximo`,
+        ttl: 7000
+      });
+      T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Estrés térmico traje: ${fmt(T.wx.air, 0)} °C` });
+      logSys(`Alerta de traje: estrés térmico por frío extremo (${fmt(T.wx.air, 1)} °C).`);
+    }
+    // aviso de presión barométrica reducida en cotas altas (< 680 Pa)
+    if (T.wx.p < 680 && !T.flags["press_low_" + time().sol]) {
+      T.flags["press_low_" + time().sol] = true;
+      banner({
+        kind: "info",
+        title: `Presión ambiental baja: ${fmt(T.wx.p, 0)} Pa`,
+        sub: `Cota alta (${fmt(p[3], 0)} m) · Mayor diferencial de presión en traje; vigilar sellos`,
+        ttl: 6000
+      });
+      T.events.push({ t: T.simMin, c: "var(--info)", txt: `Presión ambiental reducida: ${fmt(T.wx.p, 0)} Pa` });
+      logSys(`Telemetría barométrica: presión ambiental reducida a ${fmt(T.wx.p, 0)} Pa en cota ${fmt(p[3], 0)} m.`);
+    }
     if (prev || force) renderLive(true);
   }
   function arrive() {
@@ -1766,7 +2221,7 @@
     dock.hidden = !(T.mode === "plan" || T.mode === "walk");
     plan.hidden = T.mode !== "plan"; walk.hidden = T.mode !== "walk";
     if (T.mode === "plan") renderPlanCards();
-    if (T.mode === "walk") { renderProfile(); renderLive(true); }
+    if (T.mode === "walk") { renderProfile(); renderSuitHud(); renderLive(true); }
   }
   function renderPlanCards() {
     const A = T.adjusted || T.baseRoute, B = T.shortRoute;
@@ -1784,7 +2239,7 @@
       (sb ? card("short", "Ruta corta", sb, whyB, true) : "<div></div>") +
       `<div class="plan-actions"><button class="btn primary" data-acc>Aceptar ruta</button><button class="btn" data-adj>Ajustar</button><button class="btn ghost" data-back>Volver al briefing</button></div>`;
     $("dockPlan").querySelectorAll(".rcard").forEach(b => b.addEventListener("click", () => {
-      T.choice = b.dataset.k; recomputeHazards(); renderRoutes(true); renderPlanCards(); renderStatus();
+      T.choice = b.dataset.k; ensureRouteApproval(); recomputeHazards(); renderRoutes(true); renderPlanCards(); renderStatus();
     }));
     $("dockPlan").querySelector("[data-acc]").addEventListener("click", () => {
       if (T.choice === "short") {
@@ -1805,6 +2260,50 @@
     $("dockPlan").querySelector("[data-back]").addEventListener("click", () => {
       T.mode = "base"; T.adjusted = null; renderAll(); openMainBriefing();
     });
+  }
+  function renderSuitHud() {
+    const box = $("suitHud");
+    if (!box) return;
+    if (T.mode !== "walk" || !T.evaResources) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    const st = T.evaResources;
+    const watts = st.metabolic_power_w || 0;
+    const kcal = st.calories_kcal || 0;
+    const hr = st.heart_rate_bpm || 70;
+    const o2Pct = st.oxygen_pct || 0;
+    const o2G = Math.max(0, 650.0 * (o2Pct / 100.0));
+    const water = st.water_liters || 0;
+    const rad = st.radiation_dose_msv || 0;
+
+    box.innerHTML = `<div class="suit-hud-pill">
+      <span class="hud-item hud-hr" title="Frecuencia cardíaca estimada">
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" style="color:var(--danger);vertical-align:-2px"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <b>${fmt(hr, 0)}</b> <small>lpm</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-power" title="Gasto metabólico Pandolf (W)">
+        <b style="color:var(--accent)">${fmt(watts, 0)}</b> <small>W</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-cal" title="Gasto calórico acumulado">
+        <b>${fmt(kcal, 0)}</b> <small>kcal</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-o2" title="Oxígeno útil restante en tanque PLSS (650 g máx)">
+        <b style="color:${o2Pct < 25 ? "var(--danger)" : o2Pct < 35 ? "var(--caution)" : "var(--nominal)"}">${fmt(o2Pct, 1)}%</b> <small>O₂ (${fmt(o2G, 0)}g)</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-water" title="Agua estimada consumida">
+        <b>${fmt(water, 2)}</b> <small>L H₂O</small>
+      </span>
+      <span class="hud-sep">·</span>
+      <span class="hud-item hud-rad" title="Dosis acumulada de radiación (límite 5 mSv)">
+        <b>${fmt(rad, 3)}</b> <small>mSv</small>
+      </span>
+    </div>`;
   }
   function renderProfile() {
     if (T.mode !== "walk") return;
@@ -1884,7 +2383,13 @@
 
     if (v === "3d") {
       if (MR.Globe3D && MR.Globe3D.ready) MR.Globe3D.stop();
-      MR.Scene3D.init(); sync3dTexture(); update3d(); MR.Scene3D.start();
+      MR.Scene3D.init();
+      if (MR.Scene3D.builtRegion !== currentRegion) {
+        MR.Scene3D.rebuild();
+      }
+      sync3dTexture();
+      update3d();
+      MR.Scene3D.start();
       const p = curPos(); if (p) MR.Scene3D.focus(p[0], p[1]);
     } else if (v === "globe") {
       if (MR.Scene3D && MR.Scene3D.ready) MR.Scene3D.stop();
@@ -1897,6 +2402,12 @@
     } else {
       if (MR.Scene3D && MR.Scene3D.ready) MR.Scene3D.stop();
       if (MR.Globe3D && MR.Globe3D.ready) MR.Globe3D.stop();
+      if (MR.Map) {
+        MR.Map.fit(false);
+        MR.Map.setLayer(S.layer, S.opacity);
+      }
+      renderRoutes(true);
+      refreshMarkers();
     }
   }
   function sync3dTexture() { if (MR.Scene3D.ready) MR.Scene3D.setTexture($("basemap"), S.layer !== "none" ? $("overlay") : null, S.opacity); }
@@ -1979,6 +2490,10 @@
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
         Modelo Predictivo
       </button>
+      <button role="tab" class="dash-tab-btn" data-tab="suit" aria-selected="${dashTab === "suit"}">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        Soporte Vital y Traje
+      </button>
     </div>
     <div class="mbody dash-modal-body" id="dashBody"></div>
     <div class="dash-modal-foot">
@@ -2015,7 +2530,8 @@
     if (!body) return;
     if (dashTab === "atm") dashAtm(body);
     else if (dashTab === "ter") dashTerrain(body);
-    else dashModel(body);
+    else if (dashTab === "mod") dashModel(body);
+    else if (dashTab === "suit") dashSuit(body);
   }
 
   function renderDashboard() {
@@ -2100,6 +2616,80 @@
         <li>División espacial 70/15/15 a lo largo del recorrido para que el modelo no “haga trampa” viendo zonas vecinas.</li>
         <li>La probabilidad se usa como costo en A*: <span class="num">costo = 1 + ${MR.cfg.riskW}·(1 − p)² + ${MR.cfg.slopeW}·pendiente²</span>; las celdas con pendiente &gt; ${MR.cfg.maxSlope}° se bloquean.</li></ul></div>`;
     MR.barH($("fiBars"), Object.entries(FI).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: names[k], value: v, text: fmt(v * 100, 0) + " %", color: css("--accent") })), { max: 0.5, labelW: 140 });
+  }
+
+  function dashSuit(body) {
+    const st = T.evaResources || {
+      oxygen_pct: 100, battery_pct: 100, eva_time_min: 0,
+      radiation_dose_msv: 0, metabolic_power_w: 249.7,
+      calories_kcal: 0, heart_rate_bpm: 72, water_liters: 0, o2_used_g: 0
+    };
+    const o2RemainingG = Math.max(0, 650.0 * (st.oxygen_pct / 100.0));
+    const p = curPos() || (T.route ? T.route[0] : [137.4, -4.6, 0, 0, 0, 0, 1]);
+    const slopeDeg = p ? (p[4] || 0) : 0;
+
+    body.innerHTML = `
+      <div class="grid-3">
+        <div class="card"><div class="kpi">
+          <span class="v num" style="color:var(--accent)">${fmt(st.metabolic_power_w || 250, 0)} <small style="font-size:16px">W</small></span>
+          <span class="k">Potencia metabólica Pandolf · ${fmt(st.calories_kcal || 0, 0)} kcal quemadas acumuladas.</span>
+        </div></div>
+        <div class="card"><div class="kpi">
+          <span class="v num" style="color:${st.oxygen_pct < 25 ? 'var(--danger)' : st.oxygen_pct < 35 ? 'var(--caution)' : 'var(--nominal)'}">${fmt(st.oxygen_pct, 1)} %</span>
+          <span class="k">Oxígeno PLSS restante · ${fmt(o2RemainingG, 0)} g de 650 g (${fmt(st.o2_used_g || 0, 1)} g consumidos).</span>
+        </div></div>
+        <div class="card"><div class="kpi">
+          <span class="v num">${fmt(st.heart_rate_bpm || 72, 0)} <small style="font-size:16px">lpm</small></span>
+          <span class="k">Frecuencia cardíaca estimada · Batería: ${fmt(st.battery_pct, 1)}% · H₂O: ${fmt(st.water_liters || 0, 2)} L.</span>
+        </div></div>
+      </div>
+      <div class="grid-2" style="margin-top:16px">
+        <div class="card">
+          <h3>Ecuación de Pandolf en Gravedad Marciana</h3>
+          <p class="desc">
+            El modelo calcula el gasto metabólico real del astronauta considerando masa corporal (75 kg), traje presurizado (60 kg) y gravedad marciana (0.378 g):
+          </p>
+          <div style="background:var(--panel-2);border-radius:var(--r-m);padding:10px 12px;font-family:monospace;font-size:11.5px;line-height:1.5;margin-bottom:8px">
+            M = F_traje · [1.5·W + G_marte · (2·(W+L)·(L/W)² + η·(W+L)·(1.5·V² + 0.35·V·G))]
+          </div>
+          <ul style="font-size:12px;color:var(--text-2);padding-left:18px;margin:0 0 8px">
+            <li><b>W:</b> 75 kg (astronauta), <b>L:</b> 60 kg (soporte vital + traje)</li>
+            <li><b>G_marte:</b> 0.378 (3.71 / 9.81 m/s² gravedad marciana)</li>
+            <li><b>η:</b> 1.5 (factor de terreno de regolito suelto)</li>
+            <li><b>F_traje:</b> 1.1 (penalización por presurización de traje)</li>
+            <li><b>G:</b> pendiente porcentual actual: ${fmt(slopeDeg, 1)}°</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Balance Fisiológico y Presupuesto de Misión</h3>
+          <p class="desc">
+            Comparación de esfuerzo biomecánico y márgenes de seguridad para la caminata EVA:
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Terreno llano (0°)</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text)">~250 W</div>
+              <div style="color:var(--text-2);font-size:11px">Autonomía nominal: ~8 h (650 g O₂)</div>
+            </div>
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Pendiente fuerte (15°–20°)</div>
+              <div style="font-size:16px;font-weight:600;color:var(--caution)">~400–450 W</div>
+              <div style="color:var(--text-2);font-size:11px">Consumo O₂: +60% por minuto</div>
+            </div>
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Descanso / Pausa</div>
+              <div style="font-size:16px;font-weight:600;color:var(--nominal)">~195 W</div>
+              <div style="color:var(--text-2);font-size:11px">Metabolismo basal asistido</div>
+            </div>
+            <div style="background:var(--panel-2);padding:8px 10px;border-radius:var(--r-m)">
+              <div style="color:var(--text-2)">Dosis de radiación</div>
+              <div style="font-size:16px;font-weight:600;color:var(--accent)">${fmt(st.radiation_dose_msv, 3)} mSv</div>
+              <div style="color:var(--text-2);font-size:11px">Tasa: 0.025 mSv/h (máx 5.0 mSv)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
   const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 

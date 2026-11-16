@@ -1,0 +1,52 @@
+{
+  "fecha": "2026-11-15",
+  "descripcion": "Comparación cuantitativa entre rutas predictivas para astronautas EVA y trayectorias reales de rovers de exploración NASA.",
+  "advertencia_operacional": "Los rovers son plataformas no tripuladas; la proximidad geométrica no sustituye la verificación de soporte vital y refugios presurizados.",
+  "curiosity_gale": {
+    "rover": "Curiosity (MSL)",
+    "region": "Cráter Gale",
+    "origen": "Bradbury Landing (137.4416°, -4.5895°)",
+    "destino": "Punto final registrado de la traza (137.3799°, -4.7247°)",
+    "puntos_rover_originales": 19188,
+    "puntos_ruta_planificada": 181,
+    "metricas": {
+      "desviacion_media_m": 756.8,
+      "desviacion_mediana_m": 689.27,
+      "desviacion_max_m": 1475.6,
+      "desviacion_std_m": 377.02,
+      "longitud_planificada_m": 9486.1,
+      "longitud_rover_m": 18770.0,
+      "razon_longitud": 0.505,
+      "puntos_evaluados": 476,
+      "paso_muestreo_m": 20.0,
+      "pct_dentro_corredor_50m": 3.15,
+      "pct_dentro_corredor_100m": 6.09,
+      "pct_dentro_corredor_200m": 9.66
+    }
+  },
+  "perseverance_jezero": {
+    "rover": "Perseverance (Mars 2020)",
+    "region": "Cráter Jezero",
+    "origen": "Octavia E. Butler Landing (77.4509°, 18.4446°)",
+    "destino": "Delta Front West (77.3750°, 18.4620°)",
+    "metricas": {
+      "desviacion_media_m": 151.27,
+      "desviacion_mediana_m": 123.85,
+      "desviacion_max_m": 438.47,
+      "desviacion_std_m": 135.17,
+      "longitud_planificada_m": 4384.8,
+      "longitud_rover_m": 4675.6,
+      "razon_longitud": 0.938,
+      "puntos_evaluados": 221,
+      "paso_muestreo_m": 20.0,
+      "pct_dentro_corredor_50m": 36.65,
+      "pct_dentro_corredor_100m": 45.7,
+      "pct_dentro_corredor_200m": 65.61
+    }
+  },
+  "resumen_conclusiones": {
+    "gale_eficiencia_distancia": "La ruta predictiva humana es 49.5% más directa que el recorrido de exploración geológica de Curiosity.",
+    "gale_desviacion_media_m": 756.8,
+    "jezero_desviacion_media_m": 151.27
+  }
+}

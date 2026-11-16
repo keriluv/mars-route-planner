@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import yaml
 from docstore import DocStore  # noqa: E402
 from marsroute.storage import Storage  # noqa: E402
-from marsroute.domain import Report  # noqa: E402
+from marsroute.domain import Report, ResourceState  # noqa: E402
 
 MAX_BODY = 64 * 1024
 CREW = {"ev1", "ev2", "ev3"}
@@ -93,6 +93,29 @@ def _crew(v):
     return v
 
 
+def parse_report(body):
+    """Valida el reporte antes de intentar guardarlo en SQLite."""
+    lon = _num(body.get("lon"), -180, 180)
+    lat = _num(body.get("lat"), -90, 90)
+    if lon is None or lat is None:
+        raise ValueError("coordenadas obligatorias")
+    attachments = body.get("attachments", body.get("adjuntos", {}))
+    if not isinstance(attachments, dict):
+        raise ValueError("adjuntos debe ser un objeto")
+    return Report(
+        id=_txt(body.get("id"), 50, True),
+        author=_crew(body.get("author") or body.get("autor")),
+        type=_txt(body.get("type") or body.get("tipo"), 30, True),
+        lon=lon, lat=lat,
+        elev_m=_num(body.get("elev_m") or body.get("elev"), -20000, 30000) or 0.0,
+        sol_min=_num(body.get("sol_min") or body.get("simMin"), 0, 1e7) or 0.0,
+        km=_num(body.get("km"), 0, 10000) or 0.0,
+        text=_txt(body.get("text") or body.get("texto"), 1000, True),
+        attachments=attachments,
+        sync_status=_txt(body.get("sync_status"), 20) or "local",
+    )
+
+
 def save_hallazgo(b):
     tipo = b.get("type")
     if tipo not in ("mineral", "roca", "otro"):
@@ -137,11 +160,52 @@ def save_telemetria(b):
 _planner = {}
 
 
+def parse_initial_resources(value):
+    if not isinstance(value, dict):
+        raise ValueError("initial_resources debe ser un objeto completo")
+    required = {"oxygen_pct": (0, 100), "battery_pct": (0, 100),
+                "eva_time_min": (0, 1e9), "radiation_dose_msv": (0, 1e9)}
+    optional = {"calories_kcal": (0, 1e9), "metabolic_power_w": (0, 1e9),
+                "heart_rate_bpm": (0, 300), "water_liters": (0, 100), "o2_used_g": (0, 1e9)}
+    if not set(required).issubset(set(value)):
+        raise ValueError("initial_resources requiere oxígeno, batería, tiempo y dosis")
+    all_fields = {**required, **optional}
+    if not set(value).issubset(set(all_fields)):
+        raise ValueError("initial_resources contiene campos desconocidos")
+    parsed = {}
+    for name, (low, high) in all_fields.items():
+        if name in value:
+            v = value[name]
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                raise ValueError(f"{name} debe ser un número")
+            parsed[name] = _num(v, low, high)
+    return ResourceState(**parsed)
+
+
 def plan_route(b):
     import numpy as np
     import yaml
     from marsroute.layers import load_layers
     from marsroute.multicriteria import MultiCriteriaPlanner
+
+    region = b.get("region", "gale")
+    if region != "gale":
+        raise ValueError("planificación en esta región no disponible; solo Gale tiene capas verificadas")
+    stops = b.get("stops")
+    if not isinstance(stops, list) or not 2 <= len(stops) <= 8:
+        raise ValueError("se necesitan entre 2 y 8 puntos")
+    cfg = yaml.safe_load((ROOT / "config" / "mission.yaml").read_text(encoding="utf-8"))
+    west, south, east, north = cfg["bbox"]
+    for point in stops:
+        if not isinstance(point, (list, tuple)) or len(point) != 2:
+            raise ValueError("cada punto debe contener longitud y latitud")
+        lon, lat = _num(point[0], west, east), _num(point[1], south, north)
+        if lon is None or lat is None:
+            raise ValueError("coordenadas obligatorias")
+    requested_profile = b.get("profile", "segura")
+    if requested_profile not in ("all", "segura", "rapida", "cientifica"):
+        raise ValueError("perfil de ruta desconocido")
+    initial_resources = parse_initial_resources(b["initial_resources"]) if "initial_resources" in b else None
 
     if "planner_instance" not in _planner:
         cfg = yaml.safe_load((ROOT / "config" / "mission.yaml").read_text(encoding="utf-8"))
@@ -161,8 +225,8 @@ def plan_route(b):
     start = (float(stops[0][0]), float(stops[0][1]))
     targets = [(float(p[0]), float(p[1])) for p in stops[1:-1]]
     final_dest = (float(stops[-1][0]), float(stops[-1][1]))
+    adjustments = planner.stop_adjustments([start, *targets, final_dest])
 
-    requested_profile = b.get("profile", "segura")
     require_shelter = b.get("require_shelter", True)
 
     if requested_profile == "all":
@@ -172,12 +236,16 @@ def plan_route(b):
             final_shelter_lonlat=final_dest,
             shelters_catalog=shelters,
             require_final_shelter=require_shelter,
+            initial_resources=initial_resources,
         )
         first = alts.get("segura") or list(alts.values())[0]
         return {
             "alternatives": {k: v.to_dict() for k, v in alts.items()},
             "route": [[p[0], p[1]] for p in first.points],
             "cells": len(first.points),
+            "is_valid": first.is_valid,
+            "rejection_reason": first.rejection_reason,
+            "stop_adjustments": adjustments,
         }
 
     alt = planner.plan_alternative(
@@ -187,6 +255,7 @@ def plan_route(b):
         final_shelter_lonlat=final_dest,
         shelters_catalog=shelters,
         require_final_shelter=require_shelter,
+        initial_resources=initial_resources,
     )
     return {
         "route": [[p[0], p[1]] for p in alt.points],
@@ -194,6 +263,7 @@ def plan_route(b):
         "alternative": alt.to_dict(),
         "is_valid": alt.is_valid,
         "rejection_reason": alt.rejection_reason,
+        "stop_adjustments": adjustments,
     }
 
 
@@ -262,6 +332,11 @@ class Handler(BaseHTTPRequestHandler):
                 if name == "scenario":
                     scen_file = ROOT / "data" / "simulated" / "demo_scenario.json"
                     return self._json(200, json.loads(scen_file.read_text(encoding="utf-8")) if scen_file.exists() else {})
+                if name in ("rover-validation", "validacion-rovers"):
+                    vfile = ROOT / "outputs" / "validacion_rovers.json"
+                    if not vfile.exists():
+                        vfile = ROOT / "web" / "data" / "rover_validation.json"
+                    return self._json(200, json.loads(vfile.read_text(encoding="utf-8")) if vfile.exists() else {})
                 if name == "reportes":
                     reports = storage.list_reports(q.get("author") or q.get("autor"))
                     return self._json(200, [r.to_dict() for r in reports])
@@ -320,19 +395,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("se espera un objeto JSON")
             name = url.path[5:] if url.path.startswith("/api/") else ""
             if name == "reportes":
-                rep = Report(
-                    id=_txt(body.get("id"), 50, True),
-                    author=_txt(body.get("author") or body.get("autor"), 20, True),
-                    type=_txt(body.get("type") or body.get("tipo"), 30, True),
-                    lon=_num(body.get("lon"), -180, 180),
-                    lat=_num(body.get("lat"), -90, 90),
-                    elev_m=_num(body.get("elev_m") or body.get("elev"), -20000, 30000) or 0.0,
-                    sol_min=_num(body.get("sol_min") or body.get("simMin"), 0, 1e7) or 0.0,
-                    km=_num(body.get("km"), 0, 10000) or 0.0,
-                    text=_txt(body.get("text") or body.get("texto"), 1000, True),
-                    attachments=body.get("attachments") or body.get("adjuntos") or {},
-                    sync_status=_txt(body.get("sync_status"), 20) or "local",
-                )
+                rep = parse_report(body)
                 storage.save_report(rep)
                 return self._json(201, {"ok": True, "id": rep.id})
             handlers = {"hallazgos": save_hallazgo, "bitacora": save_mensaje, "misiones": save_mision, "telemetria": save_telemetria}

@@ -8,10 +8,19 @@
   const MR = window.MR;
   const S3 = (MR.Scene3D = { ready: false });
   let renderer, scene, camera, controls, terrain, routeMesh, doneMesh, secMeshes = [], astro, beacon, pins = [], host;
-  let exag = 2.5, follow = true, running = false;
+  let exag = 6.0, follow = true, running = false;
   let raycaster, mouse;
-  const SIZE = 100;                       // el terreno mide 100 × 100 unidades (≈ 53 km)
-  const KM_PER_UNIT = 53.2 / SIZE;
+  const SIZE = 100;                       // el terreno mide 100 × 100 unidades
+  let layerVisible = true;
+  let mineralsVisible = true;
+
+  function getKmPerUnit() {
+    const bbox = (MR.activeRegion && MR.activeRegion.bbox) || MR.bbox || (MR.D && MR.D.bbox);
+    if (!bbox) return 53.2 / SIZE;
+    const midLat = (bbox[1] + bbox[3]) / 2;
+    const kmWidth = MR.distKm ? MR.distKm([bbox[0], midLat], [bbox[2], midLat]) : 53.2;
+    return Math.max(0.1, kmWidth / SIZE);
+  }
 
   function getDemInfo() {
     if (MR.currentRegion === "jezero" && MR.F.jezero_dem && window.JEZERO_DATA && window.JEZERO_DATA.dem) {
@@ -23,7 +32,8 @@
   function heightAt(lon, lat) {
     const z = MR.sample("dem", lon, lat);
     const info = getDemInfo();
-    return ((z - info.min) / 1000 / KM_PER_UNIT) * exag;
+    const kpu = getKmPerUnit();
+    return ((z - info.min) / 1000 / kpu) * exag;
   }
 
   function toXYZ(lon, lat, lift = 0.25) {
@@ -81,12 +91,16 @@
     const pos = geo.attributes.position;
     const info = getDemInfo();
     const Z = info.Z, lo = info.min;
+    const kpu = getKmPerUnit();
     for (let i = 0; i < pos.count; i++) {
-      pos.setY(i, ((Z[i] - lo) / 1000 / KM_PER_UNIT) * exag);
+      pos.setY(i, ((Z[i] - lo) / 1000 / kpu) * exag);
     }
     geo.computeVertexNormals();
 
     const baseImg = document.getElementById("basemap");
+    if (!S3.textureCanvas || S3.builtRegion !== MR.currentRegion) {
+      S3.setTexture(baseImg, null, 1);
+    }
     const tex = new THREE.Texture(S3.textureCanvas || baseImg);
     tex.needsUpdate = true;
     tex.anisotropy = 4;
@@ -97,6 +111,7 @@
       new THREE.MeshLambertMaterial({ map: tex, emissive: 0x777777, emissiveMap: tex })
     );
     scene.add(terrain);
+    S3.builtRegion = MR.currentRegion;
   }
 
   // Compone mapa base + capa de análisis en una textura
@@ -104,10 +119,18 @@
     const c = document.createElement("canvas");
     c.width = c.height = 1200;
     const ctx = c.getContext("2d");
-    try {
-      ctx.drawImage(baseImg, 0, 0, 1200, 1200);
-    } catch (e) {
-      /* imagen aún no cargada */
+    const isReady = baseImg && (baseImg.complete || baseImg.naturalWidth > 0);
+    if (isReady) {
+      try {
+        ctx.drawImage(baseImg, 0, 0, 1200, 1200);
+      } catch (e) {
+        /* imagen no disponible aún */
+      }
+    } else if (baseImg) {
+      baseImg.addEventListener("load", function onImgLd() {
+        baseImg.removeEventListener("load", onImgLd);
+        S3.setTexture(baseImg, overlayCanvas, opacity);
+      });
     }
     if (overlayCanvas) {
       ctx.globalAlpha = opacity;
@@ -115,7 +138,7 @@
       ctx.drawImage(overlayCanvas, 0, 0, 1200, 1200);
     }
     S3.textureCanvas = c;
-    if (terrain) {
+    if (terrain && isReady) {
       const tx = new THREE.Texture(c);
       tx.needsUpdate = true;
       if (THREE.sRGBEncoding) tx.encoding = THREE.sRGBEncoding;
@@ -168,15 +191,15 @@
       doneMesh = tube(st.route.slice(0, Math.max(2, i + 1)), 0x46c882, 0.3);
     }
     if (!astro) {
-      astro = new THREE.Mesh(new THREE.SphereGeometry(0.7, 20, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
+      astro = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.5, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 }));
       scene.add(astro);
       scene.add(beacon);
     }
     if (st.pos) {
-      const p = toXYZ(st.pos[0], st.pos[1], 0.8);
+      const p = toXYZ(st.pos[0], st.pos[1], 0.85);
       astro.position.copy(p);
-      beacon.position.set(p.x, p.y + 3, p.z);
+      beacon.position.set(p.x, p.y + 2.25, p.z);
       astro.material.color.set(st.color || "#1E64DC");
       astro.visible = beacon.visible = true;
       if (follow) {
@@ -209,22 +232,25 @@
       const isMin = m.type === "mineral" || m.isMineral;
       const c = isMin ? (m.mineral && m.mineral.category === "Carbonatos / Olivino" ? 0x00d26a : 0x2f7fb8) : (col[m.type] || 0xffffff);
 
+      const stickH = 3.6;
+      const stickR = 0.11;
       const stick = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.06, 3, 6),
+        new THREE.CylinderGeometry(stickR, stickR, stickH, 8),
         new THREE.MeshBasicMaterial({ color: c })
       );
-      stick.position.set(base.x, base.y + 1.5, base.z);
+      stick.position.set(base.x, base.y + stickH / 2, base.z);
 
       let head;
+      const headY = base.y + stickH + 0.9;
       if (isMin) {
         head = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.75),
-          new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.4 })
+          new THREE.OctahedronGeometry(1.2),
+          new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.65 })
         );
-        head.position.set(base.x, base.y + 3.4, base.z);
+        head.position.set(base.x, headY, base.z);
         const ring = new THREE.Mesh(
-          new THREE.RingGeometry(0.4, 0.9, 16),
-          new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.5 })
+          new THREE.RingGeometry(0.5, 1.3, 16),
+          new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
         );
         ring.rotation.x = Math.PI / 2;
         ring.position.set(base.x, base.y + 0.1, base.z);
@@ -233,20 +259,37 @@
       } else {
         head = new THREE.Mesh(
           m.type === "meta"
-            ? new THREE.ConeGeometry(0.7, 1.4, 4)
+            ? new THREE.ConeGeometry(1.2, 2.2, 6)
             : m.type === "refugio"
-            ? new THREE.CylinderGeometry(0.5, 0.6, 1.0, 6)
-            : new THREE.OctahedronGeometry(0.55),
+            ? new THREE.CylinderGeometry(0.9, 1.0, 1.5, 6)
+            : new THREE.OctahedronGeometry(1.0),
           new THREE.MeshBasicMaterial({ color: c })
         );
-        head.position.set(base.x, base.y + 3.3, base.z);
+        head.position.set(base.x, headY, base.z);
         g.userData = { isMineral: false, target: m, onClick: m.onClick, label: m.label };
       }
 
       g.add(stick);
       g.add(head);
+      g._head = head;
+      if (isMin) g.visible = mineralsVisible;
       scene.add(g);
       pins.push(g);
+    });
+  };
+
+  S3.setLayerVisible = function (v) {
+    layerVisible = !!v;
+    const ov = layerVisible ? document.getElementById("overlay") : null;
+    S3.setTexture(document.getElementById("basemap"), ov, 0.7);
+  };
+
+  S3.setMineralsVisible = function (v) {
+    mineralsVisible = !!v;
+    pins.forEach(p => {
+      if (p.userData && p.userData.isMineral) {
+        p.visible = mineralsVisible;
+      }
     });
   };
 
@@ -327,8 +370,8 @@
       // Rotación suave de cristales minerales
       const tSec = now * 0.002;
       pins.forEach(p => {
-        if (p.userData && p.userData.isMineral && p.children[1]) {
-          p.children[1].rotation.y = tSec;
+        if (p._head && p.userData && p.userData.isMineral) {
+          p._head.rotation.y = tSec;
         }
       });
 

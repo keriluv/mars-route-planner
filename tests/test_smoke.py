@@ -219,7 +219,7 @@ def test_multicriteria_planner_and_rejection():
     goal_shelter = (137.8599, -5.3709)  # Base Mount Sharp
     arbitrary_point = (137.55, -4.75)  # Punto sin refugio
 
-    # 1. Ruta válida a refugio
+    # La ruta histórica a Mount Sharp excede una EVA: no cambiar a rover automáticamente.
     alt_segura = planner.plan_alternative(
         profile_id="segura",
         start_lonlat=start,
@@ -228,10 +228,10 @@ def test_multicriteria_planner_and_rejection():
         shelters_catalog=shelters,
         require_final_shelter=True,
     )
-    assert alt_segura.is_valid is True
+    assert alt_segura.is_valid is False
     assert alt_segura.total_km > 0
-    assert alt_segura.resources.oxygen_pct > 0
-    assert alt_segura.rejection_reason is None
+    assert alt_segura.resources.eva_time_min > 480
+    assert alt_segura.rejection_reason is not None
 
     # 2. Rechazo por destino sin refugio
     alt_rechazada = planner.plan_alternative(

@@ -544,29 +544,29 @@
       const k = cfg.exag / M_PER_DEG;
       const yBase = loc.elev * k;
 
-      // Anillo de pulso en la base
-      const ringGeo = new THREE.RingGeometry(0.2, 0.45, 24);
+      // Anillo en la base sutil
+      const ringGeo = new THREE.RingGeometry(0.035, 0.08, 24);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({ color: loc.color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       group.add(ring);
 
-      // Haz cilíndrico luminoso
-      const beamGeo = new THREE.CylinderGeometry(0.04, 0.08, 1.6, 12);
-      beamGeo.translate(0, 0.8, 0);
+      // Haz cilíndrico luminoso notable pero contenido
+      const beamGeo = new THREE.CylinderGeometry(0.008, 0.015, 0.26, 12);
+      beamGeo.translate(0, 0.13, 0);
       const beamMat = new THREE.MeshBasicMaterial({ color: loc.color, transparent: true, opacity: 0.75 });
       const beam = new THREE.Mesh(beamGeo, beamMat);
       group.add(beam);
 
       // Prisma octaédrico flotante
-      const octaGeo = new THREE.OctahedronGeometry(0.35, 0);
-      octaGeo.translate(0, 1.8, 0);
-      const octaMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const octaGeo = new THREE.OctahedronGeometry(0.055, 0);
+      octaGeo.translate(0, 0.32, 0);
+      const octaMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
       const diamond = new THREE.Mesh(octaGeo, octaMat);
       group.add(diamond);
 
       group.position.set(loc.lon, yBase, -loc.lat);
-      group.userData = { loc, diamond, ring, initialY: yBase };
+      group.userData = { loc, diamond, ring, beam, initialY: yBase };
       scene.add(group);
       beacons.push(group);
     });
@@ -590,6 +590,13 @@
     }
     pins.length = 0;
 
+    // Dimensiones adaptadas al relieve (calibradas para exag = 6.0, notables y legibles)
+    const exagFactor = Math.max(0.6, Math.min(3.5, (cfg.exag || 6.0) / 6.0));
+    const stemH = 0.13 * exagFactor;
+    const stemR = 0.0055 * exagFactor;
+    const headSize = 0.045 * exagFactor;
+    const ringR = 0.06 * exagFactor;
+
     (list || []).forEach(m => {
       const g = new THREE.Group();
       const pos = toGlobeXYZ(m.lon, m.lat, 0.002);
@@ -603,28 +610,29 @@
       }
 
       // Anillo de brillo en la base sobre el terreno
-      const ringGeo = new THREE.RingGeometry(0.12, 0.32, 16);
+      const ringGeo = new THREE.RingGeometry(ringR * 0.4, ringR, 16);
       ringGeo.rotateX(-Math.PI / 2);
-      const ringMat = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+      const ringMat = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
       const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.position.y = 0.01;
+      ring.position.y = 0.001;
       g.add(ring);
 
-      // Mástil vertical luminoso
-      const stemGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.9, 8);
-      stemGeo.translate(0, 0.45, 0);
+      // Mástil vertical visible y estilizado
+      const stemGeo = new THREE.CylinderGeometry(stemR, stemR, stemH, 8);
+      stemGeo.translate(0, stemH / 2, 0);
       const stemMat = new THREE.MeshBasicMaterial({ color: c });
       const stem = new THREE.Mesh(stemGeo, stemMat);
       g.add(stem);
 
       let head;
+      const headY = stemH + headSize;
       if (isMin) {
-        const octaGeo = new THREE.OctahedronGeometry(0.24, 0);
-        octaGeo.translate(0, 1.05, 0);
+        const octaGeo = new THREE.OctahedronGeometry(headSize, 0);
+        octaGeo.translate(0, headY, 0);
         const octaMat = new THREE.MeshLambertMaterial({
           color: c,
           emissive: c,
-          emissiveIntensity: 0.55
+          emissiveIntensity: 0.65
         });
         head = new THREE.Mesh(octaGeo, octaMat);
         g.userData = {
@@ -637,20 +645,20 @@
       } else {
         let headGeo;
         if (m.type === "meta") {
-          headGeo = new THREE.ConeGeometry(0.22, 0.45, 6);
-          headGeo.translate(0, 1.05, 0);
+          headGeo = new THREE.ConeGeometry(headSize * 1.15, headSize * 1.9, 6);
+          headGeo.translate(0, headY, 0);
         } else if (m.type === "refugio") {
-          headGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.35, 6);
-          headGeo.translate(0, 1.0, 0);
+          headGeo = new THREE.CylinderGeometry(headSize, headSize * 1.1, headSize * 1.25, 6);
+          headGeo.translate(0, headY, 0);
         } else if (m.type === "base") {
-          headGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.35, 12);
-          headGeo.translate(0, 1.0, 0);
+          headGeo = new THREE.CylinderGeometry(headSize * 1.1, headSize * 1.1, headSize * 1.25, 12);
+          headGeo.translate(0, headY, 0);
         } else if (m.type === "hallazgo") {
-          headGeo = new THREE.OctahedronGeometry(0.22, 0);
-          headGeo.translate(0, 1.05, 0);
+          headGeo = new THREE.OctahedronGeometry(headSize, 0);
+          headGeo.translate(0, headY, 0);
         } else {
-          headGeo = new THREE.OctahedronGeometry(0.18, 0);
-          headGeo.translate(0, 1.0, 0);
+          headGeo = new THREE.OctahedronGeometry(headSize * 0.9, 0);
+          headGeo.translate(0, headY, 0);
         }
         const headMat = new THREE.MeshBasicMaterial({ color: c });
         head = new THREE.Mesh(headGeo, headMat);
@@ -768,6 +776,7 @@
   function getInteractiveObjects() {
     const list = [];
     beacons.forEach(b => {
+      if (!b.visible) return;
       b.traverse(c => {
         if (c.isMesh) {
           c._parentGroup = b;
@@ -777,6 +786,7 @@
     });
     if (pinsGroup) {
       pinsGroup.children.forEach(g => {
+        if (!g.visible) return;
         g.traverse(c => {
           if (c.isMesh) {
             c._parentGroup = g;
@@ -895,7 +905,9 @@
     if (b2d) {
       b2d.addEventListener("click", () => {
         card.hidden = true;
-        if (window.MR && window.MR.setRegion) {
+        if (window.MR && window.MR.switchRegion) {
+          window.MR.switchRegion(loc.id);
+        } else if (window.MR && window.MR.setRegion) {
           window.MR.setRegion(loc.id);
           const sel = $("regionSelect"); if (sel) sel.value = loc.id;
         }
@@ -907,7 +919,9 @@
     if (b3d) {
       b3d.addEventListener("click", () => {
         card.hidden = true;
-        if (window.MR && window.MR.setRegion) {
+        if (window.MR && window.MR.switchRegion) {
+          window.MR.switchRegion(loc.id);
+        } else if (window.MR && window.MR.setRegion) {
           window.MR.setRegion(loc.id);
           const sel = $("regionSelect"); if (sel) sel.value = loc.id;
         }
@@ -1135,17 +1149,25 @@
       scene.fog.near = dist * 1.3;
       scene.fog.far = dist * 2.8 + 6;
 
-      // Animación orbital suave de balizas
+      // Balizas regionales (Gale, Jezero) y puntos planetarios notables y elegantes
       const tSec = now * 0.0025;
       beacons.forEach((b, idx) => {
-        if (b.userData && b.userData.diamond) {
-          b.userData.diamond.rotation.y = tSec + idx;
-          b.userData.diamond.position.y = 1.8 + Math.sin(tSec * 2 + idx) * 0.12;
+        const u = b.userData;
+        if (!u || !u.loc) return;
+
+        // Escala adaptativa: visible y notable pero contenida para no tapar el cráter
+        const s = Math.max(0.4, Math.min(1.8, (dist / 10) * 1.0));
+        b.visible = true;
+        b.scale.set(s, s, s);
+
+        if (u.diamond) {
+          u.diamond.rotation.y = tSec + idx;
+          u.diamond.position.y = 0.32 + Math.sin(tSec * 2 + idx) * 0.02;
         }
       });
 
-      // Animación de cristales minerales y escala adaptativa de pines
-      const pinScale = Math.max(0.035, Math.min(1.2, dist * 0.045));
+      // Animación de cristales minerales y escala adaptativa notable de pines
+      const pinScale = Math.max(0.75, Math.min(2.2, (dist / 4.5) * 1.0));
       if (pinsGroup) {
         pinsGroup.children.forEach((p, idx) => {
           p.scale.set(pinScale, pinScale, pinScale);

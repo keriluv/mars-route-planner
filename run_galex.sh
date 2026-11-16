@@ -20,6 +20,14 @@ if ! command -v python3 &>/dev/null; then
   exit 1
 fi
 
+# Si el puerto 8000 ya está ocupado por una instancia previa, liberarlo limpiamente
+OLD_PID=$(lsof -ti :8000 2>/dev/null || true)
+if [ -n "$OLD_PID" ]; then
+  echo "Liberando puerto 8000 (proceso previo detectado en PID $OLD_PID)..."
+  kill $OLD_PID 2>/dev/null || true
+  sleep 0.5
+fi
+
 # Iniciar servidor en segundo plano
 python3 backend/server.py &
 PID=$!

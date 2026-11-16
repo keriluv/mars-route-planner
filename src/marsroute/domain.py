@@ -139,6 +139,11 @@ class ResourceState:
     radiation_dose_msv: float = 0.0          # Dosis acumulada (límite demostrativo 5 mSv)
     max_radiation_dose_msv: float = 5.0
     reserve_to_next_shelter_pct: float = 25.0  # Margen de oxígeno reservado para alcanzar refugio
+    metabolic_power_w: float = 0.0             # Gasto metabólico instantáneo o medio (W)
+    calories_kcal: float = 0.0                 # Calorías acumuladas quemadas (kcal)
+    heart_rate_bpm: float = 70.0               # Frecuencia cardíaca estimada (lpm)
+    water_liters: float = 0.0                  # Agua acumulada consumida (L)
+    o2_used_g: float = 0.0                     # Gramos de O2 consumidos acumulados
 
     def is_safe(self) -> Tuple[bool, Optional[str]]:
         """Comprueba si los consumibles están dentro de los límites de supervivencia."""

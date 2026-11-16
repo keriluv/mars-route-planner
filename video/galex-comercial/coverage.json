@@ -1,0 +1,127 @@
+{
+  "version": 2,
+  "duration": 119.8,
+  "fps": 30,
+  "transition_overlap": 0.6,
+  "scenes": [
+    {
+      "scene": "planet",
+      "start": 0.0,
+      "duration": 8,
+      "title": "Cada paso importa",
+      "features": "Planeta 3D · gira, navega y acércate a Marte"
+    },
+    {
+      "scene": "relief",
+      "start": 7.4,
+      "duration": 8,
+      "title": "El terreno cobra dimensión",
+      "features": "Relieve 3D · órbita y perspectiva del paisaje"
+    },
+    {
+      "scene": "map",
+      "start": 14.8,
+      "duration": 8,
+      "title": "Muévete por el mapa",
+      "features": "Desplazamiento, zoom y mapas base"
+    },
+    {
+      "scene": "layers",
+      "start": 22.2,
+      "duration": 8,
+      "title": "Una superficie. Muchas lecturas",
+      "features": "Capas, curvas de nivel, pendiente y térmico relativo"
+    },
+    {
+      "scene": "regions",
+      "start": 29.6,
+      "duration": 7,
+      "title": "Dos regiones para explorar",
+      "features": "Gale y Jezero · vistas regionales"
+    },
+    {
+      "scene": "minerals",
+      "start": 36.0,
+      "duration": 8,
+      "title": "Encuentra señales de ciencia",
+      "features": "Búsqueda de minerales, fichas y referencias de instrumentos"
+    },
+    {
+      "scene": "objectives",
+      "start": 43.4,
+      "duration": 6,
+      "title": "Elige tu siguiente objetivo",
+      "features": "Objetivos, filtros y referencias sobre el mapa"
+    },
+    {
+      "scene": "planning",
+      "start": 48.8,
+      "duration": 8,
+      "title": "Diseña tu recorrido",
+      "features": "Paradas y perfiles Segura, Rápida y Científica"
+    },
+    {
+      "scene": "eva",
+      "start": 56.2,
+      "duration": 8,
+      "title": "Acompaña cada etapa",
+      "features": "Explorador, elevación, reloj, recursos y avance simulado"
+    },
+    {
+      "scene": "conditions",
+      "start": 63.6,
+      "duration": 8,
+      "title": "Pon los datos en contexto",
+      "features": "Condiciones atmosféricas, terreno y modelo"
+    },
+    {
+      "scene": "suit",
+      "start": 71.0,
+      "duration": 6,
+      "title": "Observa el esfuerzo de la EVA",
+      "features": "Fisiología y recursos · modelo experimental"
+    },
+    {
+      "scene": "weather",
+      "start": 76.4,
+      "duration": 6,
+      "title": "Observa. Evalúa. Decide",
+      "features": "Tormenta hipotética, alertas y pausa"
+    },
+    {
+      "scene": "missions",
+      "start": 81.8,
+      "duration": 7,
+      "title": "Una misión. Nuevos objetivos",
+      "features": "Misiones principales y secundarias"
+    },
+    {
+      "scene": "records",
+      "start": 88.2,
+      "duration": 8,
+      "title": "Conserva lo que descubres",
+      "features": "Hallazgos, notas y estado de los reportes"
+    },
+    {
+      "scene": "log",
+      "start": 95.6,
+      "duration": 7,
+      "title": "Cada observación cuenta",
+      "features": "Bitácora, asistente y comunicaciones simuladas"
+    },
+    {
+      "scene": "rovers",
+      "start": 102.0,
+      "duration": 7,
+      "title": "Conecta con sus recorridos",
+      "features": "Curiosity y Perseverance · comparación exploratoria"
+    },
+    {
+      "scene": "controls",
+      "start": 108.4,
+      "duration": 7,
+      "title": "Tu espacio de exploración",
+      "features": "Tema, idioma, ayuda y accesibilidad"
+    }
+  ]
+}

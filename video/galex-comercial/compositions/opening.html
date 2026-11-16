@@ -1,0 +1,27 @@
+<template>
+<style>
+#root {position:absolute;inset:0;background:#080808;color:#ffffff;font-family:Inter;overflow:hidden}
+.frame {position:absolute;left:0;top:0;width:1920px;height:810px;overflow:hidden;background:#141414}
+.camera {position:absolute;inset:0;transform-origin:60% 45%}
+video,img {width:1440px;height:810px;object-fit:contain;position:absolute;top:0;left:240px}
+.copy {position:absolute;left:112px;top:846px;right:112px}
+.label {font-size:30px;letter-spacing:3px;color:#ff765f;font-weight:700;margin-bottom:10px}
+h1 {font-size:76px;letter-spacing:-3px;line-height:1.1;margin:0;font-weight:700}
+.sub {font-size:30px;margin:14px 0 0;color:#d9d9d9}
+.rail {position:absolute;left:0;top:810px;height:6px;width:1920px;background:#fc3d21;transform-origin:left center}
+</style>
+<div id="root" data-composition-id="opening" data-width="1920" data-height="1080">
+ <div class="frame" data-layout-allow-overflow><div class="camera" id="opening-camera">
+ <img id="opening-footage" class="clip" src="assets/relief-still.png" data-start="0" data-duration="6" data-track-index="0" alt="Vista real del relieve 3D de GaleX"></div></div>
+ <div class="rail" id="opening-rail" data-layout-ignore></div>
+ <div class="copy" id="opening-copy"><div class="label">GALEX / EXPLORACIÓN MARCIANA</div><h1>Cada paso importa</h1><p class="sub">Una perspectiva para explorar, planificar y simular</p></div>
+</div>
+<script>
+const tl=gsap.timeline({paused:true});
+tl.fromTo('#opening-camera',{scale:1.12,x:30},{scale:1,x:0,duration:0.65,ease:'power3.out'},0);
+tl.fromTo('#opening-copy',{y:24,opacity:0},{y:0,opacity:1,duration:0.45,ease:'power3.out'},0.12);
+tl.fromTo('#opening-rail',{scaleX:0},{scaleX:1,duration:0.7,ease:'power3.inOut'},0);
+tl.fromTo('#opening-camera',{scale:1,x:0},{scale:1.18,x:0,duration:0.7,ease:'power3.inOut',immediateRender:false},1.6);
+tl.to('#opening-camera',{scale:1,x:0,duration:0.7,ease:'power3.inOut'},4.5);
+window.__timelines['opening']=tl;
+</script></template>
