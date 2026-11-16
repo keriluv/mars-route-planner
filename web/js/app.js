@@ -250,35 +250,35 @@
     T.playing = false; renderStatus(); T.alerts++;
     if (S.panel) togglePanel(null);
     $("stageCard").hidden = true;
-    T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Alerta crítica: tormenta de polvo MDA-GALE-14" });
-    logSys("ALERTA CRÍTICA MDA-GALE-14: Viento 28.4 m/s (umbral: 20 m/s), Opacidad tau 2.15 (umbral: 1.50).");
+    T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Critical alert: MDA-GALE-14 dust storm" });
+      logSys("CRITICAL ALERT MDA-GALE-14: Wind 28.4 m/s (threshold: 20 m/s), opacity tau 2.15 (threshold: 1.50).");
 
-    showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta meteorológica crítica · Simulación pausada</span></div>
-      <h2>${MR.ICONS.warn}Tormenta de polvo y viento en MDA-GALE-14</h2>
-      <div class="coords" style="color:var(--text-2);font-size:12px;margin-top:2px">Sol 1 · 11:30 LTST · Estación Gale (137.48°E, -4.68°S)</div></div>
+    showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Critical weather alert · Simulation paused</span></div>
+      <h2>${MR.ICONS.warn}Dust storm and high winds at MDA-GALE-14</h2>
+      <div class="coords" style="color:var(--text-2);font-size:12px;margin-top:2px">Sol 1 · 11:30 LTST · Gale station (137.48°E, -4.68°S)</div></div>
       <div class="mbody">
         ${factsHtml([
-          ["28,4 m/s", "Viento (Crítico > 20 m/s)"],
-          ["2,15", "Opacidad \u03c4 (Crítico > 1.50)"],
-          ["−64 °C", "Temp. ambiente"],
-          ["Dunas Bagnold", "Corredor impactado"]
+          ["28.4 m/s", "Wind (critical > 20 m/s)"],
+          ["2.15", "Opacity \u03c4 (critical > 1.50)"],
+          ["−64 °C", "Ambient temperature"],
+          ["Bagnold Dunes", "Affected corridor"]
         ])}
         <div class="alt" style="margin-top:10px;padding:10px;border-left:3px solid var(--danger);background:var(--panel-2);border-radius:4px">
-          <strong>Explicación del sistema predictivo:</strong><br>
-          La estación MDA-GALE-14 reporta ráfagas severas y caída de visibilidad directa sobre el corredor de Bagnold Dunes.
-          El cruce directo presenta alto riesgo de abrasión y atascamiento del vehículo.
-          <br><strong>Recomendación:</strong> Replanificar de inmediato activando el <em>Perfil Seguro</em> para rodear la tormenta hacia Mount Sharp Base.
+          <strong>Predictive system explanation:</strong><br>
+          Station MDA-GALE-14 reports severe gusts and reduced visibility across the Bagnold Dunes corridor.
+          A direct crossing carries a high risk of abrasion and vehicle immobilization.
+          <br><strong>Recommendation:</strong> Replan immediately with the <em>Safe profile</em> and route around the storm toward Mount Sharp Base.
         </div>
         <div class="actions" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn ghost" data-ignore>Mantener rumbo actual</button>
-          <button class="btn primary" data-replan>Replanificar ruta segura</button>
+          <button class="btn ghost" data-ignore>Keep current heading</button>
+          <button class="btn primary" data-replan>Replan safe route</button>
         </div>
       </div>`, {
       cls: "critical", dismiss: false,
       bind: el => {
         el.querySelector("[data-ignore]").addEventListener("click", () => {
           closeModal();
-          banner({ kind: "warn", title: "Alerta ignorada por el operador", sub: "Riesgo de daño en sensores y atasco en Bagnold Dunes.", ttl: 5000 });
+          banner({ kind: "warn", title: "Alert ignored by operator", sub: "Risk of sensor damage and getting stuck in Bagnold Dunes.", ttl: 5000 });
           T.playing = true; renderStatus();
         });
         el.querySelector("[data-replan]").addEventListener("click", () => {
@@ -293,12 +293,12 @@
             lat: curP[1],
             elev: curP[3] || -4400,
             km: T.km,
-            text: "Replanificación de emergencia por tormenta de polvo MDA-GALE-14 (viento 28.4 m/s, tau 2.15)",
+            text: "Emergency route replan for MDA-GALE-14 dust storm (wind 28.4 m/s, tau 2.15)",
             attachments: { wind: 28.4, tau: 2.15, simMin: T.simMin, station: "MDA-GALE-14" },
             sync_status: "local"
           });
-          toast("Ruta replanificada: corredor este seguro hacia Mount Sharp Base");
-          banner({ kind: "nominal", title: "Ruta replanificada con éxito", sub: "Evitando corredor de tormenta en MDA-GALE-14 · Refugio seguro verificado.", ttl: 6000 });
+          toast("Route replanned: safe eastern corridor toward Mount Sharp Base");
+          banner({ kind: "nominal", title: "Route successfully replanned", sub: "Avoiding the MDA-GALE-14 storm corridor · Safe shelter verified.", ttl: 6000 });
         });
       }
     });
@@ -325,7 +325,7 @@
     } else {
       renderProfileMetrics();
     }
-    toast(`Perfil activo: ${p.toUpperCase()}`);
+    toast(`Route profile active: ${{ segura: "SAFE", rapida: "FAST", cientifica: "SCIENCE" }[p] || p.toUpperCase()}`);
   }
 
   function setMobility(m) {
@@ -811,7 +811,7 @@
     if (T.mode !== "walk" || !$("stageCard").hidden) return;
     if (!T.simulationStarted) {
       T.simulationStarted = true;
-      logSys("Simulación de práctica iniciada por el usuario.");
+      logSys("Practice simulation started by the user.");
     }
     T.playing = !T.playing;
     renderStatus(); renderDock(true);
@@ -957,27 +957,27 @@
     if (T.mode === "walk") {
       const p = curPos(); const i = MR.nearestKm(T.route, T.km);
       const rest = MR.chain([[p[0], p[1]], ...stops, goal]);
-      if (!rest) return toast("No hay ruta posible con esos límites. Sube la pendiente máxima.");
+      if (!rest) return toast("No route is possible with these limits. Increase the maximum slope.");
       T.route = MR.withKm(T.route.slice(0, i).concat([p], rest.slice(1)));
       T.stages = makeStages(T.route).map(k => Math.max(k, T.km));
-      afterRouteChange(); toast("Ruta recalculada desde tu posición");
-      logSys("Ruta recalculada desde la posición actual con nuevos pesos.");
+      afterRouteChange(); toast("Route recalculated from your current position");
+      logSys("Route recalculated from the current position using updated weights.");
       return;
     }
     const t0 = performance.now();
     const r = MR.chain([[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal]);
-    if (!r) return toast("No hay ruta posible con esos límites. Sube la pendiente máxima.");
+    if (!r) return toast("No route is possible with these limits. Increase the maximum slope.");
     T.adjusted = r; T.choice = "model";
     if (T.mode === "base") T.mode = "plan";
     afterRouteChange(true);
-    toast(`Ruta ajustada en ${Math.round(performance.now() - t0)} ms · ${fmt(r[r.length - 1][2])} km`);
-    // con backend: se refina la misma ruta en la grilla completa de 44 m
+    toast(`Route adjusted in ${Math.round(performance.now() - t0)} ms · ${fmt(r[r.length - 1][2])} km`);
+    // With the backend, refine the same route on the full 44 m grid.
     if (MR.API.online) {
       const trip = T, pts = [[T.baseRoute[0][0], T.baseRoute[0][1]], ...stops, goal];
       MR.API.route(pts, MR.cfg, T.profileMode || "segura").then(res => {
         if (!res || !res.route || trip !== T || T.mode !== "plan") return;
         T.adjusted = MR.densify(res.route); afterRouteChange(false);
-        toast(`Ruta refinada por el backend (${T.profileMode || "segura"}) · ${fmt(T.adjusted[T.adjusted.length - 1][2])} km`);
+        toast(`Route refined by the backend (${T.profileMode || "safe"}) · ${fmt(T.adjusted[T.adjusted.length - 1][2])} km`);
       });
     }
   }
@@ -1145,7 +1145,7 @@
     const f = { id: uid("f"), type, typeName: tn + (note ? " · " + note.slice(0, 24) : ""), note, photo, lon: ll[0], lat: ll[1],
       elev: MR.sample("dem", ll[0], ll[1]), simMin: T.simMin, km: T.km, fresh: true, isNew: true, crew: T.crew.id, simulationId: T.simulationId || null };
     T.findings.push(f); closePointUI(); refreshMarkers(); bump("hallazgos");
-    const msg = sendToEarth(`Hallazgo · ${tn}${note ? ": " + note : ""}`, ll, "hallazgo");
+    const msg = sendToEarth(`Finding · ${tn}${note ? ": " + note : ""}`, ll, "hallazgo");
     if (!T.simulationId) MR.API.send("hallazgos", { ...f, photo: photo ? "[img]" : null });
     if (!T.simulationId) MR.API.sendReporte({
       id: "rep_" + f.id,
@@ -1159,8 +1159,8 @@
       attachments: { type, solTime: MR.solTime(T.simMin).label },
       sync_status: "local"
     });
-    T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Hallazgo registrado: ${tn}` });
-    toast(T.simulationId ? "Hallazgo guardado en esta simulación" : "Guardado · enviado a la Tierra", "Deshacer", () => {
+    T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Finding recorded: ${tn}` });
+    toast(T.simulationId ? "Finding saved in this simulation" : "Saved · sent to Earth", "Undo", () => {
       T.findings = T.findings.filter(x => x !== f); T.log = T.log.filter(x => x !== msg);
       bump("hallazgos", -1); refreshMarkers(); renderPanel(); toast("Hallazgo eliminado");
     });
@@ -1272,8 +1272,8 @@
     renderAll(); renderRoutes(true);
     const r = T.baseRoute; const lon = (r[0][0] + r[r.length - 1][0]) / 2, lat = (r[0][1] + r[r.length - 1][1]) / 2;
     MR.Map.fit();
-    logSys(`Misión principal aceptada: ${T.crew.title}.`);
-    T.events.push({ t: T.simMin, c: "var(--brand-red)", txt: "Misión principal aceptada" });
+    logSys(`Primary mission accepted: ${T.crew.title}.`);
+    T.events.push({ t: T.simMin, c: "var(--brand-red)", txt: "Primary mission accepted" });
   }
   function acceptRoute() {
     simulationSnapshot = {
@@ -1288,9 +1288,10 @@
     recomputeHazards(); setLeft(false);
     renderAll(); renderRoutes();
     const p = curPos(); MR.Map.centerOn(p[0], p[1], 1.5);
-    banner({ kind: "ok", title: "Ruta aceptada · lista para simular", sub: "Pulsa «Iniciar simulación» cuando estés listo. Habrá una parada de decisión al final de cada tramo.", ttl: 6000 });
-    logSys(`Ruta aceptada (${T.choice === "short" ? "ruta corta" : T.adjusted ? "ruta ajustada" : "ruta del modelo"}): ${fmt(T.route[T.route.length - 1][2])} km.`);
-    T.events.push({ t: T.simMin, c: "var(--accent)", txt: "Inicio del recorrido" });
+    banner({ kind: "ok", title: "Route accepted · Ready to simulate", sub: "Select Start simulation when you are ready. You can make a decision at the end of each segment.", ttl: 6000 });
+    const routeType = T.choice === "short" ? "short route" : T.adjusted ? "adjusted route" : "model route";
+    logSys(`Route accepted (${routeType}): ${fmt(T.route[T.route.length - 1][2])} km.`);
+    T.events.push({ t: T.simMin, c: "var(--accent)", txt: "Traverse started" });
   }
 
   // Misión propia (editable)
@@ -1332,7 +1333,7 @@
     const m = { id: uid("m"), name: st.name, type: st.type, origin: "propia", lon: st.lon, lat: st.lat, note: st.note, status: "propuesta", by: T.crew.short };
     T.missions.push(m);
     activateMission(m);
-    sendToEarth(`Nueva misión propia: ${m.name} (${m.type})`, [m.lon, m.lat], "mision");
+    sendToEarth(`New custom mission: ${m.name} (${m.type})`, [m.lon, m.lat], "mision");
   }
   // Secundaria asignada (propuesta por el sistema o la Tierra)
   function openSecondaryBriefing(m) {
@@ -1345,7 +1346,7 @@
       bind: el => {
         el.querySelector("h2").textContent = m.name; el.querySelector(".n").textContent = m.note || "";
         el.querySelector("[data-n]").addEventListener("click", closeModal);
-        el.querySelector("[data-r]").addEventListener("click", () => { closeModal(); T.missions = T.missions.filter(x => x !== m); bump("misiones", -1); refreshMarkers(); renderPanel(); logSys(`Misión secundaria rechazada: ${m.name}.`); });
+        el.querySelector("[data-r]").addEventListener("click", () => { closeModal(); T.missions = T.missions.filter(x => x !== m); bump("misiones", -1); refreshMarkers(); renderPanel(); logSys(`Secondary mission declined: ${m.name}.`); });
         el.querySelector("[data-a]").addEventListener("click", () => { closeModal(); bump("misiones", -1); activateMission(m); });
       },
     });
@@ -1372,8 +1373,8 @@
       if (T.mode !== "base") recalcRoute();
       banner({ kind: "sec", title: `Misión añadida como parada: ${m.name}`, sub: "La ruta se recalculó para pasar por el punto.", ttl: 5000 });
     }
-    logSys(`Misión secundaria aceptada: ${m.name}.`);
-    T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secundaria aceptada: ${m.name}` });
+    logSys(`Secondary mission accepted: ${m.name}.`);
+    T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secondary mission accepted: ${m.name}` });
     if (!T.simulationId) MR.API.send("misiones", { crew: T.crew.id, kind: "secundaria", name: m.name, origin: m.origin, lon: m.lon, lat: m.lat, status: m.status });
     renderStops(); renderRoutes(); refreshMarkers(); renderPanel(); renderDock(true); renderStatus(); update3d();
   }
@@ -1391,7 +1392,7 @@
     const altLen = alt ? alt[alt.length - 1][2] : null, direct = targetKm - T.km;
     const extraM = alt ? Math.max(0, (altLen - direct) * 1000) : 0;
     const okAlt = alt && altMax <= MR.cfg.critSlope && extraM < 2500;
-    T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Alerta: pendiente ${fmt(z.max, 0)}°` });
+    T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Critical hazard: ${fmt(z.max, 0)}° slope` });
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Alerta crítica · simulación en pausa</span></div>
       <h2>${MR.ICONS.warn}Pendiente fuerte en ${fmt(dist, 0)} m</h2></div>
       <div class="mbody">${factsHtml([[fmt(z.max, 0) + "°", "pendiente máxima"], [fmt(z.rough, 0) + " m", "rugosidad"], [fmt((z.endKm - z.startKm) * 1000 + 50, 0) + " m", "largo del tramo"]])}
@@ -1401,7 +1402,7 @@
       <div class="actions"><button class="btn danger spacer" data-ab>Abortar</button><button class="btn" data-s>Seguir con precaución</button><button class="btn primary" data-d ${okAlt ? "" : "disabled"}>Desviar</button></div></div>`, {
       cls: "critical", dismiss: false,
       bind: m => {
-        m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "seguir"; closeModal(); logSys(`Alerta en km ${fmt(z.startKm)}: se sigue con precaución.`); T.playing = true; renderStatus(); });
+        m.querySelector("[data-s]").addEventListener("click", () => { T.handled[z.id] = "proceed"; closeModal(); logSys(`Hazard at km ${fmt(z.startKm)}: proceeding with caution.`); T.playing = true; renderStatus(); });
         m.querySelector("[data-d]").addEventListener("click", () => {
           T.handled[z.id] = "desvio"; closeModal(); T.detours++;
           const i = MR.nearestKm(T.route, T.km), j = MR.nearestKm(T.route, targetKm);
@@ -1409,8 +1410,9 @@
           T.stages = makeStages(T.route).map(k => Math.max(k, T.km));
           T.stageIdx = Math.max(0, T.stages.findIndex(k => k > T.km + 0.01));
           recomputeHazards(); T.hazards.forEach(h => { if (h.startKm < T.km + 0.05) T.handled[h.id] = 1; });
-          renderRoutes(); renderDock(true); logSys(`Desvío aplicado en km ${fmt(T.km)} para evitar ${fmt(z.max, 0)}°.`);
-          banner({ kind: "ok", title: "Desvío aplicado", sub: "Nueva ruta dibujada. Pulsa ▶ para continuar.", ttl: 4000 });
+          renderRoutes(); renderDock(true); logSys(`Detour applied at km ${fmt(T.km)} to avoid ${fmt(z.max, 0)}° terrain.`);
+          T.events.push({ t: T.simMin, c: "var(--accent)", txt: "Detour applied to avoid steep terrain" });
+          banner({ kind: "ok", title: "Detour applied", sub: "The new route is ready. Select Start simulation to continue.", ttl: 4000 });
         });
         m.querySelector("[data-ab]").addEventListener("click", () => confirmAbort(() => criticalAlert(z)));
       },
@@ -1424,7 +1426,7 @@
       bind: m => {
         m.querySelector("[data-c]").addEventListener("click", () => { closeModal(); back && back(); });
         m.querySelector("[data-y]").addEventListener("click", () => {
-          closeModal(); logSys(`Misión abortada en km ${fmt(T.km)}. Regreso a la base.`);
+          closeModal(); logSys(`Mission aborted at km ${fmt(T.km)}.`);
           T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Mission aborted" });
           T.aborted = true; T.mode = "done"; T.playing = false;
           renderAll(true);
@@ -1532,7 +1534,7 @@
       const replanButton = card.querySelector("[data-replan]");
       if (replanButton) replanButton.addEventListener("click", () => replanAfterIncident(incident));
       const restButton = card.querySelector("[data-r]");
-      if (restButton) restButton.addEventListener("click", () => { T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h."); renderStatus(); updateWeather(true); });
+      if (restButton) restButton.addEventListener("click", () => { T.simMin += 60; card.hidden = true; logSys("Rested for 1 hour."); renderStatus(); updateWeather(true); });
       const continueButton = card.querySelector("[data-c]");
       if (continueButton) continueButton.addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
       const findingButton = card.querySelector("[data-f]");
@@ -1605,8 +1607,8 @@
     $("stageCard").hidden = true;
     T.simMin = (Math.floor(T.simMin / 1440) + 1) * 1440 + EVA_START * 60;
     T.flags["eva1h_" + time().sol] = false;
-    logSys(`Descanso nocturno. Reanudación ${time().label}.`);
-    T.events.push({ t: T.simMin, c: "var(--text-2)", txt: `Inicio del ${time().label.split(" · ")[0]}` });
+    logSys(`Overnight rest. Resuming at ${time().label}.`);
+    T.events.push({ t: T.simMin, c: "var(--text-2)", txt: `Day started at ${time().label.split(" · ")[0]}` });
     renderStatus(); updateWeather(true);
     banner({ kind: "info", title: `Buenos días · ${time().label}`, sub: "Pulsa ▶ para continuar.", ttl: 4000 });
   }
@@ -1667,8 +1669,8 @@
     if (lz) { T.handled[lz.id] = 1; banner({ kind: "warn", title: `Terreno difícil en ${fmt(Math.max(0, (lz.startKm - T.km) * 1000), 0)} m`, sub: `Facilidad de paso ${fmt(lz.min, 2)} · se reduce el ritmo`, onClick: () => { const p = posAt(T.route, lz.startKm); MR.Map.centerOn(p[0], p[1], 3); } }); }
     // fin de etapa
     if (T.stageIdx < T.stages.length && T.km >= T.stages[T.stageIdx]) {
-      T.stageIdx++; T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Etapa ${T.stageIdx} completada` });
-      logSys(`Etapa ${T.stageIdx} de ${T.stages.length} completada en km ${fmt(T.km)}.`);
+      T.stageIdx++; T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Segment ${T.stageIdx} completed` });
+      logSys(`Segment ${T.stageIdx} of ${T.stages.length} completed at km ${fmt(T.km)}.`);
       const incident = T.stageIdx < T.stages.length && Math.random() < 0.35
         ? ROUTE_INCIDENTS[Math.floor(Math.random() * ROUTE_INCIDENTS.length)] : null;
       return stageCard("stage", incident);
@@ -1684,8 +1686,8 @@
       if (m.status === "aceptada" && MR.distKm(p, [m.lon, m.lat]) < 0.3) {
         m.status = "completada"; refreshMarkers(); renderRoutes(); renderPanel();
         banner({ kind: "ok", title: `Misión secundaria completada: ${m.name}`, ttl: 5000 });
-        logSys(`Misión secundaria completada: ${m.name}.`); T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secundaria completada: ${m.name}` });
-        sendToEarth(`Misión secundaria completada: ${m.name}`, [m.lon, m.lat], "mision");
+        logSys(`Secondary mission completed: ${m.name}.`); T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secondary mission completed: ${m.name}` });
+        sendToEarth(`Secondary mission completed: ${m.name}`, [m.lon, m.lat], "mision");
       }
     });
     const cand = D.objetivos.find(o => ["ciencia", "mineral", "espectral"].includes(o.type) && o.id !== T.crew.goalId && !T.proposed[o.id] && MR.distKm(p, [o.lon, o.lat]) < 3.5);
@@ -1701,15 +1703,15 @@
   }
   function earthScript(f) {
     const fire = (k, fn) => { if (!T.flags[k]) { T.flags[k] = true; fn(); } };
-    if (f > 0.06) fire("e1", () => earthMessage("Control de misión: buen inicio. Telemetría nominal; recuerden hidratarse en cada parada."));
+    if (f > 0.06) fire("e1", () => earthMessage("Mission Control: good start. Telemetry is nominal; remember to hydrate at every stop."));
     if (f > 0.3) fire("e2", () => {
       const p = curPos();
       const o = D.objetivos.filter(o => ["ciencia", "mineral", "espectral"].includes(o.type) && o.id !== T.crew.goalId && !T.proposed[o.id])
         .sort((a, b) => MR.distKm(p, [a.lon, a.lat]) - MR.distKm(p, [b.lon, b.lat]))[0];
-      if (o) { earthMessage(`Control de misión: proponemos la secundaria «${o.name}». Evalúen el desvío.`, [o.lon, o.lat]); proposeSecondary(o, "Control de misión (Tierra)"); }
+      if (o) { earthMessage(`Mission Control recommends the secondary objective “${o.name}”. Evaluate the detour.`, [o.lon, o.lat]); proposeSecondary(o, "Mission Control (Earth)"); }
     });
-    if (f > 0.55) fire("e3", () => earthMessage("Control de misión: el pronóstico indica más polvo en suspensión mañana; la radiación UV bajará."));
-    if (f > 0.85) fire("e4", () => earthMessage("Control de misión: último tramo. Confirmen coordenadas al llegar a la meta."));
+    if (f > 0.55) fire("e3", () => earthMessage("Mission Control: the forecast shows more airborne dust tomorrow; UV radiation is expected to decrease."));
+    if (f > 0.85) fire("e4", () => earthMessage("Mission Control: final segment. Confirm your coordinates when you reach the destination."));
   }
   function updateWeather(force) {
     const p = curPos() || T.baseRoute[0];
@@ -1726,9 +1728,9 @@
   }
   function arrive() {
     T.playing = false; T.mode = "done"; T.aborted = false; T.km = T.route[T.route.length - 1][2];
-    T.events.push({ t: T.simMin, c: "var(--nominal)", txt: "Meta alcanzada" });
-    logSys(`Meta alcanzada: ${goalObj().name}.`);
-    sendToEarth(`Llegamos a la meta: ${goalObj().name}. Coordenadas confirmadas.`, [goalObj().lon, goalObj().lat], "estado");
+    T.events.push({ t: T.simMin, c: "var(--nominal)", txt: "Destination reached" });
+    logSys(`Destination reached: ${goalObj().name}.`);
+    sendToEarth(`We reached the destination: ${goalObj().name}. Coordinates confirmed.`, [goalObj().lon, goalObj().lat], "estado");
     if (!T.simulationId) MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "completada" });
     renderAll();
     setTimeout(openSummary, MR.reduceMotion() ? 0 : 700);
@@ -1742,9 +1744,9 @@
     T.log.push(m);
     if (!T.simulationId) MR.API.send("bitacora", { crew: T.crew.id, from: "explorador", text, t: T.simMin, lon: ll && ll[0], lat: ll && ll[1], kind });
     // respuesta de la Tierra: llega tras ida + vuelta + 6 min de análisis
-    const reply = kind === "hallazgo" ? `Recibido: «${text.replace("Hallazgo · ", "")}». Excelente; guarden la muestra y registren contexto.`
-      : kind === "mision" ? `Recibido: ${text}. De acuerdo, prioridad media.` : kind === "estado" ? "¡Felicitaciones a toda la tripulación! Recibido en la Tierra." :
-      kind === "pos" ? "Posición recibida y registrada en el mapa de control." : `Recibido: «${text.slice(0, 60)}». Continúen según el plan.`;
+    const reply = kind === "hallazgo" ? `Received: “${text.replace('Finding · ', '')}”. Excellent; preserve the sample and record its context.`
+      : kind === "mision" ? `Received: ${text}. Approved; medium priority.` : kind === "estado" ? "Congratulations to the whole crew! Message received on Earth." :
+      kind === "pos" ? "Position received and logged on the control map." : `Received: “${text.slice(0, 60)}”. Continue according to plan.`;
     T.events.push({ t: T.simMin + 2 * ONE_WAY_MIN + 6, pending: true, reply, ll });
     renderPanel();
     return m;
@@ -1752,10 +1754,10 @@
   function earthMessage(text, ll) {
     T.log.push({ id: uid("l"), from: "earth", text, t: T.simMin, ll });
     bump("bitacora"); renderPanel();
-    banner({ kind: "msg", title: "Mensaje de la Tierra", sub: text.replace("Control de misión: ", ""), onClick: () => togglePanel("bitacora", "tierra"), ttl: 6000 });
+    banner({ kind: "msg", title: "Message from Earth", sub: text.replace("Mission Control: ", ""), onClick: () => togglePanel("bitacora", "tierra"), ttl: 6000 });
   }
   function deliverEarthReplies() {
-    T.events.forEach(e => { if (e.pending && T.simMin >= e.t) { e.pending = false; e.done = true; earthMessage("Control de misión: " + e.reply, e.ll); } });
+    T.events.forEach(e => { if (e.pending && T.simMin >= e.t) { e.pending = false; e.done = true; earthMessage("Mission Control: " + e.reply, e.ll); } });
     T.events = T.events.filter(e => !e.done);
   }
   setInterval(deliverEarthReplies, 500);
@@ -1767,25 +1769,25 @@
     T.ai.push({ from: "me", text: q, t: T.simMin });
     const s = q.toLowerCase(), p = curPos(), R = activeRoute() || T.baseRoute, L = R[R.length - 1][2];
     let a;
-    if (/falta|distancia|cu[aá]nto|llegar|eta/.test(s)) {
+    if (/remaining|distance|how much|how long|arrival|eta|falta|distancia|cu[aá]nto|llegar/.test(s)) {
       const rest = R.filter(x => x[2] >= T.km); const h = rest.length > 1 ? MR.estimateHours(MR.withKm(rest)) : 0;
-      a = `Faltan ${fmt(L - T.km)} km (≈ ${fmt(h, 1)} h de caminata). Ritmo actual ${fmt(MR.walkSpeed(MR.gradeAt(R, MR.nearestKm(R, T.km)), (p || R[0])[6]), 1)} km/h.`;
-    } else if (/peligro|riesgo|pendiente|alerta/.test(s)) {
+      a = `${fmt(L - T.km)} km remain (about ${fmt(h, 1)} hours of travel). Current pace: ${fmt(MR.walkSpeed(MR.gradeAt(R, MR.nearestKm(R, T.km)), (p || R[0])[6]), 1)} km/h.`;
+    } else if (/hazard|risk|slope|alert|peligro|riesgo|pendiente/.test(s)) {
       const z = T.hazards.find(z => z.endKm >= T.km);
-      a = z ? `Próximo tramo empinado en ${fmt(Math.max(0, z.startKm - T.km))} km: hasta ${fmt(z.max, 0)}°. Te avisaré 200 m antes.` : "No hay tramos sobre el umbral crítico en lo que queda de ruta.";
-    } else if (/clima|temperatura|condici|uv|presi/.test(s)) {
+      a = z ? `Next steep segment in ${fmt(Math.max(0, z.startKm - T.km))} km: up to ${fmt(z.max, 0)}°. I will alert you 200 m ahead.` : "No segments exceed the critical threshold for the rest of the route.";
+    } else if (/weather|climate|temperature|condition|uv|pressure|clima|temperatura|condici|presi/.test(s)) {
       const w = T.wx || MR.weather(time().hour, (p || R[0])[3], T.crew.profile), f = MR.weather(time().hour + 1, (p || R[0])[3], T.crew.profile);
-      a = `Ahora: ${fmt(w.air, 0)} °C aire, UV ${fmt(w.uv, 1)} W/m², ${fmt(w.p, 0)} Pa. En 1 h: ${fmt(f.air, 0)} °C. Fuente: REMS (Curiosity) corregido por altura.`;
-    } else if (/posici|coorden|d[oó]nde|ubicaci/.test(s)) {
+      a = `Current conditions: ${fmt(w.air, 0)} °C air temperature, UV ${fmt(w.uv, 1)} W/m², ${fmt(w.p, 0)} Pa. In 1 hour: ${fmt(f.air, 0)} °C. Source: REMS (Curiosity), adjusted for elevation.`;
+    } else if (/position|coordinate|where|location|posici|coorden|d[oó]nde|ubicaci/.test(s)) {
       const q2 = p || R[0];
-      a = `Estás en ${MR.fmtLL(q2[0], q2[1])}, a ${fmt(q2[3], 0)} m de altura, km ${fmt(T.km)} de ${fmt(L)}.`;
-    } else if (/objetivo|cerca|interes|muestra/.test(s)) {
+      a = `Your position is ${MR.fmtLL(q2[0], q2[1])}, at ${fmt(q2[3], 0)} m elevation, km ${fmt(T.km)} of ${fmt(L)}.`;
+    } else if (/target|nearby|interest|sample|objetivo|cerca|interes|muestra/.test(s)) {
       const q2 = p || R[0]; const o = D.objetivos.filter(o => !["base"].includes(o.type)).map(o => [o, MR.distKm(q2, [o.lon, o.lat])]).sort((a, b) => a[1] - b[1])[0];
-      a = `El objetivo más cercano es «${o[0].name}» a ${fmt(o[1])} km. ${o[0].note}`;
-    } else if (/ruta|[oó]ptim|por qu[eé]/.test(s)) {
+      a = `The nearest target is “${o[0].name}”, ${fmt(o[1])} km away. ${o[0].note}`;
+    } else if (/route|optimal|why|ruta|[oó]ptim/.test(s)) {
       const st = MR.routeStats(R, T.mobility);
-      a = `La ruta actual mide ${fmt(st.length)} km con pendiente media ${fmt(st.meanSlope)}° y facilidad media ${fmt(st.meanTrav, 2)}. El modelo prefiere rodear por terreno parecido al que Curiosity ya cruzó, aunque sea más larga.`;
-    } else a = "Puedo responder sobre: distancia restante, próximo peligro, condiciones, tu posición, objetivos cercanos o por qué esta ruta.";
+      a = `The current route is ${fmt(st.length)} km, with a mean slope of ${fmt(st.meanSlope)}° and mean traversability of ${fmt(st.meanTrav, 2)}. The model favors terrain similar to areas Curiosity has already crossed, even when that makes the route longer.`;
+    } else a = "Ask me about remaining distance, upcoming hazards, current conditions, your position, nearby targets, or why this route was chosen.";
     T.ai.push({ from: "them", text: a, t: T.simMin });
     renderPanel();
   }
@@ -1811,7 +1813,7 @@
   function renderPanel() {
     if (!S.panel) return;
     const body = $("spBody");
-    const titles = { misiones: "Misiones", bitacora: "Bitácora", hallazgos: `Hallazgos (${T.findings.length})` };
+    const titles = { misiones: "Missions", bitacora: "Logbook", hallazgos: `Findings (${T.findings.length})` };
     $("spTitle").textContent = titles[S.panel];
     if (S.panel === "misiones") return panelMissions(body);
     if (S.panel === "bitacora") return panelLog(body);
@@ -1820,23 +1822,23 @@
   function panelMissions(body) {
     const R = activeRoute(); const L = R ? R[R.length - 1][2] : T.baseRoute[T.baseRoute.length - 1][2];
     const pct = R ? Math.round((T.km / L) * 100) : 0;
-    const status = { base: "Pendiente de aceptar", plan: "Planeando ruta", walk: T.playing ? "En recorrido" : "En pausa", done: "Completada" }[T.mode];
+    const status = { base: "Awaiting acceptance", plan: "Planning route", walk: T.playing ? "On traverse" : "Paused", done: T.aborted ? "Aborted" : "Completed" }[T.mode];
     const n = T.stages.length || makeStages(T.baseRoute).length;
-    body.innerHTML = `<p class="sp-sub">${T.crew.short} · ${T.crew.role} — viaje independiente</p>
-      <div class="m-main"><span class="kicker">Misión principal · ${status}</span><h4></h4>
+    body.innerHTML = `<p class="sp-sub">${T.crew.short} · ${T.crew.role} — independent expedition</p>
+      <div class="m-main"><span class="kicker">Primary mission · ${status}</span><h4></h4>
         <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
         <div class="kicker num" style="display:flex;justify-content:space-between"><span>${pct} %</span><span>${fmt(T.km)} / ${fmt(L)} km</span></div>
         <div class="stages">${Array.from({ length: n }, (_, i) => `<span class="${i < T.stageIdx ? "done" : i === T.stageIdx && T.mode === "walk" ? "cur" : ""}" title="Etapa ${i + 1}"></span>`).join("")}</div>
-        ${T.mode === "base" ? '<div class="row-actions"><button class="btn primary" data-b>Abrir briefing</button></div>' : ""}
-        ${T.mode === "walk" ? '<div class="row-actions"><button class="btn ghost" data-ab>Abortar misión</button></div>' : ""}</div>
-      <h3 style="font-size:14px;margin:18px 0 4px;display:flex;justify-content:space-between;align-items:center">Secundarias <button class="btn" data-new style="min-height:32px;font-size:13px">+ Nueva misión</button></h3>
+        ${T.mode === "base" ? '<div class="row-actions"><button class="btn primary" data-b>Open briefing</button></div>' : ""}
+        ${T.mode === "walk" ? '<div class="row-actions"><button class="btn ghost" data-ab>Abort mission</button></div>' : ""}</div>
+      <h3 style="font-size:14px;margin:18px 0 4px;display:flex;justify-content:space-between;align-items:center">Secondary missions <button class="btn" data-new style="min-height:32px;font-size:13px">+ New mission</button></h3>
       <div id="secList"></div>`;
     body.querySelector("h4").textContent = T.crew.title;
     const b = body.querySelector("[data-b]"); b && b.addEventListener("click", openMainBriefing);
     const ab = body.querySelector("[data-ab]"); ab && ab.addEventListener("click", () => confirmAbort());
     body.querySelector("[data-new]").addEventListener("click", () => openOwnBriefing());
     const list = body.querySelector("#secList");
-    if (!T.missions.length) list.innerHTML = `<p class="empty">Sin misiones secundarias todavía. El sistema y la Tierra propondrán objetivos cercanos durante el recorrido, o crea la tuya tocando el mapa.</p>`;
+    if (!T.missions.length) list.innerHTML = `<p class="empty">No secondary missions yet. The system and Mission Control may suggest nearby targets during the traverse, or you can create one by selecting the map.</p>`;
     T.missions.slice().reverse().forEach(m => {
       const d = document.createElement("div"); d.className = "m-sec" + (m.status === "completada" ? " done" : "");
       const st = { propuesta: ["Propuesta", "warn"], aceptada: ["Aceptada", "sec"], completada: ["Completada ✓", "ok"] }[m.status];
@@ -1855,26 +1857,26 @@
   }
   function panelLog(body) {
     const tab = S.logTab;
-    body.innerHTML = `<div class="tabs log-tabs" role="tablist"><button role="tab" data-t="tierra" aria-selected="${tab === "tierra"}">Tierra · retraso ${ONE_WAY_MIN} min</button><button role="tab" data-t="asistente" aria-selected="${tab === "asistente"}">Asistente de ruta</button></div>
+    body.innerHTML = `<div class="tabs log-tabs" role="tablist"><button role="tab" data-t="tierra" aria-selected="${tab === "tierra"}">Earth · ${ONE_WAY_MIN} min delay</button><button role="tab" data-t="asistente" aria-selected="${tab === "asistente"}">Route assistant</button></div>
       <div class="log" id="logBox" aria-live="polite"></div>
-      ${tab === "asistente" ? `<div class="quick">${["¿Cuánto falta?", "Próximo peligro", "Condiciones ahora", "Mi posición", "Objetivo cercano", "¿Por qué esta ruta?"].map(q => `<button>${q}</button>`).join("")}</div>` :
-        `<div class="quick"><button data-pos>Enviar mi posición</button><button data-st>Todo en orden</button></div>`}
-      <form class="composer"><input maxlength="200" placeholder="${tab === "asistente" ? "Pregunta al asistente…" : "Mensaje a la Tierra…"}" aria-label="Mensaje"><button class="btn primary" type="submit">Enviar</button></form>`;
+      ${tab === "asistente" ? `<div class="quick">${["How much farther?", "Next hazard", "Current conditions", "My position", "Nearby target", "Why this route?"].map(q => `<button>${q}</button>`).join("")}</div>` :
+        `<div class="quick"><button data-pos>Send my position</button><button data-st>All systems nominal</button></div>`}
+      <form class="composer"><input maxlength="200" placeholder="${tab === "asistente" ? "Ask the assistant…" : "Message Earth…"}" aria-label="Message"><button class="btn primary" type="submit">Send</button></form>`;
     body.querySelectorAll("[data-t]").forEach(b => b.addEventListener("click", () => { S.logTab = b.dataset.t; renderPanel(); }));
     const box = body.querySelector("#logBox");
     const items = tab === "asistente" ? T.ai : T.log;
-    if (!items.length) box.innerHTML = `<p class="empty">${tab === "asistente" ? "Pregunta por distancia, peligros, clima o tu posición. Responde al instante." : "Aquí llegan los mensajes de la Tierra y se guardan tus reportes. Cada mensaje tarda 12 min en llegar."}</p>`;
+    if (!items.length) box.innerHTML = `<p class="empty">${tab === "asistente" ? "Ask about distance, hazards, weather, or your location. Replies are instant." : "Messages from Earth and your reports appear here. Each message takes 12 minutes to arrive."}</p>`;
     items.forEach(m => {
       const d = document.createElement("div"); d.className = "msg " + (m.from === "me" ? "me" : m.from === "sys" ? "sys" : "them");
       d.appendChild(document.createTextNode(m.text));
       const meta = document.createElement("span"); meta.className = "meta";
-      const who = m.from === "me" ? T.crew.short : m.from === "earth" ? "Tierra" : m.from === "sys" ? "" : "Asistente";
+      const who = m.from === "me" ? T.crew.short : m.from === "earth" ? "Earth" : m.from === "sys" ? "" : "Assistant";
       let st = "";
-      if (m.from === "me" && tab === "tierra") st = T.simMin >= m.arrive ? " · ✓ recibido en la Tierra" : ` · enviado → llega ${MR.solTime(m.arrive).hm}`;
+      if (m.from === "me" && tab === "tierra") st = T.simMin >= m.arrive ? " · ✓ received by Earth" : ` · sent → arrives ${MR.solTime(m.arrive).hm}`;
       meta.textContent = `${who ? who + " " : ""}${MR.solTime(m.t).hm}${st}`;
       d.appendChild(meta);
       if (m.ll) {
-        const l = document.createElement("button"); l.className = "loc"; l.textContent = "Ver en el mapa"; l.type = "button";
+        const l = document.createElement("button"); l.className = "loc"; l.textContent = "View on map"; l.type = "button";
         l.addEventListener("click", () => {
           if (S.view === "3d") MR.Scene3D.focus(m.ll[0], m.ll[1]);
           else if (S.view === "globe" && MR.Globe3D) MR.Globe3D.flyTo(m.ll[0], m.ll[1], 3.0);
@@ -1894,8 +1896,8 @@
     body.querySelectorAll(".quick button").forEach(b => b.addEventListener("click", () => {
       if (tab === "asistente") return askAssistant(b.textContent);
       const p = curPos() || T.baseRoute[0];
-      if (b.dataset.pos !== undefined) sendToEarth(`Coordenadas vitales: ${MR.fmtLL(p[0], p[1])} · ${fmt(p[3], 0)} m · km ${fmt(T.km)}`, [p[0], p[1]], "pos");
-      else sendToEarth("Estado: todo en orden, continuamos.", [p[0], p[1]]);
+      if (b.dataset.pos !== undefined) sendToEarth(`Position update: ${MR.fmtLL(p[0], p[1])} · ${fmt(p[3], 0)} m · km ${fmt(T.km)}`, [p[0], p[1]], "pos");
+      else sendToEarth("Status: all systems nominal; continuing as planned.", [p[0], p[1]]);
     }));
   }
   function panelFindings(body) {
