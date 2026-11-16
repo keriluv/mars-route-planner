@@ -17,8 +17,8 @@
     science: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
     reference: '<svg viewBox="0 0 24 24"><path d="M4 18l6-6 4 4 6-8"/></svg>',
     shelter: '<svg viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10z"/><path d="M9 21v-8h6v8"/></svg>',
-    hallazgo: '<svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>',
-    secundaria: '<svg viewBox="0 0 24 24"><path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 17l-5.5 3 1.5-6.5-5-4 6.5-.5z"/></svg>',
+    finding: '<svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>',
+    secondary: '<svg viewBox="0 0 24 24"><path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 17l-5.5 3 1.5-6.5-5-4 6.5-.5z"/></svg>',
     warn: '<svg viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>',
     msg: '<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>',
     ok: '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>',
@@ -279,7 +279,7 @@
       const b = document.createElement("button");
       b.className = "mk" + (m.cls ? " " + m.cls : ""); b.dataset.t = m.type; b.type = "button";
       b.setAttribute("aria-label", m.label); if (m.color) b.style.setProperty("--c", m.color);
-      if (m.type === "propuesta") b.innerHTML = `<span class="chip">${MR.ICONS.secundaria}<span></span></span>`;
+      if (m.type === "proposed") b.innerHTML = `<span class="chip">${MR.ICONS.secondary}<span></span></span>`;
       else b.innerHTML = `<span class="dot">${MR.ICONS[m.icon || m.type] || MR.ICONS.info}</span><span class="tag"></span>`;
       (b.querySelector(".tag") || b.querySelector(".chip span")).textContent = m.label;
       b.addEventListener("click", ev => { ev.stopPropagation(); m.onClick && m.onClick(m, ev); });

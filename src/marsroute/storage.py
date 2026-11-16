@@ -18,68 +18,68 @@ DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "backend" / "data" / "ma
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS explorador (
+CREATE TABLE IF NOT EXISTS explorer (
     id          TEXT PRIMARY KEY,
-    rol         TEXT NOT NULL,
+    role         TEXT NOT NULL,
     color       TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS mision (
+CREATE TABLE IF NOT EXISTS mission (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    explorador  TEXT NOT NULL,
-    tipo        TEXT NOT NULL CHECK (tipo IN ('principal', 'secundaria')),
-    origen      TEXT CHECK (origen IN ('asignada', 'propia')),
-    nombre      TEXT NOT NULL,
+    explorer  TEXT NOT NULL,
+    type        TEXT NOT NULL CHECK (type IN ('primary', 'secondary')),
+    origin      TEXT CHECK (origin IN ('assigned', 'own')),
+    name      TEXT NOT NULL,
     lon         REAL, lat REAL,
-    estado      TEXT NOT NULL,
+    status      TEXT NOT NULL,
     km          REAL,
-    creado      TEXT NOT NULL DEFAULT (datetime('now'))
+    created      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS hallazgo (
+CREATE TABLE IF NOT EXISTS finding (
     id          TEXT PRIMARY KEY,
-    explorador  TEXT NOT NULL,
-    tipo        TEXT NOT NULL CHECK (tipo IN ('mineral', 'roca', 'otro')),
-    nota        TEXT,
-    lon         REAL NOT NULL, lat REAL NOT NULL, altura_m REAL,
+    explorer  TEXT NOT NULL,
+    type        TEXT NOT NULL CHECK (type IN ('mineral', 'rock', 'other')),
+    note        TEXT,
+    lon         REAL NOT NULL, lat REAL NOT NULL, elevation_m REAL,
     sol_min     REAL,
     km          REAL,
-    tiene_foto  INTEGER NOT NULL DEFAULT 0,
-    creado      TEXT NOT NULL DEFAULT (datetime('now'))
+    has_photo  INTEGER NOT NULL DEFAULT 0,
+    created      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS mensaje (
+CREATE TABLE IF NOT EXISTS message (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    explorador  TEXT NOT NULL,
-    remitente   TEXT NOT NULL CHECK (remitente IN ('explorador', 'tierra', 'sistema')),
-    texto       TEXT NOT NULL,
-    tipo        TEXT,
+    explorer  TEXT NOT NULL,
+    sender   TEXT NOT NULL CHECK (sender IN ('explorer', 'earth', 'system')),
+    text       TEXT NOT NULL,
+    type        TEXT,
     lon         REAL, lat REAL,
     sol_min     REAL,
-    creado      TEXT NOT NULL DEFAULT (datetime('now'))
+    created      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS reporte (
+CREATE TABLE IF NOT EXISTS report (
     id          TEXT PRIMARY KEY,
-    autor       TEXT NOT NULL,
-    tipo        TEXT NOT NULL,
+    author       TEXT NOT NULL,
+    type        TEXT NOT NULL,
     lon         REAL NOT NULL,
     lat         REAL NOT NULL,
     elev_m      REAL DEFAULT 0.0,
     sol_min     REAL DEFAULT 0.0,
     km          REAL DEFAULT 0.0,
-    texto       TEXT NOT NULL,
-    adjuntos_json TEXT DEFAULT '{}',
+    text       TEXT NOT NULL,
+    attachments_json TEXT DEFAULT '{}',
     sync_status TEXT NOT NULL DEFAULT 'local',
-    creado      TEXT NOT NULL DEFAULT (datetime('now'))
+    created      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS ix_hallazgo_exp ON hallazgo(explorador);
-CREATE INDEX IF NOT EXISTS ix_mensaje_exp ON mensaje(explorador);
-CREATE INDEX IF NOT EXISTS ix_mision_exp ON mision(explorador);
-CREATE INDEX IF NOT EXISTS ix_reporte_autor ON reporte(autor);
+CREATE INDEX IF NOT EXISTS ix_finding_explorer ON finding(explorer);
+CREATE INDEX IF NOT EXISTS ix_message_explorer ON message(explorer);
+CREATE INDEX IF NOT EXISTS ix_mission_explorer ON mission(explorer);
+CREATE INDEX IF NOT EXISTS ix_report_author ON report(author);
 
-INSERT OR IGNORE INTO explorador (id, rol, color) VALUES
+INSERT OR IGNORE INTO explorer (id, role, color) VALUES
     ('ev1', 'Commander', '#1E64DC'),
     ('ev2', 'Geologist', '#B5651D'),
     ('ev3', 'Engineer',  '#127846');
@@ -121,8 +121,8 @@ class Storage:
     def save_report(self, report: Report) -> None:
         """Saves or updates a report in SQLite."""
         sql = """
-        INSERT OR REPLACE INTO reporte (
-            id, autor, tipo, lon, lat, elev_m, sol_min, km, texto, adjuntos_json, sync_status, creado
+        INSERT OR REPLACE INTO report (
+            id, author, type, lon, lat, elev_m, sol_min, km, text, attachments_json, sync_status, created
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
@@ -146,7 +146,7 @@ class Storage:
 
     def get_report(self, report_id: str) -> Optional[Report]:
         """Gets a report by its ID."""
-        sql = "SELECT * FROM reporte WHERE id = ?"
+        sql = "SELECT * FROM report WHERE id = ?"
         with self._lock:
             with self._get_connection() as conn:
                 row = conn.execute(sql, (report_id,)).fetchone()
@@ -154,27 +154,27 @@ class Storage:
                     return None
                 return Report(
                     id=row["id"],
-                    author=row["autor"],
-                    type=row["tipo"],
+                    author=row["author"],
+                    type=row["type"],
                     lon=row["lon"],
                     lat=row["lat"],
                     elev_m=row["elev_m"],
                     sol_min=row["sol_min"],
                     km=row["km"],
-                    text=row["texto"],
-                    attachments=json.loads(row["adjuntos_json"] or "{}"),
+                    text=row["text"],
+                    attachments=json.loads(row["attachments_json"] or "{}"),
                     sync_status=row["sync_status"],
-                    created_at=row["creado"],
+                    created_at=row["created"],
                 )
 
     def list_reports(self, author: Optional[str] = None, limit: int = 100) -> List[Report]:
         """Lists reports in chronological order."""
-        sql = "SELECT * FROM reporte"
+        sql = "SELECT * FROM report"
         params: list[Any] = []
         if author:
-            sql += " WHERE autor = ?"
+            sql += " WHERE author = ?"
             params.append(author)
-        sql += " ORDER BY creado DESC LIMIT ?"
+        sql += " ORDER BY created DESC LIMIT ?"
         params.append(limit)
 
         with self._lock:
@@ -183,17 +183,17 @@ class Storage:
                 return [
                     Report(
                         id=r["id"],
-                        author=r["autor"],
-                        type=r["tipo"],
+                        author=r["author"],
+                        type=r["type"],
                         lon=r["lon"],
                         lat=r["lat"],
                         elev_m=r["elev_m"],
                         sol_min=r["sol_min"],
                         km=r["km"],
-                        text=r["texto"],
-                        attachments=json.loads(r["adjuntos_json"] or "{}"),
+                        text=r["text"],
+                        attachments=json.loads(r["attachments_json"] or "{}"),
                         sync_status=r["sync_status"],
-                        created_at=r["creado"],
+                        created_at=r["created"],
                     )
                     for r in rows
                 ]
@@ -202,21 +202,21 @@ class Storage:
     def save_finding(self, finding: Dict[str, Any]) -> None:
         """Records a geological finding."""
         sql = """
-        INSERT OR REPLACE INTO hallazgo (
-            id, explorador, tipo, nota, lon, lat, altura_m, sol_min, km, tiene_foto
+        INSERT OR REPLACE INTO finding (
+            id, explorer, type, note, lon, lat, elevation_m, sol_min, km, has_photo
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             finding["id"],
-            finding.get("crew", finding.get("explorador", "ev1")),
-            finding.get("type", finding.get("tipo", "otro")),
-            finding.get("note", finding.get("nota", "")),
+            finding.get("crew", finding.get("explorer", "ev1")),
+            finding.get("type", "other"),
+            finding.get("note", ""),
             finding["lon"],
             finding["lat"],
-            finding.get("elev", finding.get("altura_m", 0.0)),
+            finding.get("elev", finding.get("elevation_m", 0.0)),
             finding.get("simMin", finding.get("sol_min", 0.0)),
             finding.get("km", 0.0),
-            1 if finding.get("photo", finding.get("tiene_foto")) else 0,
+            1 if finding.get("photo", finding.get("has_photo")) else 0,
         )
         with self._lock:
             with self._get_connection() as conn:
@@ -224,12 +224,12 @@ class Storage:
                 conn.commit()
 
     def list_findings(self, crew: Optional[str] = None) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM hallazgo"
+        sql = "SELECT * FROM finding"
         params: list[Any] = []
         if crew:
-            sql += " WHERE explorador = ?"
+            sql += " WHERE explorer = ?"
             params.append(crew)
-        sql += " ORDER BY creado DESC"
+        sql += " ORDER BY created DESC"
         with self._lock:
             with self._get_connection() as conn:
                 return [dict(r) for r in conn.execute(sql, params).fetchall()]
@@ -237,14 +237,14 @@ class Storage:
     # ------------------------------------------------------------- Messages
     def save_message(self, msg: Dict[str, Any]) -> int:
         sql = """
-        INSERT INTO mensaje (explorador, remitente, texto, tipo, lon, lat, sol_min)
+        INSERT INTO message (explorer, sender, text, type, lon, lat, sol_min)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            msg.get("crew", msg.get("explorador", "ev1")),
-            msg.get("from", msg.get("remitente", "explorador")),
-            msg.get("text", msg.get("texto", "")),
-            msg.get("kind", msg.get("tipo", "texto")),
+            msg.get("crew", msg.get("explorer", "ev1")),
+            msg.get("from", msg.get("sender", "explorer")),
+            msg.get("text", msg.get("text", "")),
+            msg.get("kind", msg.get("type", "text")),
             msg.get("lon"),
             msg.get("lat"),
             msg.get("sol_min", msg.get("t", 0.0)),
@@ -256,10 +256,10 @@ class Storage:
                 return cur.lastrowid or 0
 
     def list_messages(self, crew: Optional[str] = None) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM mensaje"
+        sql = "SELECT * FROM message"
         params: list[Any] = []
         if crew:
-            sql += " WHERE explorador = ?"
+            sql += " WHERE explorer = ?"
             params.append(crew)
         sql += " ORDER BY id ASC"
         with self._lock:

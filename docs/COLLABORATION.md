@@ -6,9 +6,9 @@ Phase 4. A finding or an alert recorded by one astronaut reaches the other two a
 
 | Origin | Notice type | Example text | Where it is generated |
 |---|---|---|---|
-| Logged finding | `hallazgo` (finding) | «Mineral: green olivine» | when a finding is saved (`saveFinding`) |
-| Critical slope alert | `alerta_pendiente` (slope alert) | «slope of 15° over a 138 m section (km 52.2)» | when the alert opens (`criticalAlert`), once per section |
-| Critical radiation alert | `alerta_radiacion` (radiation alert) | «EVA dose of 5.2 mSv today (threshold 5.0 mSv)» | when the threshold is exceeded (`checkRadiation`), once per level |
+| Logged finding | `finding` | «Mineral: green olivine» | when a finding is saved (`saveFinding`) |
+| Critical slope alert | `slope_alert` | «slope of 15° over a 138 m section (km 52.2)» | when the alert opens (`criticalAlert`), once per section |
+| Critical radiation alert | `radiation_alert` | «EVA dose of 5.2 mSv today (threshold 5.0 mSv)» | when the threshold is exceeded (`checkRadiation`), once per level |
 
 Left out for now: the demonstration weather alert (it already fires for each explorer at 11:30), messages to Earth and missions.
 
@@ -29,10 +29,10 @@ The author does not see their own notice as a foreign zone. The size of the zone
 | Situation | What happens |
 |---|---|
 | **Without a server** (double-click on `index.html`) | Notices live in `localStorage` (`mr_shared`). Two tabs of the same browser notify each other instantly through the `storage` event; a new tab loads the ones already saved, without repeating banners. |
-| **With a backend** (`python backend/server.py`) | In addition: each notice goes to **SQLite** (`aviso` table) and each event to **JSONL** (`backend/data/docstore/eventos.jsonl`). Other browsers receive them by polling `/api/avisos` every 4 s. |
+| **With a backend** (`python backend/server.py`) | In addition: each notice goes to **SQLite** (`notice` table) and each event to **JSONL** (`backend/data/docstore/events.jsonl`). Other browsers receive them by polling `/api/notices` every 4 s. |
 
-- **SQLite (`aviso`):** the record: id, author, type, text, coordinates, radius, region, author's clock, status (`activo`/`retirado`, i.e. active/withdrawn).
-- **JSONL (`eventos`):** the log of what happened: `aviso_publicado` (published), `aviso_recibido` (received, with who received it) and `aviso_retirado` (withdrawn).
+- **SQLite (`notice`):** the record: id, author, type, text, coordinates, radius, region, author's clock, status (`active`/`withdrawn`).
+- **JSONL (`events`):** the log of what happened: `notice_published`, `notice_received` (with who received it) and `notice_withdrawn`.
 - **Idempotent resend:** the same id is not duplicated and the event is not repeated. What was created offline is uploaded on reconnection.
 - **Validation:** the server rejects unknown explorers, invalid types, empty text and out-of-range coordinates.
 
@@ -40,11 +40,11 @@ The author does not see their own notice as a foreign zone. The size of the zone
 
 | Method | Route | Use |
 |---|---|---|
-| GET | `/api/avisos[?region=gale]` | list of notices (includes withdrawn ones, so clients remove them) |
-| POST | `/api/avisos` | publishes a notice |
-| POST | `/api/avisos/retirar` | `{id, crew}`: only the author can withdraw it |
-| POST | `/api/avisos/recibido` | `{id, crew}`: leaves the receipt event |
-| GET | `/api/eventos[?tipo=…]` | events from the JSONL store |
+| GET | `/api/notices[?region=gale]` | list of notices (includes withdrawn ones, so clients remove them) |
+| POST | `/api/notices` | publishes a notice |
+| POST | `/api/notices/withdraw` | `{id, crew}`: only the author can withdraw it |
+| POST | `/api/notices/received` | `{id, crew}`: leaves the receipt event |
+| GET | `/api/events[?type=…]` | events from the JSONL store |
 
 `MARS_DATA_DIR` allows using a different data folder (tests use it so as not to touch `backend/data`).
 
@@ -60,4 +60,4 @@ The author does not see their own notice as a foreign zone. The size of the zone
 ## Tests
 
 - `python tests/web_fase4.py` (Playwright): without a server (two tabs, withdrawal, slope and radiation alerts) and with a backend (two browsers, SQLite, JSONL, idempotence, validation).
-- `python -m pytest tests/test_avisos.py`: notices backend with a temporary folder.
+- `python -m pytest tests/test_notices.py`: notices backend with a temporary folder.

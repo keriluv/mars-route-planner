@@ -124,7 +124,7 @@ def test_storage_sqlite_crud():
         rep = Report(
             id="rep-001",
             author="ev1",
-            type="hallazgo",
+            type="finding",
             lon=137.5,
             lat=-4.8,
             elev_m=-3200.0,
@@ -162,14 +162,14 @@ def test_storage_sqlite_crud():
         # 3. Save and list messages
         store.save_message({
             "crew": "ev1",
-            "from": "tierra",
+            "from": "earth",
             "text": "Authorization to proceed to station MDA-14 granted.",
-            "kind": "texto",
+            "kind": "text",
             "sol_min": 200.0,
         })
         messages = store.list_messages(crew="ev1")
         assert len(messages) >= 1
-        assert "MDA-14" in messages[-1]["texto"]
+        assert "MDA-14" in messages[-1]["text"]
 
     finally:
         if temp_db.exists():
@@ -204,7 +204,7 @@ def test_server_modules_importable(tmp_path, monkeypatch):
 
     try:
         assert hasattr(server, "Handler")
-        assert hasattr(server, "save_aviso")
+        assert hasattr(server, "save_notice")
     finally:
         server.db.close()
         sys.modules.pop("server", None)

@@ -132,13 +132,13 @@ GaleX is a **100 % web, offline-first** application for predictive planning and 
    - Default mobility: **on foot in a suit**; the pressurized rover remains available.
 6. **Collaboration between astronauts:**
    - A finding or an alert (slope or radiation) from one explorer reaches the others as a zone on the map, a marker and a message in their logbook. **Each one keeps their own separate trip.**
-   - Persistence: `localStorage` (two tabs notify each other instantly, also over file://) and, with a backend, SQLite (`aviso` table) plus events in JSONL. Details in `docs/COLLABORATION.md`.
+   - Persistence: `localStorage` (two tabs notify each other instantly, also over file://) and, with a backend, SQLite (`notice` table) plus events in JSONL. Details in `docs/COLLABORATION.md`.
 7. **Hard constraints and life support:** verified pressurized shelter at the end of the path (rejection if the distance to the shelter > 1 km); O₂ and battery on foot measured **per workday** (the suit is recharged every night: assumption).
 8. **3D planetary relief:**
    - **3D Relief** of the study frame, with the base map and the active layer as texture. It works over file://: the base maps travel as `data:` URIs in `web/data/basemaps_data.js` (loaded on demand), because the browser does not allow an image read from a file to be used as a WebGL texture.
    - **3D Planet** (`mars-3d-terrain` engine): NASA Mars Trek MOLA tiles with level-of-detail zoom. It needs internet or the backend; without them the procedural fallback relief remains. Over file:// the console may show CORS blocks for NASA tiles that do not exist.
 9. **MDA weather network and replanning:** simulated stations (`MDA-GALE-01` to `MDA-GALE-22`) and a demonstration scenario (storm at `MDA-GALE-14`, sol 1, 11:30 LTST) with one-click replanning.
-10. **SQLite persistence:** `mars_route.sqlite` (`reporte`, `hallazgo`, `mensaje`, `explorador`, `mision`, `aviso`). The user interface is in English.
+10. **SQLite persistence:** `mars_route.sqlite` (`report`, `finding`, `message`, `explorer`, `mission`, `notice`). The user interface is in English.
 
 ### Tests
 
@@ -146,7 +146,7 @@ GaleX is a **100 % web, offline-first** application for predictive planning and 
 
 ```bash
 python scripts/plan_route.py              # once: generates outputs/traversability.npy (ignored by git)
-python -m pytest tests/test_smoke.py tests/test_avisos.py
+python -m pytest tests/test_smoke.py tests/test_notices.py
 ```
 
 **Browser** (Playwright; opens `web/index.html` over file://, without a server, except for the backend test):
@@ -193,7 +193,7 @@ config/route_profiles.yaml     multi-criteria profiles and hard constraints
 data/simulated/                MDA weather alert scenario
 src/marsroute/                 geometry, layers, model, planner, evaluation, domain and SQLite store
 backend/server.py              multithreaded HTTP/JSON server (MARS_DATA_DIR variable for another data folder)
-backend/schema.sql             SQLite schema (reporte, hallazgo, aviso, etc.)
+backend/schema.sql             SQLite schema (report, finding, notice, etc.)
 backend/docstore.py            JSONL store (telemetry, targets, events)
 web/index.html                 main web interface
 web/css/app.css                responsive and accessible styles

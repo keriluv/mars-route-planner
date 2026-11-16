@@ -54,11 +54,11 @@ def switch_crew(pg, crew: str) -> None:
 
 
 def peers(pg) -> list[dict]:
-    return pg.evaluate("() => MR.state().log.filter(m => m.from === 'peer').map(m => ({ text: m.text, aviso: m.aviso, author: m.author }))")
+    return pg.evaluate("() => MR.state().log.filter(m => m.from === 'peer').map(m => ({ text: m.text, notice: m.notice, author: m.author }))")
 
 
 def n_markers(pg) -> int:
-    return pg.evaluate("() => document.querySelectorAll('.mk[data-t=aviso]').length")
+    return pg.evaluate("() => document.querySelectorAll('.mk[data-t=notice]').length")
 
 
 def n_zones(pg) -> int:
@@ -85,18 +85,18 @@ def scenario_a(browser) -> None:
 
     register_finding(a, "green olivine")
     check("EV1 logs the finding (it stays in their trip)", a.evaluate("() => MR.state().findings.length") == 1)
-    lst = a.evaluate("() => MR.Shared.list.map(n => ({ k: n.kind, a: n.author, e: n.estado }))")
-    check("the finding is published as a shared notice", lst == [{"k": "hallazgo", "a": "ev1", "e": "activo"}], str(lst))
+    lst = a.evaluate("() => MR.Shared.list.map(n => ({ k: n.kind, a: n.author, e: n.status }))")
+    check("the finding is published as a shared notice", lst == [{"k": "finding", "a": "ev1", "e": "active"}], str(lst))
     check("it is saved in localStorage", len(a.evaluate("() => JSON.parse(localStorage.getItem('mr_shared') || '[]')")) == 1)
     check("the author does not see their own notice as a foreign zone", n_markers(a) == 0 and n_zones(a) == 0)
 
-    # EV2 (mismo navegador): mensaje, marcador, zona; su viaje sigue separado
+    # EV2 (mismo navegador): message, marcador, zona; su viaje sigue separado
     switch_crew(a, "ev2")
     p2 = peers(a)
     check("EV2 receives the message in their logbook", len(p2) == 1 and "EV1" in p2[0]["text"] and "green olivine" in p2[0]["text"], str(p2))
     check("EV2 sees the notice marker on the map", n_markers(a) == 1)
     check("EV2 sees the marked zone on the map", n_zones(a) == 1)
-    check("EV2 has the unread logbook badge", a.evaluate("() => { const b = document.querySelector('[data-count=bitacora]'); return !!b && !b.hidden && +b.textContent >= 1; }"))
+    check("EV2 has the unread logbook badge", a.evaluate("() => { const b = document.querySelector('[data-count=logbook]'); return !!b && !b.hidden && +b.textContent >= 1; }"))
     check("EV2's trip stays separate (no findings, km 0, base mode)", a.evaluate("() => { const t = MR.state(); return t.findings.length === 0 && t.km === 0 && t.mode === 'base'; }"))
     switch_crew(a, "ev3")
     check("EV3 also receives the notice", len(peers(a)) == 1 and n_markers(a) == 1)
@@ -113,14 +113,14 @@ def scenario_a(browser) -> None:
     register_finding(a, "light quartz")
     check("the 2nd tab receives the new notice without reloading", wait_for(b, "() => MR.state().log.filter(m => m.from === 'peer').length === 2", 6000))
     check("and shows it with a banner, marker and zone", b.evaluate("() => !!document.querySelector('#banners .banner')") and n_markers(b) == 2 and n_zones(b) == 2)
-    b.evaluate("() => document.querySelector('.rail-btn[data-panel=hallazgos]').click()")
+    b.evaluate("() => document.querySelector('.rail-btn[data-panel=findings]').click()")
     b.wait_for_timeout(400)
     panel = " ".join(b.inner_text("#spBody").split()).upper()
     check("EV2's findings panel lists those from others", "FINDINGS FROM OTHER EXPLORERS (2)" in panel, panel[:140])
 
     # undo withdraws the notice for the others
     a.evaluate("() => { const b = document.querySelector('#toast button'); b && b.click(); }")
-    check("«Undo» withdraws the notice in the other tab", wait_for(b, "() => MR.state().log.filter(m => m.from === 'peer').length === 1 && document.querySelectorAll('.mk[data-t=aviso]').length === 1", 6000))
+    check("«Undo» withdraws the notice in the other tab", wait_for(b, "() => MR.state().log.filter(m => m.from === 'peer').length === 1 && document.querySelectorAll('.mk[data-t=notice]').length === 1", 6000))
 
     a.close()
     b.close()
@@ -159,14 +159,14 @@ def scenario_a2(browser) -> None:
         pg.wait_for_timeout(120)
         waited += 120
     check("a critical slope alert appears", got)
-    sl = pg.evaluate("() => MR.Shared.list.filter(n => n.kind === 'alerta_pendiente').map(n => ({ a: n.author, t: n.text }))")
+    sl = pg.evaluate("() => MR.Shared.list.filter(n => n.kind === 'slope_alert').map(n => ({ a: n.author, t: n.text }))")
     check("the slope alert is published for the others", len(sl) == 1 and sl[0]["a"] == "ev1" and "slope" in sl[0]["t"], str(sl))
     pg.click("#modal [data-s]")
     pg.evaluate("() => { MR.cfg.radThr = 0.02; }")  # low threshold: the radiation alert fires right away
     pg.evaluate("() => { if (!MR.state().playing) document.getElementById('btnPlay').click(); }")
     got = wait_for(pg, "() => { const m = document.getElementById('modal'); return !m.hidden && m.innerText.includes('Critical radiation alert') }", 60000)
     check("the radiation alert appears", got)
-    rl = pg.evaluate("() => MR.Shared.list.filter(n => n.kind === 'alerta_radiacion').map(n => n.author)")
+    rl = pg.evaluate("() => MR.Shared.list.filter(n => n.kind === 'radiation_alert').map(n => n.author)")
     check("the radiation alert is published only once", rl == ["ev1"], str(rl))
     pg.click("#modal [data-p]")
     switch_crew(pg, "ev2")
@@ -227,31 +227,31 @@ def scenario_b(browser) -> None:
         check("both browsers connect to the backend", x.evaluate("() => MR.API.online") and y.evaluate("() => MR.API.online"))
         switch_crew(y, "ev2")
         register_finding(x, "gypsum vein")
-        rows = api(base, "/api/avisos")
-        check("the notice is stored in SQLite (aviso table)", len(rows) == 1 and rows[0]["author"] == "ev1" and rows[0]["estado"] == "activo", str(rows)[:200])
+        rows = api(base, "/api/notices")
+        check("the notice is stored in SQLite (notice table)", len(rows) == 1 and rows[0]["author"] == "ev1" and rows[0]["status"] == "active", str(rows)[:200])
         con = sqlite3.connect(Path(tmp) / "mars_route.sqlite")
-        n_db = con.execute("SELECT COUNT(*) FROM aviso WHERE autor='ev1' AND tipo='hallazgo'").fetchone()[0]
+        n_db = con.execute("SELECT COUNT(*) FROM notice WHERE author='ev1' AND type='finding'").fetchone()[0]
         con.close()
         check("the row exists in the SQLite file", n_db == 1)
         check("the other browser receives it through synchronization (≤ 12 s)", wait_for(y, "() => MR.state().log.filter(m => m.from === 'peer').length === 1", 12000))
         check("and sees it on its map", n_markers(y) == 1 and n_zones(y) == 1)
-        ev = api(base, "/api/eventos")
-        tipos = [e["tipo"] for e in ev]
-        check("JSONL events: published and received", "aviso_publicado" in tipos and "aviso_recibido" in tipos, str(tipos))
-        check("the receipt event says who received it", any(e["tipo"] == "aviso_recibido" and e.get("crew") == "ev2" for e in ev))
-        check("the JSONL exists in the data folder", (Path(tmp) / "docstore" / "eventos.jsonl").exists())
+        ev = api(base, "/api/events")
+        tipos = [e["type"] for e in ev]
+        check("JSONL events: published and received", "notice_published" in tipos and "notice_received" in tipos, str(tipos))
+        check("the receipt event says who received it", any(e["type"] == "notice_received" and e.get("crew") == "ev2" for e in ev))
+        check("the JSONL exists in the data folder", (Path(tmp) / "docstore" / "events.jsonl").exists())
 
         # resending the same notice does not duplicate it
         n = rows[0]
-        body = json.dumps({"id": n["id"], "author": "ev1", "kind": "hallazgo", "text": n["text"], "lon": n["lon"], "lat": n["lat"]}).encode()
-        req = urllib.request.Request(base + "/api/avisos", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        body = json.dumps({"id": n["id"], "author": "ev1", "kind": "finding", "text": n["text"], "lon": n["lon"], "lat": n["lat"]}).encode()
+        req = urllib.request.Request(base + "/api/notices", data=body, headers={"Content-Type": "application/json"}, method="POST")
         urllib.request.urlopen(req, timeout=5).read()
-        check("resending the same notice does not duplicate it", len(api(base, "/api/avisos")) == 1 and [e["tipo"] for e in api(base, "/api/eventos")].count("aviso_publicado") == 1)
+        check("resending the same notice does not duplicate it", len(api(base, "/api/notices")) == 1 and [e["type"] for e in api(base, "/api/events")].count("notice_published") == 1)
 
         # an invalid type or a fake author are rejected
-        bad = json.dumps({"id": "x1", "author": "ev9", "kind": "hallazgo", "text": "t", "lon": 137, "lat": -5}).encode()
+        bad = json.dumps({"id": "x1", "author": "ev9", "kind": "finding", "text": "t", "lon": 137, "lat": -5}).encode()
         try:
-            urllib.request.urlopen(urllib.request.Request(base + "/api/avisos", data=bad, headers={"Content-Type": "application/json"}, method="POST"), timeout=5)
+            urllib.request.urlopen(urllib.request.Request(base + "/api/notices", data=bad, headers={"Content-Type": "application/json"}, method="POST"), timeout=5)
             rejected = False
         except urllib.error.HTTPError as e:
             rejected = e.code == 400
@@ -259,9 +259,9 @@ def scenario_b(browser) -> None:
 
         # withdraw: Undo in the author's browser
         x.evaluate("() => { const b = document.querySelector('#toast button'); b && b.click(); }")
-        check("withdrawing updates SQLite", wait_for(x, "() => true", 100) and api(base, "/api/avisos")[0]["estado"] == "retirado")
-        check("the other browser stops seeing it", wait_for(y, "() => MR.state().log.filter(m => m.from === 'peer').length === 0 && document.querySelectorAll('.mk[data-t=aviso]').length === 0", 12000))
-        check("JSONL event of withdrawn notice", "aviso_retirado" in [e["tipo"] for e in api(base, "/api/eventos")])
+        check("withdrawing updates SQLite", wait_for(x, "() => true", 100) and api(base, "/api/notices")[0]["status"] == "withdrawn")
+        check("the other browser stops seeing it", wait_for(y, "() => MR.state().log.filter(m => m.from === 'peer').length === 0 && document.querySelectorAll('.mk[data-t=notice]').length === 0", 12000))
+        check("JSONL event of withdrawn notice", "notice_withdrawn" in [e["type"] for e in api(base, "/api/events")])
         cx.close()
         cy.close()
     finally:

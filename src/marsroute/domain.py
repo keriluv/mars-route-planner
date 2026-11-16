@@ -242,8 +242,8 @@ class RouteAlternative:
 class Report:
     """Logbook report or geological finding persisted in SQLite."""
     id: str
-    author: str                              # 'ev1', 'ev2', 'ev3', 'sistema', 'tierra' (stored wire values)
-    type: str                                # 'hallazgo' (finding), 'mensaje', 'mision', 'alerta' (stored wire values)
+    author: str                              # 'ev1', 'ev2', 'ev3', 'system', 'earth' (stored wire values)
+    type: str                                # 'finding' (finding), 'message', 'mission', 'alert' (stored wire values)
     lon: float
     lat: float
     elev_m: float = 0.0
@@ -251,7 +251,7 @@ class Report:
     km: float = 0.0
     text: str = ""
     attachments: Dict[str, Any] = field(default_factory=dict)
-    sync_status: str = "local"               # 'local', 'enviado' (sent), 'pendiente' (pending)
+    sync_status: str = "local"               # 'local', 'sent' (sent), 'pending' (pending)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:

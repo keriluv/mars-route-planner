@@ -44,9 +44,9 @@
     spectral: 0x2f7fb8,
     science: 0xb5651d,
     reference: 0xc0c8d4,
-    hallazgo: 0x46c882,
-    secundaria: 0xa68bff,
-    propuesta: 0xa68bff
+    finding: 0x46c882,
+    secondary: 0xa68bff,
+    proposed: 0xa68bff
   };
 
   const MINERAL_COLORS = {
@@ -659,7 +659,7 @@
         } else if (m.type === "base") {
           headGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.35, 12);
           headGeo.translate(0, 1.0, 0);
-        } else if (m.type === "hallazgo") {
+        } else if (m.type === "finding") {
           headGeo = new THREE.OctahedronGeometry(0.22, 0);
           headGeo.translate(0, 1.05, 0);
         } else {

@@ -61,8 +61,8 @@ def main() -> int:
 
         # --- controls in Route → EVA workday, with persistence
         pg.click("#modal [data-n]")  # «Not now»
-        pg.evaluate("() => document.querySelector('[data-lptab=ruta]').click()")
-        check("EVA workday panel labeled as an assumption", "EVA workday" in pg.inner_text("[data-lpsec=ruta]") and "ASSUMPTION" in pg.inner_text("[data-lpsec=ruta]"))
+        pg.evaluate("() => document.querySelector('[data-lptab=route]').click()")
+        check("EVA workday panel labeled as an assumption", "EVA workday" in pg.inner_text("[data-lpsec=route]") and "ASSUMPTION" in pg.inner_text("[data-lpsec=route]"))
         pg.evaluate("() => { const e = document.getElementById('evaPause'); e.value = 10; e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); }")
         check("the breaks control updates the summary", "sols" in pg.inner_text("#evaSummary") and pg.evaluate("() => MR.eva.cfg.pauseMinPerH") == 10, pg.inner_text("#evaSummary"))
         check("the configuration is saved", pg.evaluate("() => JSON.parse(localStorage.getItem('mr_eva')).pauseMinPerH") == 10)

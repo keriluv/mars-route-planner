@@ -4,19 +4,19 @@ Serves the web page (web/ folder) and a small JSON API:
 
   GET  /api/health                 server status
   GET  /api/targets                fixed targets (document store)
-  GET  /api/hallazgos?crew=ev1     findings of an explorer (SQLite)
-  GET  /api/bitacora?crew=ev1      logbook messages (SQLite)
-  GET  /api/telemetria?crew=ev1    telemetry readings (document store)
-  POST /api/hallazgos              saves a finding
-  POST /api/bitacora               saves a message
-  POST /api/misiones               saves/updates a mission
-  POST /api/telemetria             saves a telemetry reading
+  GET  /api/findings?crew=ev1     findings of an explorer (SQLite)
+  GET  /api/logbook?crew=ev1      logbook messages (SQLite)
+  GET  /api/telemetry?crew=ev1    telemetry readings (document store)
+  POST /api/findings              saves a finding
+  POST /api/logbook               saves a message
+  POST /api/missions               saves/updates a mission
+  POST /api/telemetry             saves a telemetry reading
   POST /api/route                  computes an A* route on the full grid (44 m)
-  GET  /api/avisos                 notices shared between explorers (SQLite)
-  POST /api/avisos                 publishes a notice (finding or alert) for the other explorers
-  POST /api/avisos/retirar         the author withdraws a notice
-  POST /api/avisos/recibido        an explorer confirms receipt of a notice (event only)
-  GET  /api/eventos?tipo=...       events from the JSONL store (aviso_publicado, aviso_recibido, aviso_retirado)
+  GET  /api/notices                 notices shared between explorers (SQLite)
+  POST /api/notices                 publishes a notice (finding or alert) for the other explorers
+  POST /api/notices/withdraw         the author withdraws a notice
+  POST /api/notices/received        an explorer confirms receipt of a notice (event only)
+  GET  /api/events?type=...       events from the JSONL store (notice_published, notice_received, notice_withdrawn)
 
 MARS_DATA_DIR environment variable: alternative data folder (SQLite + JSONL); useful for tests.
 
@@ -101,89 +101,89 @@ def _crew(v):
     return v
 
 
-def save_hallazgo(b):
-    tipo = b.get("type")
-    if tipo not in ("mineral", "roca", "otro"):
+def save_finding(b):
+    type = b.get("type")
+    if type not in ("mineral", "rock", "other"):
         raise ValueError("invalid finding type")
-    row = (_txt(b.get("id"), 40, True), _crew(b.get("crew")), tipo, _txt(b.get("note"), 140),
+    row = (_txt(b.get("id"), 40, True), _crew(b.get("crew")), type, _txt(b.get("note"), 140),
            _num(b.get("lon"), 130, 145), _num(b.get("lat"), -10, 0), _num(b.get("elev")),
            _num(b.get("simMin"), 0, 1e7), _num(b.get("km"), 0, 1000), 1 if b.get("photo") else 0)
     with DB_LOCK:
-        db.execute("INSERT OR REPLACE INTO hallazgo (id, explorador, tipo, nota, lon, lat, altura_m, sol_min, km, tiene_foto)"
+        db.execute("INSERT OR REPLACE INTO finding (id, explorer, type, note, lon, lat, elevation_m, sol_min, km, has_photo)"
                    " VALUES (?,?,?,?,?,?,?,?,?,?)", row)
         db.commit()
 
 
-def save_mensaje(b):
-    remitente = {"explorador": "explorador", "tierra": "tierra", "sistema": "sistema"}.get(b.get("from"), "explorador")
-    row = (_crew(b.get("crew")), remitente, _txt(b.get("text"), 300, True), _txt(b.get("kind"), 20),
+def save_message(b):
+    sender = {"explorer": "explorer", "earth": "earth", "system": "system"}.get(b.get("from"), "explorer")
+    row = (_crew(b.get("crew")), sender, _txt(b.get("text"), 300, True), _txt(b.get("kind"), 20),
            _num(b.get("lon"), 130, 145), _num(b.get("lat"), -10, 0), _num(b.get("t"), 0, 1e7))
     with DB_LOCK:
-        db.execute("INSERT INTO mensaje (explorador, remitente, texto, tipo, lon, lat, sol_min) VALUES (?,?,?,?,?,?,?)", row)
+        db.execute("INSERT INTO message (explorer, sender, text, type, lon, lat, sol_min) VALUES (?,?,?,?,?,?,?)", row)
         db.commit()
 
 
-def save_mision(b):
-    tipo = b.get("kind") if b.get("kind") in ("principal", "secundaria") else "secundaria"
-    origen = b.get("origin") if b.get("origin") in ("asignada", "propia") else None
-    row = (_crew(b.get("crew")), tipo, origen, _txt(b.get("name"), 80, True), _num(b.get("lon"), 130, 145),
+def save_mission(b):
+    type = b.get("kind") if b.get("kind") in ("primary", "secondary") else "secondary"
+    origin = b.get("origin") if b.get("origin") in ("assigned", "own") else None
+    row = (_crew(b.get("crew")), type, origin, _txt(b.get("name"), 80, True), _num(b.get("lon"), 130, 145),
            _num(b.get("lat"), -10, 0), _txt(b.get("status"), 20, True), _num(b.get("km"), 0, 1000))
     with DB_LOCK:
-        db.execute("INSERT INTO mision (explorador, tipo, origen, nombre, lon, lat, estado, km) VALUES (?,?,?,?,?,?,?,?)", row)
+        db.execute("INSERT INTO mission (explorer, type, origin, name, lon, lat, status, km) VALUES (?,?,?,?,?,?,?,?)", row)
         db.commit()
 
 
-def save_telemetria(b):
+def save_telemetry(b):
     wx = b.get("wx") or {}
     doc = {"crew": _crew(b.get("crew")), "t": _num(b.get("t"), 0, 1e7), "km": _num(b.get("km"), 0, 1000),
            "lon": _num(b.get("lon"), 130, 145), "lat": _num(b.get("lat"), -10, 0), "elev": _num(b.get("elev")),
-           "clima": {k: _num(wx.get(k)) for k in ("air", "ground", "uv", "rh", "p") if k in wx}}
-    if b.get("dosis_msv") is not None:  # accumulated EVA dose of the trip (simplified model, mSv)
-        doc["dosis_msv"] = _num(b.get("dosis_msv"), 0, 1e6)
-    docs.insert("telemetria", doc)
+           "weather": {k: _num(wx.get(k)) for k in ("air", "ground", "uv", "rh", "p") if k in wx}}
+    if b.get("dose_msv") is not None:  # accumulated EVA dose of the trip (simplified model, mSv)
+        doc["dose_msv"] = _num(b.get("dose_msv"), 0, 1e6)
+    docs.insert("telemetry", doc)
 
 
-AVISO_TIPOS = ("hallazgo", "alerta_pendiente", "alerta_radiacion")
+NOTICE_TYPES = ("finding", "slope_alert", "radiation_alert")
 
 
-def save_aviso(b):
+def save_notice(b):
     """Publishes a shared notice. It is idempotent: resending the same id neither duplicates it nor repeats the event."""
-    tipo = b.get("kind")
-    if tipo not in AVISO_TIPOS:
+    type = b.get("kind")
+    if type not in NOTICE_TYPES:
         raise ValueError("invalid notice type")
-    row = (_txt(b.get("id"), 60, True), _crew(b.get("author")), tipo, _txt(b.get("text"), 300, True),
+    row = (_txt(b.get("id"), 60, True), _crew(b.get("author")), type, _txt(b.get("text"), 300, True),
            _num(b.get("lon"), -180, 180), _num(b.get("lat"), -90, 90), _num(b.get("radiusKm"), 0.05, 20) or 0.3,
            _txt(b.get("region"), 20) or "gale", _num(b.get("simMin"), 0, 1e7))
     with DB_LOCK:
-        cur = db.execute("INSERT OR IGNORE INTO aviso (id, autor, tipo, texto, lon, lat, radio_km, region, sol_min)"
+        cur = db.execute("INSERT OR IGNORE INTO notice (id, author, type, text, lon, lat, radius_km, region, sol_min)"
                          " VALUES (?,?,?,?,?,?,?,?,?)", row)
         db.commit()
         nuevo = cur.rowcount > 0
     if nuevo:
-        docs.insert("eventos", {"tipo": "aviso_publicado", "aviso_id": row[0], "autor": row[1], "kind": tipo, "lon": row[4], "lat": row[5]})
+        docs.insert("events", {"type": "notice_published", "notice_id": row[0], "author": row[1], "kind": type, "lon": row[4], "lat": row[5]})
 
 
-def retire_aviso(b):
-    aid, autor = _txt(b.get("id"), 60, True), _crew(b.get("crew"))
+def withdraw_notice(b):
+    aid, author = _txt(b.get("id"), 60, True), _crew(b.get("crew"))
     with DB_LOCK:
-        cur = db.execute("UPDATE aviso SET estado = 'retirado' WHERE id = ? AND autor = ? AND estado = 'activo'", (aid, autor))
+        cur = db.execute("UPDATE notice SET status = 'withdrawn' WHERE id = ? AND author = ? AND status = 'active'", (aid, author))
         db.commit()
     if cur.rowcount:
-        docs.insert("eventos", {"tipo": "aviso_retirado", "aviso_id": aid, "autor": autor})
+        docs.insert("events", {"type": "notice_withdrawn", "notice_id": aid, "author": author})
 
 
-def ack_aviso(b):
-    docs.insert("eventos", {"tipo": "aviso_recibido", "aviso_id": _txt(b.get("id"), 60, True), "crew": _crew(b.get("crew"))})
+def ack_notice(b):
+    docs.insert("events", {"type": "notice_received", "notice_id": _txt(b.get("id"), 60, True), "crew": _crew(b.get("crew"))})
 
 
-def list_avisos(region=None):
-    sql, args = "SELECT * FROM aviso", ()
+def list_notices(region=None):
+    sql, args = "SELECT * FROM notice", ()
     if region:
         sql, args = sql + " WHERE region = ?", (region,)
     with DB_LOCK:
-        rows = db.execute(sql + " ORDER BY creado, rowid LIMIT 500", args).fetchall()
-    return [{"id": r["id"], "author": r["autor"], "kind": r["tipo"], "text": r["texto"], "lon": r["lon"], "lat": r["lat"],
-             "radiusKm": r["radio_km"], "region": r["region"], "simMin": r["sol_min"], "estado": r["estado"], "creado": r["creado"]} for r in rows]
+        rows = db.execute(sql + " ORDER BY created, rowid LIMIT 500", args).fetchall()
+    return [{"id": r["id"], "author": r["author"], "kind": r["type"], "text": r["text"], "lon": r["lon"], "lat": r["lat"],
+             "radiusKm": r["radius_km"], "region": r["region"], "simMin": r["sol_min"], "status": r["status"], "created": r["created"]} for r in rows]
 
 
 # ---------------------------------------------------------------- multi-criteria routes
@@ -294,14 +294,14 @@ class Handler(BaseHTTPRequestHandler):
                 if name == "targets":
                     return self._json(200, [{k: v for k, v in d.items() if not k.startswith("_")} for d in docs.find("targets")])
                 crew = _crew(q.get("crew", "ev1"))
-                if name == "hallazgos":
-                    rows = db.execute("SELECT * FROM hallazgo WHERE explorador = ? ORDER BY creado", (crew,)).fetchall()
+                if name == "findings":
+                    rows = db.execute("SELECT * FROM finding WHERE explorer = ? ORDER BY created", (crew,)).fetchall()
                     return self._json(200, [dict(r) for r in rows])
-                if name == "bitacora":
-                    rows = db.execute("SELECT * FROM mensaje WHERE explorador = ? ORDER BY id", (crew,)).fetchall()
+                if name == "logbook":
+                    rows = db.execute("SELECT * FROM message WHERE explorer = ? ORDER BY id", (crew,)).fetchall()
                     return self._json(200, [dict(r) for r in rows])
-                if name == "telemetria":
-                    return self._json(200, docs.find("telemetria", {"crew": crew}, limit=1000))
+                if name == "telemetry":
+                    return self._json(200, docs.find("telemetry", {"crew": crew}, limit=1000))
                 if name == "regions":
                     regions = []
                     reg_dir = ROOT / "config" / "regions"
@@ -315,13 +315,13 @@ class Handler(BaseHTTPRequestHandler):
                 if name == "scenario":
                     scen_file = ROOT / "data" / "simulated" / "demo_scenario.json"
                     return self._json(200, json.loads(scen_file.read_text(encoding="utf-8")) if scen_file.exists() else {})
-                if name == "avisos":
-                    return self._json(200, list_avisos(q.get("region")))
-                if name == "eventos":
-                    flt = {"tipo": q["tipo"]} if q.get("tipo") else {}
-                    return self._json(200, [{k: v for k, v in e.items() if not k.startswith("_")} for e in docs.find("eventos", flt, limit=500)])
-                if name == "reportes":
-                    reports = storage.list_reports(q.get("author") or q.get("autor"))
+                if name == "notices":
+                    return self._json(200, list_notices(q.get("region")))
+                if name == "events":
+                    flt = {"type": q["type"]} if q.get("type") else {}
+                    return self._json(200, [{k: v for k, v in e.items() if not k.startswith("_")} for e in docs.find("events", flt, limit=500)])
+                if name == "reports":
+                    reports = storage.list_reports(q.get("author"))
                     return self._json(200, [r.to_dict() for r in reports])
                 if name == "proxy/trek":
                     layer = q.get("layer", "")
@@ -377,29 +377,29 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(body, dict):
                 raise ValueError("a JSON object is expected")
             name = url.path[5:] if url.path.startswith("/api/") else ""
-            if name == "reportes":
+            if name == "reports":
                 rep = Report(
                     id=_txt(body.get("id"), 50, True),
-                    author=_txt(body.get("author") or body.get("autor"), 20, True),
-                    type=_txt(body.get("type") or body.get("tipo"), 30, True),
+                    author=_txt(body.get("author"), 20, True),
+                    type=_txt(body.get("type"), 30, True),
                     lon=_num(body.get("lon"), -180, 180),
                     lat=_num(body.get("lat"), -90, 90),
                     elev_m=_num(body.get("elev_m") or body.get("elev"), -20000, 30000) or 0.0,
                     sol_min=_num(body.get("sol_min") or body.get("simMin"), 0, 1e7) or 0.0,
                     km=_num(body.get("km"), 0, 10000) or 0.0,
-                    text=_txt(body.get("text") or body.get("texto"), 1000, True),
-                    attachments=body.get("attachments") or body.get("adjuntos") or {},
+                    text=_txt(body.get("text"), 1000, True),
+                    attachments=body.get("attachments") or {},
                     sync_status=_txt(body.get("sync_status"), 20) or "local",
                 )
                 storage.save_report(rep)
                 return self._json(201, {"ok": True, "id": rep.id})
-            if name == "avisos/retirar":
-                retire_aviso(body)
+            if name == "notices/withdraw":
+                withdraw_notice(body)
                 return self._json(200, {"ok": True})
-            if name == "avisos/recibido":
-                ack_aviso(body)
+            if name == "notices/received":
+                ack_notice(body)
                 return self._json(201, {"ok": True})
-            handlers = {"avisos": save_aviso, "hallazgos": save_hallazgo, "bitacora": save_mensaje, "misiones": save_mision, "telemetria": save_telemetria}
+            handlers = {"notices": save_notice, "findings": save_finding, "logbook": save_message, "missions": save_mission, "telemetry": save_telemetry}
             if name in handlers:
                 handlers[name](body)
                 return self._json(201, {"ok": True})

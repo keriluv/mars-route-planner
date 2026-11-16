@@ -52,19 +52,19 @@
     if (!API.online) return null;
     try { return await req("scenario"); } catch (e) { return null; }
   };
-  API.getReportes = async function () {
+  API.getReports = async function () {
     if (!API.online) return [];
-    try { return await req("reportes"); } catch (e) { return []; }
+    try { return await req("reports"); } catch (e) { return []; }
   };
-  API.sendReporte = async function (rep) {
-    return await API.send("reportes", rep);
+  API.sendReport = async function (rep) {
+    return await API.send("reports", rep);
   };
   // notices shared between explorers (see shared.js)
-  API.sendAviso = n => API.send("avisos", n);
-  API.retractAviso = (id, crew) => API.send("avisos/retirar", { id, crew });
-  API.ackAviso = (id, crew) => API.send("avisos/recibido", { id, crew });
-  API.getAvisos = async function () {
+  API.sendNotice = n => API.send("notices", n);
+  API.retractNotice = (id, crew) => API.send("notices/withdraw", { id, crew });
+  API.ackNotice = (id, crew) => API.send("notices/received", { id, crew });
+  API.getNotices = async function () {
     if (!API.online) return null;
-    try { return await req("avisos"); } catch (e) { return null; }
+    try { return await req("notices"); } catch (e) { return null; }
   };
 })();

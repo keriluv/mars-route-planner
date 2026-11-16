@@ -145,13 +145,13 @@
     </button>
     <div class="lp-body" id="lpBody">
       <div class="tabs" role="tablist">
-        <button role="tab" aria-selected="true" data-lptab="capas">Layers</button>
-        <button role="tab" aria-selected="false" data-lptab="objetivos">Targets</button>
-        <button role="tab" aria-selected="false" data-lptab="minerales">Minerals</button>
-        <button role="tab" aria-selected="false" data-lptab="ruta">Route</button>
+        <button role="tab" aria-selected="true" data-lptab="layers">Layers</button>
+        <button role="tab" aria-selected="false" data-lptab="targets">Targets</button>
+        <button role="tab" aria-selected="false" data-lptab="minerals">Minerals</button>
+        <button role="tab" aria-selected="false" data-lptab="route">Route</button>
       </div>
 
-      <section class="lp-sec" data-lpsec="capas">
+      <section class="lp-sec" data-lpsec="layers">
         <!-- 3D Planet layers (NASA Mars Trek) -->
         <div id="globeLayersSection" hidden>
           <div class="globe-layers-head">
@@ -187,7 +187,7 @@
         </div>
       </section>
 
-      <section class="lp-sec" data-lpsec="objetivos" hidden>
+      <section class="lp-sec" data-lpsec="targets" hidden>
         <h3>Show on the map</h3>
         <div class="chips" id="typeChips"></div>
         <label class="slider">Only within <output id="distOut">60 km</output> of the route
@@ -195,7 +195,7 @@
         <ul class="obj-list" id="objList"></ul>
       </section>
 
-      <section class="lp-sec" data-lpsec="minerales" hidden>
+      <section class="lp-sec" data-lpsec="minerals" hidden>
         <div class="min-head-row">
           <h3>Scientific search</h3>
           <span class="min-region-badge" id="minRegionBadge">Gale Crater</span>
@@ -212,7 +212,7 @@
         <div class="min-list" id="minList" role="list" aria-label="Catalog of Martian minerals and rocks"></div>
       </section>
 
-      <section class="lp-sec" data-lpsec="ruta" hidden>
+      <section class="lp-sec" data-lpsec="route" hidden>
         <h3>Route profile</h3>
         <div class="profile-seg" id="profileSeg" role="radiogroup" aria-label="Route profile">
           <button role="radio" aria-checked="true" data-profile="safe" class="profile-opt">
@@ -282,15 +282,15 @@
 
   <!-- ============ RIGHT: fixed icons + side panel ============ -->
   <nav class="rail" aria-label="Panels">
-    <button class="rail-btn" data-panel="misiones" aria-label="Missions (M)" title="Missions (M)">
+    <button class="rail-btn" data-panel="missions" aria-label="Missions (M)" title="Missions (M)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 0h11l-2 4 2 4H5"/></svg>
-      <span class="lbl">Missions</span><span class="count" data-count="misiones" hidden>0</span></button>
-    <button class="rail-btn" data-panel="bitacora" aria-label="Logbook (B)" title="Logbook (B)">
+      <span class="lbl">Missions</span><span class="count" data-count="missions" hidden>0</span></button>
+    <button class="rail-btn" data-panel="logbook" aria-label="Logbook (B)" title="Logbook (B)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
-      <span class="lbl">Logbook</span><span class="count" data-count="bitacora" hidden>0</span></button>
-    <button class="rail-btn" data-panel="hallazgos" aria-label="Findings (H)" title="Findings (H)">
+      <span class="lbl">Logbook</span><span class="count" data-count="logbook" hidden>0</span></button>
+    <button class="rail-btn" data-panel="findings" aria-label="Findings (H)" title="Findings (H)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-10a6 6 0 0 1 12 0c0 4.5-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg>
-      <span class="lbl">Findings</span><span class="count" data-count="hallazgos" hidden>0</span></button>
+      <span class="lbl">Findings</span><span class="count" data-count="findings" hidden>0</span></button>
   </nav>
   <aside class="sidepanel" id="sidePanel" aria-live="polite" hidden>
     <header class="sp-head"><h2 id="spTitle">Panel</h2>

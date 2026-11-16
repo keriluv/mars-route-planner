@@ -22,7 +22,7 @@
   const ONE_WAY_MIN = 12;           // Mars → Earth communication delay (simulated)
   const MIN_PER_SEC = 2;            // x1 = 2 Martian minutes per real second
   // display labels for the stored mission-status tokens
-  const STATUS_LABEL = { propuesta: "proposed", aceptada: "accepted", "en curso": "in progress", completada: "completed", abortada: "aborted" };
+  const STATUS_LABEL = { proposed: "proposed", accepted: "accepted", "in_progress": "in progress", completed: "completed", aborted: "aborted" };
   // Configurable EVA workday (see MR.eva in core.js): start and end of the walk (the end subtracts the safety reserve)
   const evaStart = () => MR.eva.cfg.startHour, evaEnd = () => MR.eva.walkEndHour(), hm = h => MR.fmtHM(h);
 
@@ -33,7 +33,7 @@
       profileMode: "safe", mobility: "astronaut", alertTriggered: false,
       km: 0, simMin: MR.eva.cfg.startHour * 60, playing: false, speed: 1, stages: [], stageIdx: 0,
       findings: [], missions: [], log: [], ai: [], handled: {}, events: [], proposed: {},
-      unread: { misiones: 1, bitacora: 0, hallazgos: 0 }, briefed: false, wx: null, lastWx: -1e9,
+      unread: { missions: 1, logbook: 0, findings: 0 }, briefed: false, wx: null, lastWx: -1e9,
       lastTele: -1e9, flags: {}, alerts: 0, detours: 0, hazards: [], lows: [], stops: [], measure: null,
       // radiation (simplified model): accumulated EVA dose, per sol, and active solar event if any
       rad: { total: 0, bySol: {}, spe: null, crit: {}, flags: {} }, returning: null, sharedSeen: {},
@@ -42,7 +42,7 @@
   const trips = {}; CREW.forEach(c => (trips[c.id] = newTrip(c)));
   let T = trips.ev1;
   const S = { view: "2d", layer: "hazard", opacity: 0.55, base: "relief", panel: null,
-    types: { goal: 1, base: 1, mineral: 1, spectral: 1, science: 1, reference: 1 }, distMax: 60, logTab: "tierra", fTab: "todos" };
+    types: { goal: 1, base: 1, mineral: 1, spectral: 1, science: 1, reference: 1 }, distMax: 60, logTab: "earth", fTab: "all" };
   const UI = (MR.UI = {});
   MR.state = () => T; // inspection (console / tests)
 
@@ -261,10 +261,10 @@
           closeModal();
           setRouteProfile("safe");
           const curP = curPos() || T.baseRoute[0];
-          MR.API.sendReporte({
+          MR.API.sendReport({
             id: uid("rep_storm_"),
             author: T.crew.id,
-            type: "alerta_clima",
+            type: "weather_alert",
             lon: curP[0],
             lat: curP[1],
             elev: curP[3] || -4400,
@@ -925,7 +925,7 @@
     const box = $("stopList"); box.innerHTML = "";
     const minStops = (window.MARS_MINERALS || []).filter(m => T.stops.includes(m.id)).map(m => ({ id: m.id, name: m.name, lon: m.lon, lat: m.lat }));
     const cands = regionObjectives().filter(o => !["base", "goal"].includes(o.type) && o.id !== T.crew.goalId)
-      .concat(T.missions.filter(m => m.origin === "propia" && m.status !== "completada").map(m => ({ id: m.id, name: m.name, lon: m.lon, lat: m.lat })))
+      .concat(T.missions.filter(m => m.origin === "own" && m.status !== "completed").map(m => ({ id: m.id, name: m.name, lon: m.lon, lat: m.lat })))
       .concat(minStops);
     cands.forEach(o => {
       const d = MR.distToRoute(T.baseRoute, [o.lon, o.lat]);
@@ -990,7 +990,7 @@
       MR.Map.drawShort(other, MR.hazardZones(other || []));
     } else MR.Map.drawShort(null);
     MR.Map.drawDone(T.route, T.km, curPos());
-    MR.Map.drawSecondary(T.missions.filter(m => m.path && m.status === "aceptada").map(m => m.path));
+    MR.Map.drawSecondary(T.missions.filter(m => m.path && m.status === "accepted").map(m => m.path));
     MR.Map.drawMeasure(T.measure && T.measure.a, T.measure && T.measure.b);
     const p = curPos(); MR.Map.setAstronaut(p, T.crew.color, T.crew.short);
   }
@@ -1021,27 +1021,27 @@
       const b = D.targets[0]; if (S.types.base) list.push({ id: "start", type: "base", lon: b.lon, lat: b.lat, label: b.name, onClick: () => openObjective(b) });
     }
     T.missions.forEach(m => {
-      if (m.status === "propuesta") list.push({ id: m.id, type: "propuesta", lon: m.lon, lat: m.lat, label: m.name, onClick: () => openSecondaryBriefing(m) });
-      else list.push({ id: m.id, type: "secundaria", lon: m.lon, lat: m.lat, label: m.name + (m.status === "completada" ? " ✓" : ""), onClick: () => openMissionCard(m) });
+      if (m.status === "proposed") list.push({ id: m.id, type: "proposed", lon: m.lon, lat: m.lat, label: m.name, onClick: () => openSecondaryBriefing(m) });
+      else list.push({ id: m.id, type: "secondary", lon: m.lon, lat: m.lat, label: m.name + (m.status === "completed" ? " ✓" : ""), onClick: () => openMissionCard(m) });
     });
-    T.findings.forEach(f => list.push({ id: f.id, type: "hallazgo", lon: f.lon, lat: f.lat, label: f.typeName, cls: f.fresh ? "new" : "", onClick: () => openFindingCard(f) }));
+    T.findings.forEach(f => list.push({ id: f.id, type: "finding", lon: f.lon, lat: f.lat, label: f.typeName, cls: f.fresh ? "new" : "", onClick: () => openFindingCard(f) }));
     if (T.measure) {
-      if (T.measure.a) list.push({ id: "ma", type: "medida", lon: T.measure.a[0], lat: T.measure.a[1], label: "Point A" });
-      if (T.measure.b) list.push({ id: "mb", type: "medida", lon: T.measure.b[0], lat: T.measure.b[1], label: "Point B" });
+      if (T.measure.a) list.push({ id: "ma", type: "measure", lon: T.measure.a[0], lat: T.measure.a[1], label: "Point A" });
+      if (T.measure.b) list.push({ id: "mb", type: "measure", lon: T.measure.b[0], lat: T.measure.b[1], label: "Point B" });
     }
     const zones = [];
     MR.Shared.visibleFor(T.crew.id, currentRegion).forEach(n => {
       const a = crewOf(n.author), K = MR.Shared.kinds[n.kind];
-      list.push({ id: n.id, type: "aviso", icon: K.icon, lon: n.lon, lat: n.lat, label: `${a.short} · ${K.label}`, color: a.color, onClick: () => openSharedCard(n) });
+      list.push({ id: n.id, type: "notice", icon: K.icon, lon: n.lon, lat: n.lat, label: `${a.short} · ${K.label}`, color: a.color, onClick: () => openSharedCard(n) });
       zones.push({ lon: n.lon, lat: n.lat, radiusKm: n.radiusKm, color: a.color });
     });
     MR.Map.drawZones(zones);
     MR.Map.setMarkers(list);
     T.findings.forEach(f => (f.fresh = false));
     if (S.view === "3d" && MR.Scene3D && MR.Scene3D.ready) {
-      MR.Scene3D.updatePins(list.filter(m => m.type !== "medida"));
+      MR.Scene3D.updatePins(list.filter(m => m.type !== "measure"));
     } else if (S.view === "globe" && MR.Globe3D && MR.Globe3D.ready) {
-      const globeList = [...list.filter(m => m.type !== "medida")];
+      const globeList = [...list.filter(m => m.type !== "measure")];
       const otherMinerals = (window.MARS_MINERALS || []).filter(m => m.region !== (currentRegion || "gale"));
       otherMinerals.forEach(m => {
         if (!globeList.some(x => x.id === m.id)) {
@@ -1080,7 +1080,7 @@
         Elevation ${fmt(MR.sample("dem", ll[0], ll[1]), 0)} m · Slope ${fmt(MR.sample("slope", ll[0], ll[1]), 1)}° · Traversability ${fmt(MR.sample("traversability", ll[0], ll[1]), 2)}
         <div class="verdict" style="color:${col}">${ic}<span>${v.txt}</span></div></div>
       <button role="menuitem" data-a="f">${MR.ICONS.goal}Log a finding here</button>
-      <button role="menuitem" data-a="m">${MR.ICONS.secundaria}Create mission here</button>
+      <button role="menuitem" data-a="m">${MR.ICONS.secondary}Create mission here</button>
       <button role="menuitem" data-a="d"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg>Measure distance</button>`;
     $("ctxMenu").hidden = false;
     $("ctxMenu").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
@@ -1117,7 +1117,7 @@
   }
 
   /* ---------- findings ---------- */
-  const FTYPES = [["mineral", "Mineral"], ["roca", "Rock"], ["otro", "Other"]];
+  const FTYPES = [["mineral", "Mineral"], ["rock", "Rock"], ["other", "Other"]];
   function openFindingForm(ll) {
     let type = null, photo = null;
     mini(ll, `<h4>Finding</h4><div class="coords">${MR.fmtLL(ll[0], ll[1])} · ${fmt(MR.sample("dem", ll[0], ll[1]), 0)} m</div>
@@ -1147,14 +1147,14 @@
     const tn = FTYPES.find(x => x[0] === type)[1];
     const f = { id: uid("f"), type, typeName: tn + (note ? " · " + note.slice(0, 24) : ""), note, photo, lon: ll[0], lat: ll[1],
       elev: MR.sample("dem", ll[0], ll[1]), simMin: T.simMin, km: T.km, fresh: true, isNew: true, crew: T.crew.id };
-    T.findings.push(f); closePointUI(); refreshMarkers(); bump("hallazgos");
-    f.avisoId = MR.Shared.publish({ kind: "hallazgo", author: T.crew.id, lon: ll[0], lat: ll[1], text: `${tn}${note ? ": " + note : ""}`, simMin: T.simMin, region: currentRegion }).id;
-    const msg = sendToEarth(`Finding · ${tn}${note ? ": " + note : ""}`, ll, "hallazgo");
-    MR.API.send("hallazgos", { ...f, photo: photo ? "[img]" : null });
-    MR.API.sendReporte({
+    T.findings.push(f); closePointUI(); refreshMarkers(); bump("findings");
+    f.noticeId = MR.Shared.publish({ kind: "finding", author: T.crew.id, lon: ll[0], lat: ll[1], text: `${tn}${note ? ": " + note : ""}`, simMin: T.simMin, region: currentRegion }).id;
+    const msg = sendToEarth(`Finding · ${tn}${note ? ": " + note : ""}`, ll, "finding");
+    MR.API.send("findings", { ...f, photo: photo ? "[img]" : null });
+    MR.API.sendReport({
       id: "rep_" + f.id,
       author: T.crew.id,
-      type: "hallazgo",
+      type: "finding",
       lon: ll[0],
       lat: ll[1],
       elev: f.elev,
@@ -1165,8 +1165,8 @@
     });
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Finding logged: ${tn}` });
     toast("Saved · sent to Earth", "Undo", () => {
-      T.findings = T.findings.filter(x => x !== f); T.log = T.log.filter(x => x !== msg); MR.Shared.retract(f.avisoId, T.crew.id);
-      bump("hallazgos", -1); refreshMarkers(); renderPanel(); toast("Finding removed");
+      T.findings = T.findings.filter(x => x !== f); T.log = T.log.filter(x => x !== msg); MR.Shared.retract(f.noticeId, T.crew.id);
+      bump("findings", -1); refreshMarkers(); renderPanel(); toast("Finding removed");
     });
     renderPanel();
   }
@@ -1182,26 +1182,26 @@
     return r && r.length && currentRegion === (n.region || "gale") ? MR.distToRoute(r, [n.lon, n.lat]) : null;
   }
   function deliverShared(res, silent) {
-    res.changed.forEach(n => { if (n.estado === "retirado") Object.values(trips).forEach(t => { t.log = t.log.filter(m => m.aviso !== n.id); }); });
+    res.changed.forEach(n => { if (n.status === "withdrawn") Object.values(trips).forEach(t => { t.log = t.log.filter(m => m.notice !== n.id); }); });
     res.added.forEach(n => {
-      if (n.estado !== "activo") return;
+      if (n.status !== "active") return;
       const a = crewOf(n.author), K = MR.Shared.kinds[n.kind];
       Object.values(trips).forEach(t => {
         if (t.crew.id === n.author || t.sharedSeen[n.id]) return;
         t.sharedSeen[n.id] = 1;
         const d = sharedDistKm(t, n), near = d != null && d < n.radiusKm + 1;
         const text = `${a.short} · ${K.label}: ${n.text}` + (d != null ? ` · your route passes ${fmt(d, 1)} km away` : "");
-        t.log.push({ id: uid("l"), from: "peer", text, t: t.simMin, ll: [n.lon, n.lat], aviso: n.id, author: n.author });
+        t.log.push({ id: uid("l"), from: "peer", text, t: t.simMin, ll: [n.lon, n.lat], notice: n.id, author: n.author });
         t.events.push({ t: t.simMin, c: "var(--secondary)", txt: `Notice from ${a.short}: ${K.label.toLowerCase()}` });
         if (t === T) {
-          bump("bitacora");
+          bump("logbook");
           if (!silent) banner({ kind: near ? "warn" : "msg", title: `${a.short} · ${K.label}`, sub: n.text + (d != null ? ` · your route passes ${fmt(d, 1)} km away` : ""),
-            onClick: () => { MR.Map.centerOn(n.lon, n.lat, 2.8); togglePanel("bitacora", "tierra"); }, ttl: 8000 });
-        } else t.unread.bitacora++;
+            onClick: () => { MR.Map.centerOn(n.lon, n.lat, 2.8); togglePanel("logbook", "earth"); }, ttl: 8000 });
+        } else t.unread.logbook++;
         if (!silent) MR.Shared.ack(n.id, t.crew.id);
       });
     });
-    if (S.panel === "bitacora" || S.panel === "hallazgos") renderPanel();
+    if (S.panel === "logbook" || S.panel === "findings") renderPanel();
     refreshMarkers();
   }
   function openSharedCard(n) {
@@ -1242,11 +1242,11 @@
   }
   function openMissionCard(m) {
     mini([m.lon, m.lat], `<h4></h4><div class="coords">${MR.fmtLL(m.lon, m.lat)}</div>
-      <p style="margin:8px 0;font-size:13px"><span class="badge sec">${m.origin === "propia" ? "Own" : "Assigned"}</span> <span class="badge ${m.status === "completada" ? "ok" : ""}">${STATUS_LABEL[m.status] || m.status}</span></p>
+      <p style="margin:8px 0;font-size:13px"><span class="badge sec">${m.origin === "own" ? "Own" : "Assigned"}</span> <span class="badge ${m.status === "completed" ? "ok" : ""}">${STATUS_LABEL[m.status] || m.status}</span></p>
       <div class="actions"><button class="btn ghost" data-x>Close</button><button class="btn" data-o>View in Missions</button></div>`, el => {
       el.querySelector("h4").textContent = m.name;
       el.querySelector("[data-x]").addEventListener("click", closePointUI);
-      el.querySelector("[data-o]").addEventListener("click", () => { closePointUI(); togglePanel("misiones"); });
+      el.querySelector("[data-o]").addEventListener("click", () => { closePointUI(); togglePanel("missions"); });
     });
   }
   function reportHere() {
@@ -1315,7 +1315,7 @@
     });
   }
   function acceptMain() {
-    T.mode = "plan"; T.unread.misiones = Math.max(0, T.unread.misiones - 1);
+    T.mode = "plan"; T.unread.missions = Math.max(0, T.unread.missions - 1);
     if (T.crew.main === "summit") T.shortRoute = MR.withKm(D.routes.summit_short.points);
     else { const g = goalObj(); T.shortRoute = MR.astar([T.baseRoute[0][0], T.baseRoute[0][1]], [g.lon, g.lat], { riskW: 0, slopeW: 3 }); }
     recomputeHazards(); setLeft(window.innerWidth >= 820);
@@ -1334,7 +1334,7 @@
     banner({ kind: "ok", title: "Route accepted · simulation paused", sub: "Press ▶ (Space) to start walking.", ttl: 6000 });
     logSys(`Route accepted (${T.choice === "short" ? "short route" : T.adjusted ? "adjusted route" : "model route"}): ${fmt(T.route[T.route.length - 1][2])} km.`);
     T.events.push({ t: T.simMin, c: "var(--accent)", txt: "Traverse start" });
-    MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "en curso", km: T.route[T.route.length - 1][2] });
+    MR.API.send("missions", { crew: T.crew.id, kind: "primary", name: T.crew.title, status: "in_progress", km: T.route[T.route.length - 1][2] });
   }
 
   // Own mission (editable)
@@ -1373,10 +1373,10 @@
     render();
   }
   function proposeOwn(st) {
-    const m = { id: uid("m"), name: st.name, type: st.type, origin: "propia", lon: st.lon, lat: st.lat, note: st.note, status: "propuesta", by: T.crew.short };
+    const m = { id: uid("m"), name: st.name, type: st.type, origin: "own", lon: st.lon, lat: st.lat, note: st.note, status: "proposed", by: T.crew.short };
     T.missions.push(m);
     activateMission(m);
-    sendToEarth(`New own mission: ${m.name} (${m.type})`, [m.lon, m.lat], "mision");
+    sendToEarth(`New own mission: ${m.name} (${m.type})`, [m.lon, m.lat], "mission");
   }
   // Assigned secondary (proposed by the system or Earth)
   function openSecondaryBriefing(m) {
@@ -1389,8 +1389,8 @@
       bind: el => {
         el.querySelector("h2").textContent = m.name; el.querySelector(".n").textContent = m.note || "";
         el.querySelector("[data-n]").addEventListener("click", closeModal);
-        el.querySelector("[data-r]").addEventListener("click", () => { closeModal(); T.missions = T.missions.filter(x => x !== m); bump("misiones", -1); refreshMarkers(); renderPanel(); logSys(`Secondary mission rejected: ${m.name}.`); });
-        el.querySelector("[data-a]").addEventListener("click", () => { closeModal(); bump("misiones", -1); activateMission(m); });
+        el.querySelector("[data-r]").addEventListener("click", () => { closeModal(); T.missions = T.missions.filter(x => x !== m); bump("missions", -1); refreshMarkers(); renderPanel(); logSys(`Secondary mission rejected: ${m.name}.`); });
+        el.querySelector("[data-a]").addEventListener("click", () => { closeModal(); bump("missions", -1); activateMission(m); });
       },
     });
   }
@@ -1400,25 +1400,25 @@
       const re = MR.nearestIdx(T.route, [m.lon, m.lat], Math.min(T.route.length - 1, i + 1));
       const rejoin = Math.min(T.route.length - 1, Math.max(re.i, i + 1));
       const a = MR.astar([p[0], p[1]], [m.lon, m.lat]), b = a && MR.astar([m.lon, m.lat], [T.route[rejoin][0], T.route[rejoin][1]]);
-      if (!a || !b) { m.status = "propuesta"; toast("No safe detour to that point was found"); return; }
+      if (!a || !b) { m.status = "proposed"; toast("No safe detour to that point was found"); return; }
       const det = MR.withKm(a.concat(b.slice(1)));
       const extra = Math.max(0, det[det.length - 1][2] - (T.route[rejoin][2] - T.km));
       T.route = MR.withKm(T.route.slice(0, i).concat([p], det.slice(1), T.route.slice(rejoin + 1)));
       const L = T.route[T.route.length - 1][2];
       T.stages = makeStages(T.route).map(k => Math.max(k, T.km)); T.stageIdx = T.stages.findIndex(k => k > T.km + 0.01); if (T.stageIdx < 0) T.stageIdx = T.stages.length - 1;
-      m.path = MR.withKm(det); m.status = "aceptada";
+      m.path = MR.withKm(det); m.status = "accepted";
       recomputeHazards();
       banner({ kind: "sec", title: `Detour computed: ${m.name}`, sub: `+${fmt(extra, 1)} km detour · total route ${fmt(L)} km`, ttl: 6000 });
     } else {
       // in Plan or Base map: it becomes a route stop
-      m.status = "aceptada";
+      m.status = "accepted";
       if (!T.stops.includes(m.id)) T.stops.push(m.id);
       if (T.mode !== "base") recalcRoute();
       banner({ kind: "sec", title: `Mission added as a stop: ${m.name}`, sub: "The route was recalculated to pass through the point.", ttl: 5000 });
     }
     logSys(`Secondary mission accepted: ${m.name}.`);
     T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secondary accepted: ${m.name}` });
-    MR.API.send("misiones", { crew: T.crew.id, kind: "secundaria", name: m.name, origin: m.origin, lon: m.lon, lat: m.lat, status: m.status });
+    MR.API.send("missions", { crew: T.crew.id, kind: "secondary", name: m.name, origin: m.origin, lon: m.lon, lat: m.lat, status: m.status });
     renderStops(); renderRoutes(); refreshMarkers(); renderPanel(); renderDock(true); renderStatus(); update3d();
   }
 
@@ -1456,7 +1456,7 @@
     const lvl = Math.floor(day / thr);
     if (!T.returning && lvl >= 1 && lvl > (R.crit[sol] || 0)) {
       R.crit[sol] = lvl; const rp = curPos();
-      MR.Shared.publish({ kind: "alerta_radiacion", author: T.crew.id, lon: rp[0], lat: rp[1], simMin: T.simMin, region: currentRegion,
+      MR.Shared.publish({ kind: "radiation_alert", author: T.crew.id, lon: rp[0], lat: rp[1], simMin: T.simMin, region: currentRegion,
         text: `EVA dose of ${fmt(day, 1)} mSv today (threshold ${fmt(thr, 1)} mSv)${on ? " with an active solar event" : ""}` });
       radiationAlert(day); return true;
     }
@@ -1479,7 +1479,7 @@
     const backDose = back ? MR.radiation.routeDose(back, T.mobility) * (on ? MR.radiation.P.speMult : 1) : null;
     T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Radiation alert: ${fmt(day, 1)} mSv today` });
     logSys(`RADIATION ALERT: today's EVA dose ${fmt(day, 2)} mSv, threshold ${fmt(thr, 1)} mSv${on ? " (solar event active)" : ""}.`);
-    MR.API.sendReporte({ id: uid("rep_rad_"), author: T.crew.id, type: "alerta_radiacion", lon: p[0], lat: p[1], elev: p[3] || 0, km: T.km,
+    MR.API.sendReport({ id: uid("rep_rad_"), author: T.crew.id, type: "radiation_alert", lon: p[0], lat: p[1], elev: p[3] || 0, km: T.km,
       text: `Radiation alert: ${fmt(day, 2)} mSv in the workday (threshold ${fmt(thr, 1)} mSv)`, attachments: { dose_msv: day, thr_msv: thr, spe: on, simMin: T.simMin }, sync_status: "local" });
     showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Critical radiation alert · simulation paused</span></div>
       <h2>${MR.ICONS.warn}Workday dose over the threshold</h2></div>
@@ -1509,8 +1509,8 @@
     renderRoutes(); renderDock(true);
     logSys(`Return to shelter «${sh.name}» due to radiation (${fmt(T.route[T.route.length - 1][2] - T.km, 1)} km).`);
     T.events.push({ t: T.simMin, c: "var(--accent)", txt: `Return to shelter: ${sh.name}` });
-    sendToEarth(`We are returning to shelter ${sh.name} due to radiation (EVA dose ${fmt(T.rad.total, 2)} mSv).`, [p[0], p[1]], "estado");
-    MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "returning to shelter", km: T.km });
+    sendToEarth(`We are returning to shelter ${sh.name} due to radiation (EVA dose ${fmt(T.rad.total, 2)} mSv).`, [p[0], p[1]], "status");
+    MR.API.send("missions", { crew: T.crew.id, kind: "primary", name: T.crew.title, status: "returning to shelter", km: T.km });
     banner({ kind: "ok", title: "Return to shelter underway", sub: `Destination: ${sh.name}. Press ▶ to continue.`, ttl: 5000 });
     T.playing = true; renderStatus();
   }
@@ -1521,7 +1521,7 @@
     $("stageCard").hidden = true;
     if (!T.flags["sh_" + z.id]) {
       T.flags["sh_" + z.id] = 1; const zp = posAt(T.route, z.startKm);
-      MR.Shared.publish({ kind: "alerta_pendiente", author: T.crew.id, lon: zp[0], lat: zp[1], simMin: T.simMin, region: currentRegion,
+      MR.Shared.publish({ kind: "slope_alert", author: T.crew.id, lon: zp[0], lat: zp[1], simMin: T.simMin, region: currentRegion,
         text: `slope of ${fmt(z.max, 0)}° over a ${fmt((z.endKm - z.startKm) * 1000 + 50, 0)} m section (km ${fmt(z.startKm)})` });
     }
     const p = curPos(); const dist = Math.max(0, (z.startKm - T.km) * 1000);
@@ -1568,7 +1568,7 @@
           closeModal(); logSys(`Mission aborted at km ${fmt(T.km)}. Returning to base.`);
           T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Mission aborted" });
           Object.assign(T, { mode: "base", route: null, km: 0, playing: false, adjusted: null, choice: "model", briefed: false, handled: {}, flags: {}, returning: null });
-          T.unread.misiones = 1; renderAll(true); MR.Map.fit();
+          T.unread.missions = 1; renderAll(true); MR.Map.fit();
           banner({ kind: "warn", title: "Mission aborted", sub: "Back on the base map. Open Missions to resume.", ttl: 6000 });
         });
       },
@@ -1576,13 +1576,13 @@
   }
 
   /* =====================================================
-     AVISOS: banner (arriba), tarjeta de etapa (abajo), toast
+     NOTICES: banner (top), stage card (bottom), toast
      ===================================================== */
   function banner({ kind = "warn", title, sub, onClick, ttl = 6000, icon }) {
     const box = $("banners");
     while (box.children.length >= 3) box.firstChild.remove();
     const b = document.createElement("button"); b.className = "banner " + kind; b.type = "button";
-    b.innerHTML = `${MR.ICONS[icon || { warn: "warn", info: "info", msg: "msg", ok: "ok", sec: "secundaria" }[kind]]}<span class="txt"><span class="t"></span><small></small></span><span class="x" aria-label="Close">✕</span>`;
+    b.innerHTML = `${MR.ICONS[icon || { warn: "warn", info: "info", msg: "msg", ok: "ok", sec: "secondary" }[kind]]}<span class="txt"><span class="t"></span><small></small></span><span class="x" aria-label="Close">✕</span>`;
     b.querySelector(".t").textContent = title; b.querySelector("small").textContent = sub || "";
     if (!sub) b.querySelector("small").remove();
     const kill = () => { b.classList.add("out"); setTimeout(() => b.remove(), 250); };
@@ -1663,7 +1663,7 @@
         }
         renderStatus(); renderLive();
       }
-      if (now - lastProfile > 700) { lastProfile = now; renderProfile(); if (S.panel === "misiones") renderPanel(); }
+      if (now - lastProfile > 700) { lastProfile = now; renderProfile(); if (S.panel === "missions") renderPanel(); }
     }
     requestAnimationFrame(loop);
   }
@@ -1675,7 +1675,7 @@
     accrueDose(dMin);
     // conditions data every 10 Martian minutes
     if (T.simMin - T.lastWx >= 10) updateWeather();
-    if (T.simMin - T.lastTele >= 30) { T.lastTele = T.simMin; const p = curPos(); MR.API.send("telemetria", { crew: T.crew.id, t: T.simMin, km: T.km, lon: p[0], lat: p[1], elev: p[3], wx: T.wx, dosis_msv: T.rad.total }); }
+    if (T.simMin - T.lastTele >= 30) { T.lastTele = T.simMin; const p = curPos(); MR.API.send("telemetry", { crew: T.crew.id, t: T.simMin, km: T.km, lon: p[0], lat: p[1], elev: p[3], wx: T.wx, dose_msv: T.rad.total }); }
     checkEvents(L);
   }
   function checkEvents(L) {
@@ -1708,22 +1708,22 @@
     // secondary missions: completed / proposed by the system
     const p = curPos();
     T.missions.forEach(m => {
-      if (m.status === "aceptada" && MR.distKm(p, [m.lon, m.lat]) < 0.3) {
-        m.status = "completada"; refreshMarkers(); renderRoutes(); renderPanel();
+      if (m.status === "accepted" && MR.distKm(p, [m.lon, m.lat]) < 0.3) {
+        m.status = "completed"; refreshMarkers(); renderRoutes(); renderPanel();
         banner({ kind: "ok", title: `Secondary mission completed: ${m.name}`, ttl: 5000 });
         logSys(`Secondary mission completed: ${m.name}.`); T.events.push({ t: T.simMin, c: "var(--secondary)", txt: `Secondary completed: ${m.name}` });
-        sendToEarth(`Secondary mission completed: ${m.name}`, [m.lon, m.lat], "mision");
+        sendToEarth(`Secondary mission completed: ${m.name}`, [m.lon, m.lat], "mission");
       }
     });
     const cand = D.targets.find(o => ["science", "mineral", "spectral"].includes(o.type) && o.id !== T.crew.goalId && !T.proposed[o.id] && MR.distKm(p, [o.lon, o.lat]) < 3.5);
-    if (cand && !T.missions.some(m => m.status === "propuesta")) proposeSecondary(cand, "System (target model)");
+    if (cand && !T.missions.some(m => m.status === "proposed")) proposeSecondary(cand, "System (target model)");
     // Earth script according to progress
     earthScript(T.km / L);
   }
   function proposeSecondary(o, by) {
     T.proposed[o.id] = 1;
-    const m = { id: uid("m"), name: o.name, type: "Science", origin: "asignada", by, lon: o.lon, lat: o.lat, note: o.note, status: "propuesta", objId: o.id };
-    T.missions.push(m); bump("misiones"); refreshMarkers();
+    const m = { id: uid("m"), name: o.name, type: "Science", origin: "assigned", by, lon: o.lon, lat: o.lat, note: o.note, status: "proposed", objId: o.id };
+    T.missions.push(m); bump("missions"); refreshMarkers();
     banner({ kind: "sec", title: `Secondary mission proposed: ${o.name}`, sub: "Tap to see the briefing · does not interrupt the walk", onClick: () => openSecondaryBriefing(m) });
   }
   function earthScript(f) {
@@ -1756,8 +1756,8 @@
     T.playing = false; T.mode = "done"; T.km = T.route[T.route.length - 1][2];
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: "Goal reached" });
     logSys(`Goal reached: ${goalObj().name}.`);
-    sendToEarth(`We have reached the goal: ${goalObj().name}. Coordinates confirmed.`, [goalObj().lon, goalObj().lat], "estado");
-    MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "completada" });
+    sendToEarth(`We have reached the goal: ${goalObj().name}. Coordinates confirmed.`, [goalObj().lon, goalObj().lat], "status");
+    MR.API.send("missions", { crew: T.crew.id, kind: "primary", name: T.crew.title, status: "completed" });
     renderAll();
     setTimeout(openSummary, MR.reduceMotion() ? 0 : 700);
   }
@@ -1767,8 +1767,8 @@
     const sh = MR.SHELTERS.find(x => x.id === T.returning.id) || { lon: 0, lat: 0 };
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Shelter reached: ${T.returning.name}` });
     logSys(`Shelter reached: ${T.returning.name}. Total EVA dose ${fmt(T.rad.total, 2)} mSv.`);
-    sendToEarth(`We have reached shelter ${T.returning.name}. Accumulated EVA dose ${fmt(T.rad.total, 2)} mSv.`, [sh.lon, sh.lat], "estado");
-    MR.API.send("misiones", { crew: T.crew.id, kind: "principal", name: T.crew.title, status: "abortada", km: T.km });
+    sendToEarth(`We have reached shelter ${T.returning.name}. Accumulated EVA dose ${fmt(T.rad.total, 2)} mSv.`, [sh.lon, sh.lat], "status");
+    MR.API.send("missions", { crew: T.crew.id, kind: "primary", name: T.crew.title, status: "aborted", km: T.km });
     renderAll();
     setTimeout(openSummary, MR.reduceMotion() ? 0 : 700);
   }
@@ -1776,13 +1776,13 @@
   /* =====================================================
      COMMUNICATION: logbook (Earth, with delay) and assistant
      ===================================================== */
-  function sendToEarth(text, ll, kind = "texto") {
+  function sendToEarth(text, ll, kind = "text") {
     const m = { id: uid("l"), from: "me", text, t: T.simMin, arrive: T.simMin + ONE_WAY_MIN, ll, kind };
     T.log.push(m);
-    MR.API.send("bitacora", { crew: T.crew.id, from: "explorador", text, t: T.simMin, lon: ll && ll[0], lat: ll && ll[1], kind });
+    MR.API.send("logbook", { crew: T.crew.id, from: "explorer", text, t: T.simMin, lon: ll && ll[0], lat: ll && ll[1], kind });
     // Earth's reply: arrives after round trip + 6 min of analysis
-    const reply = kind === "hallazgo" ? `Received: «${text.replace("Finding · ", "")}». Excellent; keep the sample and log the context.`
-      : kind === "mision" ? `Received: ${text}. Agreed, medium priority.` : kind === "estado" ? "Congratulations to the whole crew! Received on Earth." :
+    const reply = kind === "finding" ? `Received: «${text.replace("Finding · ", "")}». Excellent; keep the sample and log the context.`
+      : kind === "mission" ? `Received: ${text}. Agreed, medium priority.` : kind === "status" ? "Congratulations to the whole crew! Received on Earth." :
       kind === "pos" ? "Position received and logged on the control map." : `Received: «${text.slice(0, 60)}». Continue according to plan.`;
     T.events.push({ t: T.simMin + 2 * ONE_WAY_MIN + 6, pending: true, reply, ll });
     renderPanel();
@@ -1790,15 +1790,15 @@
   }
   function earthMessage(text, ll) {
     T.log.push({ id: uid("l"), from: "earth", text, t: T.simMin, ll });
-    bump("bitacora"); renderPanel();
-    banner({ kind: "msg", title: "Message from Earth", sub: text.replace("Mission control: ", ""), onClick: () => togglePanel("bitacora", "tierra"), ttl: 6000 });
+    bump("logbook"); renderPanel();
+    banner({ kind: "msg", title: "Message from Earth", sub: text.replace("Mission control: ", ""), onClick: () => togglePanel("logbook", "earth"), ttl: 6000 });
   }
   function deliverEarthReplies() {
     T.events.forEach(e => { if (e.pending && T.simMin >= e.t) { e.pending = false; e.done = true; earthMessage("Mission control: " + e.reply, e.ll); } });
     T.events = T.events.filter(e => !e.done);
   }
   setInterval(deliverEarthReplies, 500);
-  function logSys(text) { T.log.push({ id: uid("l"), from: "sys", text, t: T.simMin }); if (S.panel === "bitacora") renderPanel(); }
+  function logSys(text) { T.log.push({ id: uid("l"), from: "sys", text, t: T.simMin }); if (S.panel === "logbook") renderPanel(); }
 
   // Route assistant (immediate answers, no delay)
   function askAssistant(q) {
@@ -1837,11 +1837,11 @@
     if (sub) S.logTab = sub;
     document.querySelectorAll(".rail-btn").forEach(b => b.setAttribute("aria-expanded", b.dataset.panel === S.panel));
     $("sidePanel").hidden = !S.panel;
-    if (S.panel) { if (S.panel !== "hallazgos") T.unread[S.panel] = 0; renderRail(); renderPanel(); }
-    else if (T.unread.hallazgos) { T.findings.forEach(f => (f.isNew = false)); T.unread.hallazgos = 0; renderRail(); }
+    if (S.panel) { if (S.panel !== "findings") T.unread[S.panel] = 0; renderRail(); renderPanel(); }
+    else if (T.unread.findings) { T.findings.forEach(f => (f.isNew = false)); T.unread.findings = 0; renderRail(); }
   }
   function renderRail(animate, kind) {
-    ["misiones", "bitacora", "hallazgos"].forEach(k => {
+    ["missions", "logbook", "findings"].forEach(k => {
       const c = document.querySelector(`[data-count="${k}"]`), n = T.unread[k] || 0;
       c.hidden = !n; c.textContent = n;
       if (animate && k === kind && n) { c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump"); }
@@ -1850,11 +1850,11 @@
   function renderPanel() {
     if (!S.panel) return;
     const body = $("spBody");
-    const titles = { misiones: "Missions", bitacora: "Logbook", hallazgos: `Findings (${T.findings.length})` };
+    const titles = { missions: "Missions", logbook: "Logbook", findings: `Findings (${T.findings.length})` };
     $("spTitle").textContent = titles[S.panel];
-    if (S.panel === "misiones") return panelMissions(body);
-    if (S.panel === "bitacora") return panelLog(body);
-    if (S.panel === "hallazgos") return panelFindings(body);
+    if (S.panel === "missions") return panelMissions(body);
+    if (S.panel === "logbook") return panelLog(body);
+    if (S.panel === "findings") return panelFindings(body);
   }
   function panelMissions(body) {
     const R = activeRoute(); const L = R ? R[R.length - 1][2] : T.baseRoute[T.baseRoute.length - 1][2];
@@ -1877,11 +1877,11 @@
     const list = body.querySelector("#secList");
     if (!T.missions.length) list.innerHTML = `<p class="empty">No secondary missions yet. The system and Earth will propose nearby targets during the traverse, or create your own by tapping the map.</p>`;
     T.missions.slice().reverse().forEach(m => {
-      const d = document.createElement("div"); d.className = "m-sec" + (m.status === "completada" ? " done" : "");
-      const st = { propuesta: ["Proposed", "warn"], aceptada: ["Accepted", "sec"], completada: ["Completed ✓", "ok"] }[m.status];
+      const d = document.createElement("div"); d.className = "m-sec" + (m.status === "completed" ? " done" : "");
+      const st = { proposed: ["Proposed", "warn"], accepted: ["Accepted", "sec"], completed: ["Completed ✓", "ok"] }[m.status];
       d.innerHTML = `<header><b></b><span class="badge ${st[1]}">${st[0]}</span></header>
-        <span class="kicker">${m.origin === "propia" ? "Own · " + esc(m.type) : "Assigned · " + esc(m.by)}</span>
-        <div class="row-actions">${m.status === "propuesta" ? '<button class="btn primary" data-o>View briefing</button>' : ""}<button class="btn ghost" data-c>View on the map</button></div>`;
+        <span class="kicker">${m.origin === "own" ? "Own · " + esc(m.type) : "Assigned · " + esc(m.by)}</span>
+        <div class="row-actions">${m.status === "proposed" ? '<button class="btn primary" data-o>View briefing</button>' : ""}<button class="btn ghost" data-c>View on the map</button></div>`;
       d.querySelector("b").textContent = m.name;
       const o = d.querySelector("[data-o]"); o && o.addEventListener("click", () => openSecondaryBriefing(m));
       d.querySelector("[data-c]").addEventListener("click", () => {
@@ -1894,22 +1894,22 @@
   }
   function panelLog(body) {
     const tab = S.logTab;
-    body.innerHTML = `<div class="tabs log-tabs" role="tablist"><button role="tab" data-t="tierra" aria-selected="${tab === "tierra"}">Earth · ${ONE_WAY_MIN} min delay</button><button role="tab" data-t="asistente" aria-selected="${tab === "asistente"}">Route assistant</button></div>
+    body.innerHTML = `<div class="tabs log-tabs" role="tablist"><button role="tab" data-t="earth" aria-selected="${tab === "earth"}">Earth · ${ONE_WAY_MIN} min delay</button><button role="tab" data-t="assistant" aria-selected="${tab === "assistant"}">Route assistant</button></div>
       <div class="log" id="logBox" aria-live="polite"></div>
-      ${tab === "asistente" ? `<div class="quick">${["How much is left?", "Next hazard", "Current conditions", "My position", "Nearby target", "Why this route?"].map(q => `<button>${q}</button>`).join("")}</div>` :
+      ${tab === "assistant" ? `<div class="quick">${["How much is left?", "Next hazard", "Current conditions", "My position", "Nearby target", "Why this route?"].map(q => `<button>${q}</button>`).join("")}</div>` :
         `<div class="quick"><button data-pos>Send my position</button><button data-st>All in order</button></div>`}
-      <form class="composer"><input maxlength="200" placeholder="${tab === "asistente" ? "Ask the assistant…" : "Message to Earth…"}" aria-label="Message"><button class="btn primary" type="submit">Send</button></form>`;
+      <form class="composer"><input maxlength="200" placeholder="${tab === "assistant" ? "Ask the assistant…" : "Message to Earth…"}" aria-label="Message"><button class="btn primary" type="submit">Send</button></form>`;
     body.querySelectorAll("[data-t]").forEach(b => b.addEventListener("click", () => { S.logTab = b.dataset.t; renderPanel(); }));
     const box = body.querySelector("#logBox");
-    const items = tab === "asistente" ? T.ai : T.log;
-    if (!items.length) box.innerHTML = `<p class="empty">${tab === "asistente" ? "Ask about distance, hazards, weather or your position. It answers instantly." : "Messages from Earth arrive here and your reports are saved. Each message takes 12 min to arrive."}</p>`;
+    const items = tab === "assistant" ? T.ai : T.log;
+    if (!items.length) box.innerHTML = `<p class="empty">${tab === "assistant" ? "Ask about distance, hazards, weather or your position. It answers instantly." : "Messages from Earth arrive here and your reports are saved. Each message takes 12 min to arrive."}</p>`;
     items.forEach(m => {
       const d = document.createElement("div"); d.className = "msg " + (m.from === "me" ? "me" : m.from === "sys" ? "sys" : m.from === "peer" ? "peer" : "them");
       d.appendChild(document.createTextNode(m.text));
       const meta = document.createElement("span"); meta.className = "meta";
       const who = m.from === "me" ? T.crew.short : m.from === "earth" ? "Earth" : m.from === "sys" ? "" : m.from === "peer" ? "Notice" : "Assistant";
       let st = "";
-      if (m.from === "me" && tab === "tierra") st = T.simMin >= m.arrive ? " · ✓ received on Earth" : ` · sent → arrives ${MR.solTime(m.arrive).hm}`;
+      if (m.from === "me" && tab === "earth") st = T.simMin >= m.arrive ? " · ✓ received on Earth" : ` · sent → arrives ${MR.solTime(m.arrive).hm}`;
       meta.textContent = `${who ? who + " " : ""}${MR.solTime(m.t).hm}${st}`;
       d.appendChild(meta);
       if (m.ll) {
@@ -1927,11 +1927,11 @@
     const input = body.querySelector(".composer input");
     body.querySelector(".composer").addEventListener("submit", e => {
       e.preventDefault(); const v = MR.clean(input.value, 200); if (!v) return;
-      if (tab === "asistente") askAssistant(v); else { const p = curPos(); sendToEarth(v, p ? [p[0], p[1]] : null); }
+      if (tab === "assistant") askAssistant(v); else { const p = curPos(); sendToEarth(v, p ? [p[0], p[1]] : null); }
       setTimeout(() => { const i = $("spBody").querySelector(".composer input"); i && i.focus({ preventScroll: true }); }, 0);
     });
     body.querySelectorAll(".quick button").forEach(b => b.addEventListener("click", () => {
-      if (tab === "asistente") return askAssistant(b.textContent);
+      if (tab === "assistant") return askAssistant(b.textContent);
       const p = curPos() || T.baseRoute[0];
       if (b.dataset.pos !== undefined) sendToEarth(`Vital coordinates: ${MR.fmtLL(p[0], p[1])} · ${fmt(p[3], 0)} m · km ${fmt(T.km)}`, [p[0], p[1]], "pos");
       else sendToEarth("Status: all in order, we continue.", [p[0], p[1]]);
@@ -1939,8 +1939,8 @@
   }
   function panelFindings(body) {
     const ft = S.fTab;
-    const list = T.findings.filter(f => ft === "todos" || f.type === ft);
-    body.innerHTML = `<div class="chips" style="margin-bottom:12px">${[["todos", "All"], ...FTYPES].map(([k, n]) => `<button class="chip-t" aria-pressed="${ft === k}" data-k="${k}">${n}</button>`).join("")}</div><div id="fList"></div>`;
+    const list = T.findings.filter(f => ft === "all" || f.type === ft);
+    body.innerHTML = `<div class="chips" style="margin-bottom:12px">${[["all", "All"], ...FTYPES].map(([k, n]) => `<button class="chip-t" aria-pressed="${ft === k}" data-k="${k}">${n}</button>`).join("")}</div><div id="fList"></div>`;
     body.querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => { S.fTab = b.dataset.k; renderPanel(); }));
     const box = body.querySelector("#fList");
     if (!list.length) box.innerHTML = `<p class="empty">${T.findings.length ? "No findings of this type." : "No findings yet. Tap a point on the map → “Log a finding here”, or use the Report here button."}</p>`;
@@ -1953,12 +1953,12 @@
       d.querySelector("[data-p]").addEventListener("click", () => openOwnBriefing({ lon: f.lon, lat: f.lat, name: "Sample: " + f.typeName.slice(0, 40), type: "Sampling" }));
       box.appendChild(d);
     });
-    const peers = ft === "todos" ? MR.Shared.visibleFor(T.crew.id, currentRegion).filter(n => n.kind === "hallazgo") : [];
+    const peers = ft === "all" ? MR.Shared.visibleFor(T.crew.id, currentRegion).filter(n => n.kind === "finding") : [];
     if (peers.length) {
       const h = document.createElement("div"); h.className = "peer-head"; h.textContent = `Findings from other explorers (${peers.length})`; box.appendChild(h);
       peers.slice().reverse().forEach(n => {
         const a = crewOf(n.author), d = document.createElement("div"); d.className = "f-item peer";
-        d.innerHTML = `<div class="thumb">${MR.ICONS.hallazgo}</div><div><b></b><small></small><div class="row-actions"><button class="btn ghost" data-c>View</button></div></div>`;
+        d.innerHTML = `<div class="thumb">${MR.ICONS.finding}</div><div><b></b><small></small><div class="row-actions"><button class="btn ghost" data-c>View</button></div></div>`;
         d.querySelector("b").textContent = n.text; d.querySelector("small").textContent = `${a.short} · ${a.role} · ${MR.fmtLL(n.lon, n.lat)}`;
         d.querySelector("[data-c]").addEventListener("click", () => { MR.Map.centerOn(n.lon, n.lat, 3); setTimeout(() => openSharedCard(n), 300); });
         box.appendChild(d);
@@ -2007,7 +2007,7 @@
       } else acceptRoute();
     });
     $("dockPlan").querySelector("[data-adj]").addEventListener("click", () => {
-      setLeft(true); document.querySelector('[data-lptab="ruta"]').click();
+      setLeft(true); document.querySelector('[data-lptab="route"]').click();
       toast("Adjust weights or stops and press Recalculate route");
     });
     $("dockPlan").querySelector("[data-back]").addEventListener("click", () => {
@@ -2134,15 +2134,15 @@
     filteredObjectives().forEach(o => pins.push({ type: o.type, lon: o.lon, lat: o.lat, label: o.name, onClick: () => openObjective(o) }));
     const minerals = getRegionMinerals();
     minerals.forEach(m => pins.push({ type: "mineral", lon: m.lon, lat: m.lat, isMineral: true, mineral: m, label: m.name, onClick: () => openMineralModal(m) }));
-    T.findings.forEach(f => pins.push({ type: "hallazgo", lon: f.lon, lat: f.lat, label: f.typeName, onClick: () => openFindingCard(f) }));
-    T.missions.forEach(m => pins.push({ type: "secundaria", lon: m.lon, lat: m.lat, label: m.name, onClick: () => openMissionCard(m) }));
+    T.findings.forEach(f => pins.push({ type: "finding", lon: f.lon, lat: f.lat, label: f.typeName, onClick: () => openFindingCard(f) }));
+    T.missions.forEach(m => pins.push({ type: "secondary", lon: m.lon, lat: m.lat, label: m.name, onClick: () => openMissionCard(m) }));
     const st = {
       route: activeRoute(),
       km: T.km,
       pos: curPos(),
       color: T.crew.color,
       pins,
-      secondary: T.missions.filter(m => m.path && m.status === "aceptada").map(m => m.path)
+      secondary: T.missions.filter(m => m.path && m.status === "accepted").map(m => m.path)
     };
     if (MR.Scene3D && MR.Scene3D.ready) MR.Scene3D.update(st);
     if (MR.Globe3D && MR.Globe3D.ready) {
@@ -2408,7 +2408,7 @@
      ===================================================== */
   function openSummary() {
     const el = $("summary"), R = T.route, st = MR.routeStats(R);
-    const sols = Math.floor(T.simMin / 1440) + 1, sec = T.missions.filter(m => m.status === "completada").length;
+    const sols = Math.floor(T.simMin / 1440) + 1, sec = T.missions.filter(m => m.status === "completed").length;
     const hrs = (T.simMin - evaStart() * 60) / 60;
     el.innerHTML = `<header class="fv-head"><button class="btn" data-back>↩ Back to the map</button><div><h2>Mission summary</h2><div class="sub">${T.crew.short} · ${T.crew.role}</div></div></header>
       <div class="fv-body"><div class="sum-hero"><div>
@@ -2452,7 +2452,7 @@
     el.hidden = false;
     MR.profileChart($("sumProfile"), R, { stages: T.stages, hazards: T.hazards });
     el.querySelector("[data-back]").addEventListener("click", () => (el.hidden = true));
-    el.querySelector("[data-log]").addEventListener("click", () => { el.hidden = true; togglePanel("bitacora", "tierra"); });
+    el.querySelector("[data-log]").addEventListener("click", () => { el.hidden = true; togglePanel("logbook", "earth"); });
     el.querySelector("[data-new]").addEventListener("click", () => {
       el.hidden = true;
       const keep = { findings: T.findings, log: T.log, ai: T.ai, sharedSeen: T.sharedSeen };
@@ -2523,9 +2523,9 @@
       if (!$("modal").hidden || !$("dashboard").hidden || !$("summary").hidden) return;
       if (k === " ") { e.preventDefault(); togglePlay(); }
       else if (k === "1" || k === "2" || k === "3") setSpeed([1, 10, 50][+k - 1]);
-      else if (k === "m") togglePanel("misiones");
-      else if (k === "b") togglePanel("bitacora");
-      else if (k === "h") togglePanel("hallazgos");
+      else if (k === "m") togglePanel("missions");
+      else if (k === "b") togglePanel("logbook");
+      else if (k === "h") togglePanel("findings");
       else if (k === "r") reportHere();
       else if (k === "d") openDashboard();
       else if (k === "v") setView(S.view === "2d" ? "3d" : "2d");

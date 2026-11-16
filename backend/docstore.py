@@ -1,8 +1,8 @@
 """NON-RELATIONAL document store (MongoDB-style) over JSON Lines files.
 
 Stores what has no fixed shape or grows a lot:
-  - telemetria   -> readings every 30 Martian minutes (position + weather), one per document
-  - capas        -> raster layer metadata
+  - telemetry   -> readings every 30 Martian minutes (position + weather), one per document
+  - layers        -> raster layer metadata
   - targets      -> targets.json (points of interest with variable fields)
   - rutas        -> computed routes (lists of points of variable length)
 

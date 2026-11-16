@@ -127,7 +127,7 @@ They arose while reviewing `core.js`, `app.js` and the data. They are facts of t
 4. **The workday is fixed in the code:** `EVA_START = 8`, `EVA_END = 17` (`app.js:24`), and the simulation advances at 2 Martian minutes per real second.
 5. **The default mobility is `rover`** (`newTrip`, `app.js:30`) and `estimateHours` defaults to the rover speed (`core.js:173`). The briefing calls those hours «walking». In Phase 3 it must be checked whether the briefing hours come from the walking function or the rover one, before explaining why they come out as «4 to 5 sols».
 6. **The web bundle only carries** `dem, slope, roughness, traversability, thermal, color_index, spectral, traverse_km, blocked`. **It does not include `texture` or `gradient`**, and `data/processed/layers.npz` is not in the repo (it is in `.gitignore`). `data/raw/` does contain the DEM, the optical image, THEMIS, Viking and the traverse. To measure uncertainty between trees (Phase 2), the layers must be regenerated with `scripts/build_layers.py` and `models/terrain_model.joblib` loaded (scikit-learn 1.8.0 is installed); it cannot be done with only what already travels to the web.
-7. **Backend persistence:** SQLite already has `hallazgo`, `mensaje`, `mision` and `reporte`; the JSONL store (`backend/docstore.py`) handles telemetry and targets. It fits Phase 4 without changing the architecture.
+7. **Backend persistence:** SQLite already has `finding`, `message`, `mission` and `report`; the JSONL store (`backend/docstore.py`) handles telemetry and targets. It fits Phase 4 without changing the architecture.
 
 ## Table of assumptions pending labeling
 

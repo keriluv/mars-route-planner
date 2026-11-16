@@ -7,7 +7,7 @@
    Where the notices live:
      · localStorage ("mr_shared"): always. Without a server, two tabs of the same browser
        notify each other through the "storage" event.
-     · Backend (SQLite aviso table + events in JSONL): if the page is served by backend/server.py,
+     · Backend (SQLite notice table + events in JSONL): if the page is served by backend/server.py,
        it syncs every few seconds, so other browsers receive them too.
    ========================================================= */
 (function () {
@@ -17,9 +17,9 @@
 
   // radiusKm only sizes the zone drawn on the map (visual aid); it is not a measured safety distance
   S.kinds = {
-    hallazgo: { label: "Finding", radiusKm: 0.5, icon: "hallazgo" },
-    alerta_pendiente: { label: "Slope alert", radiusKm: 0.8, icon: "warn" },
-    alerta_radiacion: { label: "Radiation alert", radiusKm: 1.5, icon: "warn" },
+    finding: { label: "Finding", radiusKm: 0.5, icon: "finding" },
+    slope_alert: { label: "Slope alert", radiusKm: 0.8, icon: "warn" },
+    radiation_alert: { label: "Radiation alert", radiusKm: 1.5, icon: "warn" },
   };
   let seq = 1;
   const newId = () => "av_" + Date.now().toString(36) + (seq++) + Math.random().toString(36).slice(2, 6);
@@ -31,8 +31,8 @@
     (items || []).forEach(n => {
       if (!valid(n)) return;
       const cur = S.list.find(x => x.id === n.id);
-      if (!cur) { const c = Object.assign({ estado: "activo" }, n); S.list.push(c); added.push(c); }
-      else if (cur.estado !== "retirado" && n.estado === "retirado") { cur.estado = "retirado"; changed.push(cur); }
+      if (!cur) { const c = Object.assign({ status: "active" }, n); S.list.push(c); added.push(c); }
+      else if (cur.status !== "withdrawn" && n.status === "withdrawn") { cur.status = "withdrawn"; changed.push(cur); }
     });
     if (S.list.length > MAX) S.list = S.list.slice(-MAX);
     return { added, changed };
@@ -54,29 +54,29 @@
 
   S.publish = function ({ kind, author, lon, lat, text, simMin, region }) {
     const n = { id: newId(), author, kind, text: MR.clean(text, 280), lon, lat, radiusKm: S.kinds[kind].radiusKm, region: region || "gale",
-      simMin, estado: "activo", creado: new Date().toISOString() };
+      simMin, status: "active", created: new Date().toISOString() };
     const mine = absorb([n]); const other = persist();
     notify({ added: mine.added.concat(other.added), changed: other.changed });
-    MR.API.sendAviso(n);
+    MR.API.sendNotice(n);
     return n;
   };
   S.retract = function (id, crew) {
-    const n = S.list.find(x => x.id === id); if (!n || n.author !== crew || n.estado === "retirado") return;
-    n.estado = "retirado"; persist(); notify({ added: [], changed: [n] });
-    MR.API.retractAviso(id, crew);
+    const n = S.list.find(x => x.id === id); if (!n || n.author !== crew || n.status === "withdrawn") return;
+    n.status = "withdrawn"; persist(); notify({ added: [], changed: [n] });
+    MR.API.retractNotice(id, crew);
   };
-  S.ack = (id, crew) => MR.API.ackAviso(id, crew);
+  S.ack = (id, crew) => MR.API.ackNotice(id, crew);
 
   // notices from other explorers visible to `crewId` in the given region
-  S.visibleFor = (crewId, region) => S.list.filter(n => n.estado === "activo" && n.author !== crewId && (n.region || "gale") === region);
+  S.visibleFor = (crewId, region) => S.list.filter(n => n.status === "active" && n.author !== crewId && (n.region || "gale") === region);
 
   // syncs with the backend: fetches what others sent and uploads what was left unsent (the server ignores duplicates)
   S.sync = async function () {
-    const remote = await MR.API.getAvisos(); if (!remote) return;
+    const remote = await MR.API.getNotices(); if (!remote) return;
     const ids = new Set(remote.map(r => r.id));
-    const res = absorb(remote.map(r => Object.assign({}, r, { estado: r.estado })));
+    const res = absorb(remote.map(r => Object.assign({}, r, { status: r.status })));
     const other = persist(); notify({ added: res.added.concat(other.added), changed: res.changed.concat(other.changed) });
-    S.list.filter(n => !ids.has(n.id) && n.estado === "activo").forEach(n => MR.API.sendAviso(n));
+    S.list.filter(n => !ids.has(n.id) && n.status === "active").forEach(n => MR.API.sendNotice(n));
   };
   S.startPolling = function () { if (S.timer) return; S.sync(); S.timer = setInterval(S.sync, POLL_MS); };
 

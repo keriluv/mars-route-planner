@@ -199,10 +199,10 @@
       spectral: 0x2f7fb8,
       science: 0xb5651d,
       reference: 0xc0c8d4,
-      hallazgo: 0x46c882,
-      aviso: 0xf0963c,
-      secundaria: 0xa68bff,
-      propuesta: 0xa68bff
+      finding: 0x46c882,
+      notice: 0xf0963c,
+      secondary: 0xa68bff,
+      proposed: 0xa68bff
     };
 
     list.forEach(m => {
