@@ -1,6 +1,8 @@
 # Comercial GaleX — Cada paso importa
 
-Segunda previsualización: 119,8 segundos, 1920 × 1080, 30 fps. Diecisiete escenas de funciones y cierre de marca. Cambio de función cada 5,4–7,4 segundos con transiciones solapadas de 0,6 s. Capturas de navegación y acciones reales; sin imágenes fijas sustituyendo las tomas de relieve, planificación o recursos. Sin música ni voz, por elección del usuario para esta revisión. No hay exportación MP4 final todavía.
+Segunda revisión: 119,8 segundos, 1920 × 1080, 30 fps. Diecisiete escenas de funciones y cierre de marca. Cambio de función cada 5,4–7,4 segundos con transiciones solapadas de 0,6 s. Capturas de navegación y acciones reales; sin imágenes fijas sustituyendo las tomas de relieve, planificación o recursos. Sin música ni voz, por elección del usuario para esta revisión.
+
+MP4 de la revisión: `renders/galex-cada-paso-importa-v2.mp4` (87.635.778 bytes, aproximadamente 84 MiB). Archivo local excluido de Git; su comprobación y hash quedan registrados en `final-render-validation.json`.
 
 ```bash
 cd video/galex-comercial
@@ -10,7 +12,7 @@ npx hyperframes@0.9.56 check --json
 
 Previsualización de esta sesión: http://localhost:4567/#project/galex-comercial . El servidor local es independiente del servidor GaleX: reproduce medios capturados, sin volver a consultar NASA ni el backend de la aplicación.
 
-Después de aprobar la previsualización:
+Para volver a exportar:
 
 ```bash
 npx hyperframes@0.9.56 render --quality delivery -o renders/galex-cada-paso-importa.mp4

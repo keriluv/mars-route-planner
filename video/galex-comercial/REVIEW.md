@@ -8,8 +8,8 @@ Se construyeron 18 escenas, 17 de producto y el cierre de marca, en 119,8 s. Nue
 
 - HyperFrames 0.9.56: `ok: true`, cero errores en lint, runtime, layout, movimiento y contraste. Único aviso: `film_silent`, conservado por elección del usuario. Una información de solapamiento de indicadores de capítulo durante la transición; dura menos de 0,6 s y es intencional. Resumen en `validation-summary.json`.
 - `capture/verify_media.py`: 17 medios decodificados sin errores, 30 fps y duración coincidente con el guion. Comparación de imágenes del terreno en varios instantes confirma cambios en Planeta 3D, Relieve 3D, mapa 2D y navegación regional. Esa comparación detecta movimiento; no mide rendimiento real de la aplicación. Resultados en `media-validation.json`.
-- Se solicitaron 206 fotogramas de revisión de escenas y uniones. Se inspeccionaron los 36 fotogramas de inicio/mitad de las 18 escenas, hojas de contacto y transiciones representativas. La captura exhaustiva de las uniones se conserva en `.hyperframes/artifacts/snapshots/`.
-- Previsualización local en el puerto 4567. No se ha exportado todavía el MP4 completo; su duración y reproducción deberán comprobarse al realizar la exportación.
+- Se generaron 206 fotogramas de revisión de escenas y uniones. Se inspeccionaron los 36 fotogramas de inicio/mitad de las 18 escenas, hojas de contacto, hojas a tamaño de teléfono y transiciones representativas. La captura exhaustiva de las uniones se conserva en `.hyperframes/artifacts/snapshots/`.
+- Previsualización local en el puerto 4567 y MP4 exportado: 1920 × 1080, H.264, 30 fps, 3.594 fotogramas y 119,8 s. La decodificación completa terminó sin errores; se inspeccionaron fotogramas exportados en 4, 12, 26, 60, 92 y 118 s. El cierre conserva el logo completo. Archivo de 87.635.778 bytes, sin pista de audio. Resultado y hash en `final-render-validation.json`.
 
 ## Ajustes realizados y límites
 
