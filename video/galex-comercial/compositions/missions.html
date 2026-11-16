@@ -1,0 +1,24 @@
+<template><style>
+#root{position:absolute;inset:0;font-family:Inter;color:#fff;overflow:hidden}
+.stage{position:absolute;inset:0;background:#080808;overflow:hidden}
+.screen{position:absolute;inset:0;transform-origin:58% 48%}
+video{position:absolute;inset:0;width:1920px;height:1080px;object-fit:cover}
+.copy{position:absolute;left:112px;bottom:112px;max-width:1560px;overflow:hidden}
+.words{background:rgba(5,5,5,0.94);padding:24px 34px 26px;border-left:6px solid #fc3d21}
+h1{font-size:64px;line-height:1.1;letter-spacing:-2px;margin:0;font-weight:700}
+p{font-size:30px;line-height:1.35;color:#e5e5e5;margin:12px 0 0}
+.chapter{position:absolute;top:100px;right:112px;font-size:30px;font-weight:700;letter-spacing:2px;background:#080808;padding:10px 18px}
+.progress{position:absolute;bottom:0;left:0;width:1920px;height:5px;background:#fc3d21;transform-origin:left center}
+</style><div id="root" data-composition-id="missions" data-width="1920" data-height="1080"><div id="missions-stage" class="stage">
+<div id="missions-screen" class="screen" data-layout-allow-overflow><video id="missions-footage" class="clip" src="assets/v2-missions.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video></div>
+<div id="missions-chapter" class="chapter">13 / GALEX</div>
+<div id="missions-copy" class="copy clip" data-start="0.25" data-duration="3.8" data-track-index="1"><div id="missions-words" class="words"><h1>Una misión. Nuevos objetivos</h1><p>Misiones principales y secundarias</p></div></div>
+<div id="missions-progress" class="progress" data-layout-ignore></div></div></div><script>
+const tl=gsap.timeline({paused:true});
+tl.fromTo('#missions-stage',{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0% 0% 0% 0%)',duration:0.6,ease:'power3.inOut'},0);
+tl.fromTo('#missions-words',{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0% 0 0)',duration:0.55,ease:'power4.out'},0.25);
+tl.to('#missions-words',{clipPath:'inset(0 0 100% 0)',duration:0.3,ease:'power2.in'},3.7);
+tl.fromTo('#missions-screen',{scale:1,x:0},{scale:1.06,x:0,duration:1.15,ease:'power2.inOut'},0.8);
+tl.to('#missions-screen',{scale:1.02,x:0,duration:1.2,ease:'power2.inOut'},5.4);
+tl.fromTo('#missions-progress',{scaleX:0},{scaleX:1,duration:7,ease:'none'},0);
+window.__timelines['missions']=tl;</script></template>

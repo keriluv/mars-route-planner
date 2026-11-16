@@ -1,27 +1,24 @@
-<template>
-<style>
-#root {position:absolute;inset:0;background:#ffffff;color:#151a22;font-family:Inter;overflow:hidden}
-.frame {position:absolute;left:0;top:0;width:1920px;height:810px;overflow:hidden;background:#141414}
-.camera {position:absolute;inset:0;transform-origin:60% 45%}
-video,img {width:1440px;height:810px;object-fit:contain;position:absolute;top:0;left:240px}
-.copy {position:absolute;left:112px;top:846px;right:112px}
-.label {font-size:30px;letter-spacing:3px;color:#b52c1a;font-weight:700;margin-bottom:10px}
-h1 {font-size:76px;letter-spacing:-3px;line-height:1.1;margin:0;font-weight:700}
-.sub {font-size:30px;margin:14px 0 0;color:#434b58}
-.rail {position:absolute;left:0;top:810px;height:6px;width:1920px;background:#fc3d21;transform-origin:left center}
-</style>
-<div id="root" data-composition-id="planning" data-width="1920" data-height="1080">
- <div class="frame" data-layout-allow-overflow><div class="camera" id="planning-camera">
- <video id="planning-footage" class="clip" src="assets/planning.mp4" muted playsinline data-start="0" data-duration="11" data-track-index="0"></video><img id="planning-detail" class="clip" src="assets/planning-still.png" data-start="3" data-duration="8" data-track-index="1" alt="Detalle real de los recursos y la ruta en GaleX"></div></div>
- <div class="rail" id="planning-rail" data-layout-ignore></div>
- <div class="copy" id="planning-copy"><div class="label">04 / RUTAS PROPIAS</div><h1>Diseña tu recorrido</h1><p class="sub">Perfiles de ruta y ajustes de grilla · ejemplo corto en Gale</p></div>
-</div>
-<script>
+<template><style>
+#root{position:absolute;inset:0;font-family:Inter;color:#fff;overflow:hidden}
+.stage{position:absolute;inset:0;background:#080808;overflow:hidden}
+.screen{position:absolute;inset:0;transform-origin:20% 42%}
+video{position:absolute;inset:0;width:1920px;height:1080px;object-fit:cover}
+.copy{position:absolute;left:112px;bottom:112px;max-width:1560px;overflow:hidden}
+.words{background:rgba(5,5,5,0.94);padding:24px 34px 26px;border-left:6px solid #fc3d21}
+h1{font-size:64px;line-height:1.1;letter-spacing:-2px;margin:0;font-weight:700}
+p{font-size:30px;line-height:1.35;color:#e5e5e5;margin:12px 0 0}
+.chapter{position:absolute;top:100px;right:112px;font-size:30px;font-weight:700;letter-spacing:2px;background:#080808;padding:10px 18px}
+.progress{position:absolute;bottom:0;left:0;width:1920px;height:5px;background:#fc3d21;transform-origin:left center}
+</style><div id="root" data-composition-id="planning" data-width="1920" data-height="1080"><div id="planning-stage" class="stage">
+<div id="planning-screen" class="screen" data-layout-allow-overflow><video id="planning-footage" class="clip" src="assets/v2-planning.mp4" muted playsinline data-start="0" data-duration="8" data-track-index="0"></video></div>
+<div id="planning-chapter" class="chapter">08 / GALEX</div>
+<div id="planning-copy" class="copy clip" data-start="0.25" data-duration="3.8" data-track-index="1"><div id="planning-words" class="words"><h1>Diseña tu recorrido</h1><p>Paradas y perfiles Segura, Rápida y Científica</p></div></div>
+<div id="planning-progress" class="progress" data-layout-ignore></div></div></div><script>
 const tl=gsap.timeline({paused:true});
-tl.fromTo('#planning-camera',{scale:1.12,x:30},{scale:1,x:0,duration:0.65,ease:'power3.out'},0);
-tl.fromTo('#planning-copy',{y:24,opacity:0},{y:0,opacity:1,duration:0.45,ease:'power3.out'},0.12);
-tl.fromTo('#planning-rail',{scaleX:0},{scaleX:1,duration:0.7,ease:'power3.inOut'},0);
-tl.fromTo('#planning-camera',{scale:1,x:0},{scale:1.9,x:550,duration:0.7,ease:'power3.inOut',immediateRender:false},1.6);
-tl.to('#planning-camera',{scale:1,x:0,duration:0.7,ease:'power3.inOut'},9.5);
-window.__timelines['planning']=tl;
-</script></template>
+tl.fromTo('#planning-stage',{clipPath:'circle(0% at 70% 48%)'},{clipPath:'circle(150% at 70% 48%)',duration:0.6,ease:'power3.inOut'},0);
+tl.fromTo('#planning-words',{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0% 0 0)',duration:0.55,ease:'power4.out'},0.25);
+tl.to('#planning-words',{clipPath:'inset(0 0 100% 0)',duration:0.3,ease:'power2.in'},3.7);
+tl.fromTo('#planning-screen',{scale:1,x:0},{scale:1.25,x:85,duration:1.15,ease:'power2.inOut'},0.8);
+tl.to('#planning-screen',{scale:1.02,x:0,duration:1.2,ease:'power2.inOut'},6.4);
+tl.fromTo('#planning-progress',{scaleX:0},{scaleX:1,duration:8,ease:'none'},0);
+window.__timelines['planning']=tl;</script></template>

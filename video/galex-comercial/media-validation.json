@@ -1,0 +1,125 @@
+{
+  "duration": 119.8,
+  "max_seconds_between_features": 7.400000000000006,
+  "media": [
+    {
+      "scene": "planet",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0,
+      "terrain_mean_absolute_change": [
+        17.892430555555556,
+        23.23034722222222
+      ]
+    },
+    {
+      "scene": "relief",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0,
+      "terrain_mean_absolute_change": [
+        19.93107638888889,
+        50.135555555555555
+      ]
+    },
+    {
+      "scene": "map",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0,
+      "terrain_mean_absolute_change": [
+        20.622465277777778,
+        25.511319444444446
+      ]
+    },
+    {
+      "scene": "layers",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "regions",
+      "duration": 7.0,
+      "fps": 30,
+      "decode_errors": 0,
+      "terrain_mean_absolute_change": [
+        17.18706597222222,
+        18.61439236111111
+      ]
+    },
+    {
+      "scene": "minerals",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "objectives",
+      "duration": 6.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "planning",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "eva",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "conditions",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "suit",
+      "duration": 6.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "weather",
+      "duration": 6.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "missions",
+      "duration": 7.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "records",
+      "duration": 8.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "log",
+      "duration": 7.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "rovers",
+      "duration": 7.0,
+      "fps": 30,
+      "decode_errors": 0
+    },
+    {
+      "scene": "controls",
+      "duration": 7.0,
+      "fps": 30,
+      "decode_errors": 0
+    }
+  ],
+  "note": "Cambio de imagen y decodificación; no mide rendimiento real del producto ni sustituye revisión visual."
+}

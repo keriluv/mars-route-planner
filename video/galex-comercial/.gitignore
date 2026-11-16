@@ -10,4 +10,5 @@ assets/*-still.png
 !assets/planning-still.png
 !assets/eva-still.png
 __pycache__/
+capture/raw/
 
