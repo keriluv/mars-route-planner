@@ -104,7 +104,7 @@
     const [w, s, e, n] = MR.bbox || D.bbox;
     return lon >= w && lon <= e && lat >= s && lat <= n;
   };
-  MR.fmt = (v, d = 1) => (v == null || isNaN(v) ? "—" : Number(v).toLocaleString("es-CO", { minimumFractionDigits: d, maximumFractionDigits: d }).replace(/^-/, "−"));
+  MR.fmt = (v, d = 1) => (v == null || isNaN(v) ? "—" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }).replace(/^-/, "−"));
   MR.fmtLL = (lon, lat) => `${MR.fmt(lat, 3)}° · ${MR.fmt(lon, 3)}°`;
 
   /* ---------- rutas: formato [lon, lat, km, elev, slope, rough, trav] ---------- */
@@ -321,6 +321,16 @@
     const key = [o.riskW, o.slopeW, o.maxSlope, o.caution].join("|");
     if (key !== cacheKey) { cache = buildCost(o); cacheKey = key; }
     const { cost, blocked } = cache;
+    const avoidMasks = (o.avoid || []).map(zone => {
+      const [r, c] = MR.cellOf(zone.lon, zone.lat), [w, s, e, n] = MR.bbox;
+      const radiusKm = Math.max(0, zone.radiusKm || 0);
+      return {
+        r, c,
+        r2: Math.max(1, radiusKm / (KM_PER_DEG * (n - s) / G)),
+        c2: Math.max(1, radiusKm / (KM_PER_DEG * Math.cos(zone.lat * Math.PI / 180) * (e - w) / G)),
+      };
+    });
+    const inAvoidZone = (r, c) => avoidMasks.some(a => ((r - a.r) / a.r2) ** 2 + ((c - a.c) / a.c2) ** 2 <= 1);
     const [sr, sc] = nearestFree(blocked, ...MR.cellOf(fromLL[0], fromLL[1]));
     const [gr, gc] = nearestFree(blocked, ...MR.cellOf(toLL[0], toLL[1]));
     const n = G * G, best = new Float64Array(n).fill(Infinity), parent = new Int32Array(n).fill(-1), closed = new Uint8Array(n);
@@ -333,7 +343,7 @@
       const r = (i / G) | 0, c = i - r * G;
       for (const [dr, dc, st] of NB) {
         const rr = r + dr, cc = c + dc; if (rr < 0 || cc < 0 || rr >= G || cc >= G) continue;
-        const j = rr * G + cc; if (closed[j] || blocked[j]) continue;
+        const j = rr * G + cc; if (closed[j] || blocked[j] || inAvoidZone(rr, cc)) continue;
         const cand = best[i] + st * 0.5 * (cost[i] + cost[j]);
         if (cand < best[j]) { best[j] = cand; parent[j] = i; heap.push(cand + h(rr, cc), j); }
       }

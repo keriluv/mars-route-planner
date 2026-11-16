@@ -11,7 +11,11 @@ echo =========================================================
 
 cd /d "%~dp0"
 
-start /b python backend\server.py
+if exist ".venv\Scripts\python.exe" (
+  start /b "" ".venv\Scripts\python.exe" backend\server.py
+) else (
+  start /b "" python backend\server.py
+)
 
 timeout /t 2 /nobreak >nul
 

@@ -119,6 +119,7 @@
     buildCrew(); buildLeftPanel(); bindTop(); bindKeys();
     if (window.innerWidth < 820) setLeft(false);
     renderAll();
+    if (MR.I18n) { MR.I18n.init(); renderAll(); }
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("reduce") === "1") document.documentElement.classList.add("reduce");
     const initReg = urlParams.get("region");
@@ -173,8 +174,6 @@
     if (!T.briefed) setTimeout(openMainBriefing, 300);
   }
   let currentRegion = "gale";
-  let currentLang = "es";
-
   function switchRegion(regionId) {
     if (regionId === currentRegion) return;
     currentRegion = regionId;
@@ -184,8 +183,8 @@
     document.querySelectorAll(".rqs-btn").forEach(b => b.classList.toggle("active", b.dataset.region === regionId));
 
     if (regionId === "jezero") {
-      $("brandTitle").textContent = currentLang === "en" ? "Jezero Crater Mission" : "Misión Cráter Jezero";
-      $("brandSub").textContent = currentLang === "en" ? "Jezero Crater · Mars (Perseverance)" : "Cráter Jezero · Marte (Perseverance)";
+      $("brandTitle").textContent = "Jezero Crater Mission";
+      $("brandSub").textContent = "Jezero Crater · Mars (Perseverance)";
       banner({ kind: "info", title: "Región: Cráter Jezero", sub: "Misión Perseverance · Terreno y mosaico de Jezero activos.", ttl: 4000 });
 
       const jezRoute = (window.JEZERO_DATA && window.JEZERO_DATA.route) ? window.JEZERO_DATA.route.slice() : [];
@@ -199,8 +198,8 @@
       renderLayerList("jezero");
       renderLegend();
     } else {
-      $("brandTitle").textContent = currentLang === "en" ? "Safe Route to Mount Sharp" : "Ruta a Mount Sharp";
-      $("brandSub").textContent = currentLang === "en" ? "Gale Crater · Mars (Curiosity)" : "Cráter Gale · Marte (Curiosity)";
+      $("brandTitle").textContent = "Safe Route to Mount Sharp";
+      $("brandSub").textContent = "Gale Crater · Mars (Curiosity)";
       banner({ kind: "info", title: "Región: Cráter Gale", sub: "Misión Curiosity · Terreno local y predicción activos.", ttl: 4000 });
 
       T.baseRoute = MR.withKm(D.routes[T.crew.main].points);
@@ -232,25 +231,6 @@
     renderStops();
     renderProfileMetrics();
     update3d();
-  }
-
-  function toggleLanguage() {
-    currentLang = currentLang === "es" ? "en" : "es";
-    const lbl = $("langLabel");
-    if (lbl) lbl.textContent = currentLang.toUpperCase();
-    if (currentLang === "en") {
-      $("brandTitle").textContent = currentRegion === "jezero" ? "Jezero Crater Mission" : "Safe Route to Mount Sharp";
-      $("brandSub").textContent = currentRegion === "jezero" ? "Jezero Crater · Mars" : "Gale Crater · Mars";
-      $("btnReport").innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4h10l-1.5 3.5L16 11H6"/></svg>Report here`;
-      toast("Language switched to English");
-    } else {
-      $("brandTitle").textContent = currentRegion === "jezero" ? "Misión Cráter Jezero" : "Ruta a Mount Sharp";
-      $("brandSub").textContent = currentRegion === "jezero" ? "Cráter Jezero · Marte" : "Cráter Gale · Marte";
-      $("btnReport").innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4h10l-1.5 3.5L16 11H6"/></svg>Reportar aquí`;
-      toast("Idioma cambiado a Español");
-    }
-    renderStatus();
-    renderProfileMetrics();
   }
 
   function triggerWeatherAlert() {
@@ -721,8 +701,6 @@
     document.querySelectorAll(".rqs-btn").forEach(b => {
       b.addEventListener("click", () => switchRegion(b.dataset.region));
     });
-    const btnL = $("btnLang");
-    if (btnL) btnL.addEventListener("click", toggleLanguage);
     $("exag").addEventListener("input", e => { const v = +e.target.value; $("exagOut").textContent = fmt(v, 1) + "×"; MR.Scene3D.setExag(v); });
     $("follow3d").addEventListener("change", e => MR.Scene3D.setFollow(e.target.checked));
     const l3d = $("layer3d"); if (l3d) l3d.addEventListener("change", e => MR.Scene3D.setLayerVisible(e.target.checked));
@@ -789,7 +767,7 @@
   }
   function togglePlay() {
     if (T.mode !== "walk") return;
-    if (!T.simulationStarted) return toast("Pulsa «Iniciar simulación» para comenzar la caminata.");
+    if (!T.simulationStarted) return toast("Select “Start simulation” to begin the traverse.");
     if (!$("stageCard").hidden) return;
     if (!$("modal").hidden && $("modal").classList.contains("critical")) return;
     T.playing = !T.playing;
@@ -797,20 +775,20 @@
     renderStatus();
   }
   function renderStatus() {
-    const modeTxt = { base: "Mapa base", plan: "Planear", walk: "Recorrer", done: "Misión completada" }[T.mode];
+    const modeTxt = { base: "Base map", plan: "Planning", walk: "On traverse", done: "Mission complete" }[T.mode];
     $("modePill").textContent = modeTxt; $("modePill").dataset.mode = T.mode; document.body.dataset.mode = T.mode;
     $("clock").textContent = time().label;
     const L = activeRoute() ? activeRoute()[activeRoute().length - 1][2] : 0;
     $("kmReadout").textContent = `${fmt(T.km)} / ${fmt(L)} km`;
     const checkpoint = !$("stageCard").hidden;
     const p = $("btnPlay"); p.disabled = T.mode !== "walk" || !T.simulationStarted || checkpoint; p.setAttribute("aria-pressed", T.playing);
-    p.setAttribute("aria-label", T.playing ? "Pausar simulación" : "Iniciar simulación");
+    p.setAttribute("aria-label", T.playing ? "Pause simulation" : T.simulationStarted ? "Resume simulation" : "Start simulation");
     const start = $("btnSimStart");
     if (start) {
       start.hidden = T.mode !== "walk";
       start.disabled = checkpoint;
-      start.textContent = T.playing ? "Pausar simulación" : T.simulationStarted ? "Continuar simulación" : "Iniciar simulación";
-      $("walkPrompt").textContent = checkpoint ? "Tramo terminado: revisa los datos y decide cómo seguir." : T.simulationStarted ? "Simulación controlada por ti; puedes pausarla cuando quieras." : "Misión aceptada. Inicia cuando estés listo.";
+      start.textContent = T.playing ? "Pause simulation" : T.simulationStarted ? "Resume simulation" : "Start simulation";
+      $("walkPrompt").textContent = checkpoint ? "Segment complete: review the data and decide what to do next." : T.simulationStarted ? "You control the simulation; pause it whenever you like." : "Mission accepted. Start when you are ready.";
     }
     const clear = $("btnClearSimulation"); if (clear) clear.hidden = !T.simulationId;
     document.querySelectorAll(".crew button").forEach(b => b.setAttribute("aria-checked", b.dataset.id === T.crew.id));
@@ -1486,8 +1464,17 @@
     if (action) t.querySelector("button").addEventListener("click", () => { t.hidden = true; fn(); });
     clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), action ? 5000 : 2600);
   }
-  function stageCard(kind) {
+  const ROUTE_INCIDENTS = [
+    { title: "Rockfall blocks the traverse", detail: "Loose rocks have covered the planned track. The crew cannot safely continue along this route.", riskW: 6, slopeW: 5, maxSlope: 14 },
+    { title: "Deep sand blocks the route", detail: "The rover has reached a soft sand pocket with insufficient traction. The planned segment is no longer passable.", riskW: 7, slopeW: 4, maxSlope: 16 },
+    { title: "Terrain instability detected", detail: "A fresh surface collapse has made the next section unsafe. Mission control recommends finding another corridor.", riskW: 5, slopeW: 7, maxSlope: 13 },
+  ];
+  function stageCard(kind, incident = null) {
     T.playing = false; renderStatus();
+    if (kind === "stage" && incident) {
+      T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Incident: ${incident.title}` });
+      logSys(`Unexpected incident: ${incident.title}. The planned route is blocked.`);
+    }
     const L = T.route[T.route.length - 1][2], n = T.stages.length;
     const card = $("stageCard");
     if (kind === "night") {
@@ -1524,15 +1511,56 @@
           <div class="stat"><span class="v num">${fmt(wx.p, 1)} Pa</span><span class="k">presión estimada</span></div>
           <div class="stat"><span class="v num">${fmt(here[3], 0)} m</span><span class="k">elevación actual</span></div>
           <div class="stat"><span class="v num">${fmt(rough, 1)} m</span><span class="k">rugosidad media</span></div></div>
-        <div class="actions"><button class="btn" data-r>Descansar 1 h</button><button class="btn" data-f>Registrar hallazgo</button><button class="btn primary" data-c>Continuar tramo</button><button class="btn danger" data-ab>Abortar misión</button></div>`;
-      card.querySelector("[data-r]").addEventListener("click", () => { T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h."); renderStatus(); updateWeather(true); });
-      card.querySelector("[data-c]").addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
-      card.querySelector("[data-f]").addEventListener("click", () => { if (S.view !== "2d") setView("2d"); openFindingForm([here[0], here[1]]); });
+        ${incident ? `<div class="alt" style="margin:10px 0;padding:10px;border-left:3px solid var(--danger);background:var(--panel-2);border-radius:4px"><b>Unexpected incident: ${esc(incident.title)}</b><br>${esc(incident.detail)}<br><strong>The current route is blocked.</strong> Recalculate the remaining route and its segments before continuing.</div>` : `<p class="who" style="margin:8px 0">No blocking incident detected on this segment.</p>`}
+        <div class="actions">${incident ? `<button class="btn primary" data-replan>Recalculate route</button>` : `<button class="btn" data-r>Rest 1 hour</button><button class="btn" data-f>Record finding</button>${done < n ? '<button class="btn" data-test-incident>Simulate incident</button>' : ''}<button class="btn primary" data-c>Continue segment</button>`}<button class="btn danger" data-ab>Abort mission</button></div>`;
+      const incidentButton = card.querySelector("[data-test-incident]");
+      if (incidentButton) incidentButton.addEventListener("click", () => stageCard("stage", ROUTE_INCIDENTS[Math.floor(Math.random() * ROUTE_INCIDENTS.length)]));
+      const replanButton = card.querySelector("[data-replan]");
+      if (replanButton) replanButton.addEventListener("click", () => replanAfterIncident(incident));
+      const restButton = card.querySelector("[data-r]");
+      if (restButton) restButton.addEventListener("click", () => { T.simMin += 60; card.hidden = true; logSys("Descanso de 1 h."); renderStatus(); updateWeather(true); });
+      const continueButton = card.querySelector("[data-c]");
+      if (continueButton) continueButton.addEventListener("click", () => { card.hidden = true; T.playing = true; renderStatus(); });
+      const findingButton = card.querySelector("[data-f]");
+      if (findingButton) findingButton.addEventListener("click", () => { if (S.view !== "2d") setView("2d"); openFindingForm([here[0], here[1]]); });
       card.querySelector("[data-ab]").addEventListener("click", () => confirmAbort());
     }
     card.hidden = false;
     renderStatus();
     card.querySelector(".btn.primary").focus({ preventScroll: true });
+  }
+  function replanAfterIncident(incident) {
+    const p = curPos(), goal = goalObj();
+    if (!p || !goal) return toast("Unable to determine the current position or destination.");
+    const start = [p[0], p[1]], finish = [goal.lon, goal.lat];
+    const routeEndKm = T.route[T.route.length - 1][2];
+    const remainingKm = Math.max(0, routeEndKm - T.km);
+    const blockedKm = T.km + Math.min(3, remainingKm * 0.5);
+    const blockedPoint = posAt(T.route, blockedKm);
+    const avoid = blockedPoint ? [{ lon: blockedPoint[0], lat: blockedPoint[1], radiusKm: Math.min(0.9, Math.max(0.12, remainingKm * 0.2)) }] : [];
+    const saferOptions = { riskW: incident.riskW, slopeW: incident.slopeW, maxSlope: Math.min(MR.cfg.maxSlope, incident.maxSlope), avoid };
+    const remainder = MR.astar(start, finish, saferOptions) || MR.astar(start, finish, { riskW: Math.max(MR.cfg.riskW, 6), slopeW: Math.max(MR.cfg.slopeW, 5), maxSlope: MR.cfg.maxSlope, avoid });
+    if (!remainder || remainder.length < 2) {
+      toast("No safe alternative was found. Abort the mission or adjust route limits.");
+      return;
+    }
+    const prefix = T.route.filter(point => point[2] < T.km - 0.001).concat([p]);
+    const prefixKm = MR.withKm(prefix)[prefix.length - 1][2];
+    T.route = MR.withKm(prefix.concat(remainder.slice(1)));
+    T.km = prefixKm;
+    T.stages = makeStages(T.route);
+    T.stageIdx = Math.max(0, T.stages.findIndex(k => k > T.km + 0.01));
+    if (T.stageIdx < 0) T.stageIdx = T.stages.length;
+    T.detours++;
+    T.playing = false;
+    $("stageCard").hidden = true;
+    T.handled = T.handled.mda_storm_1130 ? { mda_storm_1130: T.handled.mda_storm_1130 } : {};
+    recomputeHazards();
+    T.hazards.forEach(h => { if (h.startKm < T.km + 0.05) T.handled[h.id] = 1; });
+    afterRouteChange();
+    renderStatus();
+    logSys(`Route recalculated after incident: ${incident.title}. New segment checkpoints: ${T.stages.filter(k => k > T.km + 0.01).length}.`);
+    banner({ kind: "ok", title: "Route recalculated", sub: `A safer detour is ready. ${T.stages.filter(k => k > T.km + 0.01).length} new segment checkpoints were planned. Select Start simulation to continue.`, ttl: 6500 });
   }
   function restUntilMorning() {
     $("stageCard").hidden = true;
@@ -1602,7 +1630,9 @@
     if (T.stageIdx < T.stages.length && T.km >= T.stages[T.stageIdx]) {
       T.stageIdx++; T.events.push({ t: T.simMin, c: "var(--nominal)", txt: `Etapa ${T.stageIdx} completada` });
       logSys(`Etapa ${T.stageIdx} de ${T.stages.length} completada en km ${fmt(T.km)}.`);
-      return stageCard("stage");
+      const incident = T.stageIdx < T.stages.length && Math.random() < 0.35
+        ? ROUTE_INCIDENTS[Math.floor(Math.random() * ROUTE_INCIDENTS.length)] : null;
+      return stageCard("stage", incident);
     }
     // En la última parada, la llegada se confirma después de que el usuario continúe.
     if (T.km >= L - 0.005 && T.stageIdx >= T.stages.length) return arrive();
