@@ -22,7 +22,7 @@
     if (!/^https?:$/.test(location.protocol)) return false;
     try { const h = await req("health"); API.online = h && h.status === "ok"; } catch (e) { API.online = false; }
     const b = document.getElementById("connBadge");
-    if (b) { b.textContent = API.online ? "Backend conectado" : "Modo local"; b.dataset.on = API.online ? "1" : "0"; }
+    if (b) { b.textContent = API.online ? "Backend connected" : "Local mode"; b.dataset.on = API.online ? "1" : "0"; }
     if (API.online) API.flush();
     return API.online;
   };

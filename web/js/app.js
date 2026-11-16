@@ -30,6 +30,7 @@
     return {
       crew: c, mode: "base", choice: "model", baseRoute: base, adjusted: null, shortRoute: null, route: null,
       profileMode: "segura", mobility: "astronaut", alertTriggered: false,
+      aborted: false,
       km: 0, simMin: EVA_START * 60, playing: false, speed: 10, stages: [], stageIdx: 0,
       simulationId: null, simulationStarted: false,
       findings: [], missions: [], log: [], ai: [], handled: {}, events: [], proposed: {},
@@ -54,6 +55,18 @@
     const i = MR.nearestKm(route, km); if (i === 0) return route[0];
     const a = route[i - 1], b = route[i], u = (km - a[2]) / ((b[2] - a[2]) || 1);
     return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, km, a[3] + (b[3] - a[3]) * u, b[4], b[5], b[6]];
+  }
+  function routeFromKm(route, km) {
+    const current = posAt(route, km);
+    return current ? MR.withKm([current, ...route.filter(point => point[2] > km + 0.001)]) : [];
+  }
+  function routeThroughKm(route, km) {
+    if (!route) return [];
+    const traversed = route.filter(point => point[2] < km - 0.001);
+    const current = posAt(route, km);
+    if (current) traversed.push(current);
+    if (traversed.length === 1) traversed.push(traversed[0].slice());
+    return MR.withKm(traversed);
   }
   const curPos = () => (T.route ? posAt(T.route, T.km) : null);
   const time = () => MR.solTime(T.simMin);
@@ -775,7 +788,7 @@
     renderStatus();
   }
   function renderStatus() {
-    const modeTxt = { base: "Base map", plan: "Planning", walk: "On traverse", done: "Mission complete" }[T.mode];
+    const modeTxt = { base: "Base map", plan: "Planning", walk: "On traverse", done: T.aborted ? "Mission aborted" : "Mission complete" }[T.mode];
     $("modePill").textContent = modeTxt; $("modePill").dataset.mode = T.mode; document.body.dataset.mode = T.mode;
     $("clock").textContent = time().label;
     const L = activeRoute() ? activeRoute()[activeRoute().length - 1][2] : 0;
@@ -1271,7 +1284,7 @@
     };
     T.simulationId = uid("sim"); T.simulationStarted = false;
     T.route = MR.withKm(planRoute().map(p => p.slice()));
-    T.mode = "walk"; T.km = 0; T.stages = makeStages(T.route); T.stageIdx = 0; T.playing = false;
+    T.mode = "walk"; T.aborted = false; T.km = 0; T.stages = makeStages(T.route); T.stageIdx = 0; T.playing = false;
     recomputeHazards(); setLeft(false);
     renderAll(); renderRoutes();
     const p = curPos(); MR.Map.centerOn(p[0], p[1], 1.5);
@@ -1412,10 +1425,10 @@
         m.querySelector("[data-c]").addEventListener("click", () => { closeModal(); back && back(); });
         m.querySelector("[data-y]").addEventListener("click", () => {
           closeModal(); logSys(`Misión abortada en km ${fmt(T.km)}. Regreso a la base.`);
-          T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Misión abortada" });
-          Object.assign(T, { mode: "base", route: null, km: 0, playing: false, adjusted: null, choice: "model", briefed: false, handled: {}, flags: {} });
-          T.unread.misiones = 1; renderAll(true); MR.Map.fit();
-          banner({ kind: "warn", title: "Misión abortada", sub: "De vuelta en el mapa base. Abre Misiones para retomar.", ttl: 6000 });
+          T.events.push({ t: T.simMin, c: "var(--danger)", txt: "Mission aborted" });
+          T.aborted = true; T.mode = "done"; T.playing = false;
+          renderAll(true);
+          openSummary();
         });
       },
     });
@@ -1472,6 +1485,7 @@
   function stageCard(kind, incident = null) {
     T.playing = false; renderStatus();
     if (kind === "stage" && incident) {
+      T.alerts++;
       T.events.push({ t: T.simMin, c: "var(--danger)", txt: `Incident: ${incident.title}` });
       logSys(`Unexpected incident: ${incident.title}. The planned route is blocked.`);
     }
@@ -1533,6 +1547,7 @@
     const p = curPos(), goal = goalObj();
     if (!p || !goal) return toast("Unable to determine the current position or destination.");
     const start = [p[0], p[1]], finish = [goal.lon, goal.lat];
+    const beforeStats = MR.routeStats(routeFromKm(T.route, T.km));
     const routeEndKm = T.route[T.route.length - 1][2];
     const remainingKm = Math.max(0, routeEndKm - T.km);
     const blockedKm = T.km + Math.min(3, remainingKm * 0.5);
@@ -1548,6 +1563,7 @@
     const prefixKm = MR.withKm(prefix)[prefix.length - 1][2];
     T.route = MR.withKm(prefix.concat(remainder.slice(1)));
     T.km = prefixKm;
+    const afterStats = MR.routeStats(routeFromKm(T.route, T.km));
     T.stages = makeStages(T.route);
     T.stageIdx = Math.max(0, T.stages.findIndex(k => k > T.km + 0.01));
     if (T.stageIdx < 0) T.stageIdx = T.stages.length;
@@ -1560,7 +1576,30 @@
     afterRouteChange();
     renderStatus();
     logSys(`Route recalculated after incident: ${incident.title}. New segment checkpoints: ${T.stages.filter(k => k > T.km + 0.01).length}.`);
-    banner({ kind: "ok", title: "Route recalculated", sub: `A safer detour is ready. ${T.stages.filter(k => k > T.km + 0.01).length} new segment checkpoints were planned. Select Start simulation to continue.`, ttl: 6500 });
+    T.events.push({ t: T.simMin, c: "var(--accent)", txt: "Route recalculated after incident" });
+    showReplanReport(incident, beforeStats, afterStats);
+  }
+  function showReplanReport(incident, before, after) {
+    const rows = [
+      ["Remaining distance", `${fmt(before.length, 1)} km`, `${fmt(after.length, 1)} km`],
+      ["Estimated travel time", `${fmt(before.hours, 1)} h`, `${fmt(after.hours, 1)} h`],
+      ["Mean slope", `${fmt(before.meanSlope, 1)}°`, `${fmt(after.meanSlope, 1)}°`],
+      ["Maximum slope", `${fmt(before.maxSlope, 1)}°`, `${fmt(after.maxSlope, 1)}°`],
+      ["Mean roughness", `${fmt(before.meanRough, 1)} m`, `${fmt(after.meanRough, 1)} m`],
+      ["Mean traversability", fmt(before.meanTrav, 2), fmt(after.meanTrav, 2)],
+    ];
+    showModal(`<div class="mhead"><div class="tag-line"><span class="tg alert">Route replanned</span></div><h2>${esc(incident.title)}</h2>
+      <p class="who">${esc(incident.detail)} The blocked area was excluded from the new route.</p></div>
+      <div class="mbody"><p class="desc">Remaining-route comparison</p><table class="cmp"><thead><tr><th>Metric</th><th>Before blockage</th><th>New detour</th></tr></thead>
+        <tbody>${rows.map(([label, oldValue, newValue]) => `<tr><th scope="row">${label}</th><td>${oldValue}</td><td>${newValue}</td></tr>`).join("")}</tbody></table>
+        <p class="who" style="margin-top:12px">${T.stages.filter(k => k > T.km + 0.01).length} new segment checkpoints were planned. Choose whether to continue along the detour or abort the mission.</p>
+        <div class="actions"><button class="btn danger" data-abort>Abort mission</button><button class="btn primary" data-continue>Continue on detour</button></div></div>`, {
+      dismiss: false,
+      bind: modal => {
+        modal.querySelector("[data-continue]").addEventListener("click", () => { closeModal(); T.playing = true; renderStatus(); });
+        modal.querySelector("[data-abort]").addEventListener("click", () => { closeModal(); confirmAbort(); });
+      },
+    });
   }
   function restUntilMorning() {
     $("stageCard").hidden = true;
@@ -1686,7 +1725,7 @@
     if (prev || force) renderLive(true);
   }
   function arrive() {
-    T.playing = false; T.mode = "done"; T.km = T.route[T.route.length - 1][2];
+    T.playing = false; T.mode = "done"; T.aborted = false; T.km = T.route[T.route.length - 1][2];
     T.events.push({ t: T.simMin, c: "var(--nominal)", txt: "Meta alcanzada" });
     logSys(`Meta alcanzada: ${goalObj().name}.`);
     sendToEarth(`Llegamos a la meta: ${goalObj().name}. Coordenadas confirmadas.`, [goalObj().lon, goalObj().lat], "estado");
@@ -2226,23 +2265,35 @@
      VISTA COMPLETA — Resumen automático
      ===================================================== */
   function openSummary() {
-    const el = $("summary"), R = T.route, st = MR.routeStats(R, T.mobility);
+    const el = $("summary"), fullRoute = T.route, R = T.aborted ? routeThroughKm(fullRoute, T.km) : fullRoute;
+    const st = MR.routeStats(R), planned = MR.routeStats(fullRoute);
     const sols = Math.floor(T.simMin / 1440) + 1, sec = T.missions.filter(m => m.status === "completada").length;
     const hrs = (T.simMin - EVA_START * 60) / 60;
-    el.innerHTML = `<header class="fv-head"><button class="btn" data-back>↩ Volver al mapa</button><div><h2>Resumen de la misión</h2><div class="sub">${T.crew.short} · ${T.crew.role}</div></div></header>
+    const checkpoints = T.stages.length, completed = Math.min(T.stageIdx, checkpoints), progress = checkpoints ? Math.min(100, T.km / Math.max(0.001, planned.length) * 100) : 0;
+    const segmentBars = Array.from({ length: Math.max(1, checkpoints) }, (_, i) => `<span class="${i < completed ? "done" : ""}" title="Segment ${i + 1}: ${i < completed ? "completed" : "not completed"}"></span>`).join("");
+    const statusTitle = T.aborted ? "Mission aborted" : "Mission complete";
+    const statusDetail = T.aborted
+      ? `${fmt(T.km, 1)} of ${fmt(planned.length, 1)} km completed · mission stopped at ${time().label}`
+      : `${esc(T.crew.title)} · destination reached at ${time().label}`;
+    el.innerHTML = `<header class="fv-head"><button class="btn" data-back>↩ Back to map</button><div><h2>Mission report</h2><div class="sub">${T.crew.short} · ${T.crew.role}</div></div></header>
       <div class="fv-body"><div class="sum-hero"><div>
-        <h1><span class="ok">${MR.ICONS.ok}</span>Misión completada</h1>
-        <p style="color:var(--text-2);font-size:16px;margin:0">${esc(T.crew.title)} · llegada ${time().label}</p>
+        <h1><span class="ok" style="${T.aborted ? "background:var(--danger)" : ""}">${T.aborted ? MR.ICONS.warn : MR.ICONS.ok}</span>${statusTitle}</h1>
+        <p style="color:var(--text-2);font-size:16px;margin:0">${statusDetail}</p>
         <div class="sum-stats">
-          <div class="stat"><span class="v num">${fmt(st.length, 1)}</span><span class="k">km recorridos</span></div>
-          <div class="stat"><span class="v num">${sols}</span><span class="k">${sols === 1 ? "sol" : "soles"} (${fmt(hrs, 0)} h)</span></div>
-          <div class="stat"><span class="v num">+${fmt(st.maxElev - R[0][3], 0)}</span><span class="k">m de desnivel</span></div>
-          <div class="stat"><span class="v num">${T.findings.length}</span><span class="k">hallazgos</span></div>
-          <div class="stat"><span class="v num">${sec}</span><span class="k">secundarias completadas</span></div>
-          <div class="stat"><span class="v num">${T.alerts}</span><span class="k">alertas atendidas · ${T.detours} desvíos</span></div></div>
-        <div class="actions" style="display:flex;gap:8px"><button class="btn primary" data-new>Nueva misión</button><button class="btn" data-log>Ver bitácora</button></div>
-        <h3 style="margin:24px 0 10px;font-size:15px">Línea de tiempo</h3><ol class="timeline"></ol></div>
-        <div><div class="sum-map"><img alt="Mapa del recorrido" src="assets/basemap_${S.base === "thermal" ? "relief" : S.base}.jpg"><svg viewBox="0 0 1200 1200" aria-hidden="true"></svg></div>
+          <div class="stat"><span class="v num">${fmt(st.length, 1)}</span><span class="k">km traveled</span></div>
+          <div class="stat"><span class="v num">${fmt(planned.length, 1)}</span><span class="k">km planned</span></div>
+          <div class="stat"><span class="v num">${sols}</span><span class="k">${sols === 1 ? "sol" : "sols"} · ${fmt(hrs, 1)} h elapsed</span></div>
+          <div class="stat"><span class="v num">${fmt(st.gain, 0)} m</span><span class="k">elevation gain</span></div>
+          <div class="stat"><span class="v num">${fmt(st.meanSlope, 1)}°</span><span class="k">mean slope · max ${fmt(st.maxSlope, 1)}°</span></div>
+          <div class="stat"><span class="v num">${fmt(st.meanRough, 1)} m</span><span class="k">mean roughness</span></div>
+          <div class="stat"><span class="v num">${fmt(st.meanTrav, 2)}</span><span class="k">mean traversability</span></div>
+          <div class="stat"><span class="v num">${T.findings.length}</span><span class="k">findings</span></div>
+          <div class="stat"><span class="v num">${T.alerts} · ${T.detours}</span><span class="k">alerts · detours</span></div>
+          <div class="stat"><span class="v num">${sec}</span><span class="k">secondary missions completed</span></div></div>
+        <div class="card" style="margin:14px 0"><h3>Segment checkpoints</h3><p class="desc">${completed} of ${checkpoints} segments completed · ${fmt(progress, 0)}% of the planned distance</p><div class="stages" style="grid-template-columns:repeat(${Math.max(1, checkpoints)},1fr)">${segmentBars}</div></div>
+        <div class="actions" style="display:flex;gap:8px"><button class="btn primary" data-new>New mission</button><button class="btn" data-log>View logbook</button></div>
+        <h3 style="margin:24px 0 10px;font-size:15px">Mission timeline</h3><ol class="timeline"></ol></div>
+        <div><div class="sum-map"><img alt="Map of the traveled route" src="assets/basemap_${S.base === "thermal" ? "relief" : S.base}.jpg"><svg viewBox="0 0 1200 1200" aria-hidden="true"></svg></div>
         <div class="profile" style="margin-top:12px;height:150px" id="sumProfile"></div></div></div></div>`;
     const svg = el.querySelector(".sum-map svg"); const NS = "http://www.w3.org/2000/svg";
     const xs = R.map(p => MR.toWorld(p[0], p[1]));
@@ -2268,7 +2319,11 @@
       li.innerHTML = `<time>${MR.solTime(e.t).label}</time><span></span>`; li.querySelector("span").textContent = e.txt; ol.appendChild(li);
     });
     el.hidden = false;
-    MR.profileChart($("sumProfile"), R, { stages: T.stages, hazards: T.hazards });
+    if (R.length > 1 && R[R.length - 1][2] > 0.001) {
+      MR.profileChart($("sumProfile"), R, { stages: T.stages.filter(k => k <= R[R.length - 1][2] + 0.01), hazards: MR.hazardZones(R) });
+    } else {
+      $("sumProfile").innerHTML = '<p class="desc">No traverse distance was recorded.</p>';
+    }
     el.querySelector("[data-back]").addEventListener("click", () => (el.hidden = true));
     el.querySelector("[data-log]").addEventListener("click", () => { el.hidden = true; togglePanel("bitacora", "tierra"); });
     el.querySelector("[data-new]").addEventListener("click", () => {
