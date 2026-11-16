@@ -1,0 +1,13 @@
+.hyperframes/
+.thumbnails/
+.transcode-cache/
+node_modules/
+renders/
+assets/*.webm
+assets/*-salvaged.mp4
+assets/*-still.png
+!assets/relief-still.png
+!assets/planning-still.png
+!assets/eva-still.png
+__pycache__/
+

@@ -1,0 +1,27 @@
+<template>
+<style>
+#root {position:absolute;inset:0;background:#080808;color:#ffffff;font-family:Inter;overflow:hidden}
+.frame {position:absolute;left:0;top:0;width:1920px;height:810px;overflow:hidden;background:#141414}
+.camera {position:absolute;inset:0;transform-origin:60% 45%}
+video,img {width:1440px;height:810px;object-fit:contain;position:absolute;top:0;left:240px}
+.copy {position:absolute;left:112px;top:846px;right:112px}
+.label {font-size:30px;letter-spacing:3px;color:#ff765f;font-weight:700;margin-bottom:10px}
+h1 {font-size:76px;letter-spacing:-3px;line-height:1.1;margin:0;font-weight:700}
+.sub {font-size:30px;margin:14px 0 0;color:#d9d9d9}
+.rail {position:absolute;left:0;top:810px;height:6px;width:1920px;background:#fc3d21;transform-origin:left center}
+</style>
+<div id="root" data-composition-id="weather" data-width="1920" data-height="1080">
+ <div class="frame" data-layout-allow-overflow><div class="camera" id="weather-camera">
+ <video id="weather-footage" class="clip" src="assets/weather.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video></div></div>
+ <div class="rail" id="weather-rail" data-layout-ignore></div>
+ <div class="copy" id="weather-copy"><div class="label">06 / ESCENARIOS AMBIENTALES</div><h1>Observa. Evalúa. Decide</h1><p class="sub">Tormenta hipotética · alertas y pausa de simulación</p></div>
+</div>
+<script>
+const tl=gsap.timeline({paused:true});
+tl.fromTo('#weather-camera',{scale:1.12,x:30},{scale:1,x:0,duration:0.65,ease:'power3.out'},0);
+tl.fromTo('#weather-copy',{y:24,opacity:0},{y:0,opacity:1,duration:0.45,ease:'power3.out'},0.12);
+tl.fromTo('#weather-rail',{scaleX:0},{scaleX:1,duration:0.7,ease:'power3.inOut'},0);
+tl.fromTo('#weather-camera',{scale:1,x:0},{scale:1.18,x:0,duration:0.7,ease:'power3.inOut',immediateRender:false},1.6);
+tl.to('#weather-camera',{scale:1,x:0,duration:0.7,ease:'power3.inOut'},5.5);
+window.__timelines['weather']=tl;
+</script></template>
